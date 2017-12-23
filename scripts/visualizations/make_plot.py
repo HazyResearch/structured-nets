@@ -2,10 +2,10 @@ import matplotlib.pyplot as plt
 import pickle as pkl
 import numpy as np
 
-n_iters = 1000
+n_iters = 20000
 step = 100
 n = 50
-mom = 0.9
+mom = 0.99
 prefix = '../../results/mom'
 
 xs = np.arange(0, n_iters, step)

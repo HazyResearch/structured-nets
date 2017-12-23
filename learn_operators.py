@@ -58,10 +58,8 @@ def learn_operators(M, A_mask, B_mask, test_X, test_Y, r, steps=10, batch_size=1
 	H = tf.Variable(tf.truncated_normal([n, r], stddev=0.01, dtype=tf.float64))
 
 	if init == 'toeplitz':
-		T_A = gen_Z_f(m, -1)
-		T_B = gen_Z_f(n, 1)
-		A = tf.Variable(T_A)
-		B = tf.Variable(T_B)
+		A = tf.Variable(gen_Z_f(m, -1))
+		B = tf.Variable(gen_Z_f(n, 1))
 	else:
 		A = tf.Variable(tf.truncated_normal([m, m], stddev=0.01, dtype=tf.float64))
 		B = tf.Variable(tf.truncated_normal([n, n], stddev=0.01, dtype=tf.float64))	

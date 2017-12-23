@@ -8,13 +8,15 @@ from fixed_operators import *
 from utils import *
 import pickle as pkl
 
-n = 50 # Matrix is n x n 
+np.random.seed(0)
+
+n = 50 # True matrix is n x n 
 true_transform = 'toeplitz' # Must be 'toeplitz', 'hankel', 'vandermonde', 'cauchy', or 'random'
 M = gen_matrix(n, true_transform)
 steps = 20000
 batch_size = 50
 test_size = 1000
-momentum = 0.9 
+momentum = 0.99
 learn_rate = 1e-5 
 displacement_rank = 2 
 results_dir = '../../results/'
