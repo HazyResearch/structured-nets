@@ -20,39 +20,38 @@ def gen_trid_corner_mask(n):
 	return mask
 
 def gen_Z_f(m, f):
-  I_m = np.eye(m-1, m-1)
-  Z_f = np.hstack((I_m, np.zeros((m-1, 1))))
-  Z_f = np.vstack((np.zeros((1, m)), Z_f)) 
-  Z_f[0, -1] = f
-  return Z_f
+	I_m = np.eye(m-1, m-1)
+	Z_f = np.hstack((I_m, np.zeros((m-1, 1))))
+	Z_f = np.vstack((np.zeros((1, m)), Z_f)) 
+	Z_f[0, -1] = f
+	return Z_f
 
 def gen_f_mask(f, m,n):
-  mask = np.ones((m, n))
-  f_mask = f*mask
+	mask = np.ones((m, n))
+	f_mask = f*mask
 
-  # Set lower triangular indices to 1: 1 if row>=col
-  il1 = np.tril_indices(n=f_mask.shape[0], m=f_mask.shape[1])
-  f_mask[il1] = 1 
-  f_mask = tf.constant(f_mask, dtype=tf.float64)
+	# Set lower triangular indices to 1: 1 if row>=col
+	il1 = np.tril_indices(n=f_mask.shape[0], m=f_mask.shape[1])
+	f_mask[il1] = 1 
+	f_mask = tf.constant(f_mask, dtype=tf.float64)
 
-  return f_mask
+	return f_mask
 
 def gen_index_arr(n):
-  r = np.arange(0, n)
-  a = np.expand_dims(r, -1)
-  b = np.expand_dims(-r, 0)
+	r = np.arange(0, n)
+	a = np.expand_dims(r, -1)
+	b = np.expand_dims(-r, 0)
 
-  index = a+b
-  
-  # Create mask
-  pos = (index < 0)
+	index = a+b
 
-  antipos = 1-pos
+	# Create mask
+	pos = (index < 0)
 
-  updated = np.multiply(antipos, index) + np.multiply(pos, index+n)
+	antipos = 1-pos
 
-  return np.expand_dims(updated, -1)
+	updated = np.multiply(antipos, index) + np.multiply(pos, index+n)
 
+	return np.expand_dims(updated, -1)
 
 def gen_matrix(n, prefix):
 	if prefix == 'toeplitz':
@@ -121,58 +120,58 @@ def sylvester_project(M, A, B, r):
 	return M_class
 
 def circulant_tf(vec, index_arr, mask=None):
-  # Slice 2D
-  output = tf.gather_nd(vec, index_arr)
+	# Slice 2D
+	output = tf.gather_nd(vec, index_arr)
 
-  # Apply mask
-  if mask is not None:
-    output = tf.multiply(output, mask)
+	# Apply mask
+	if mask is not None:
+		output = tf.multiply(output, mask)
 
-  return output
+	return output
 
 # Shape of stack_circ: (v.size, n)
 def circulant_mn_tf(v, index_arr, n, num_reps, f_mask):
-  circ_v = circulant_tf(v, index_arr)
+	circ_v = circulant_tf(v, index_arr)
 
-  multiples = tf.constant([1, num_reps]) 
- 
-  stack_circ = tf.tile(circ_v, multiples)
-  stack_circ = tf.cast(stack_circ[:, 0:n], tf.float64)
+	multiples = tf.constant([1, num_reps]) 
 
-  # Element-wise multiplication
-  masked = tf.multiply(f_mask, stack_circ)
+	stack_circ = tf.tile(circ_v, multiples)
+	stack_circ = tf.cast(stack_circ[:, 0:n], tf.float64)
 
-  return masked  
+	# Element-wise multiplication
+	masked = tf.multiply(f_mask, stack_circ)
+
+	return masked  
 
 def krylov_tf(A, v, n):
-  v_exp = tf.expand_dims(v,1)
-  cols = [v_exp]
-  this_pow = A
+	v_exp = tf.expand_dims(v,1)
+	cols = [v_exp]
+	this_pow = A
 
-  for i in range(n-1):
-    this_col = tf.matmul(this_pow, v_exp)
+	for i in range(n-1):
+		this_col = tf.matmul(this_pow, v_exp)
 
-    this_pow = tf.matmul(A, this_pow)
+		this_pow = tf.matmul(A, this_pow)
 
-    cols.append(this_col)
+		cols.append(this_col)
 
-  K = tf.stack(cols)
-  return tf.squeeze(K)
+		K = tf.stack(cols)
+	return tf.squeeze(K)
 
 
 def V_mn(v, m, n):
-  # Stack columns
-  # First col: ones
-  # Second col: v
-  # Subsequent cols: v^{c-1}
-  ones = tf.ones([m], dtype=tf.float64)
+	# Stack columns
+	# First col: ones
+	# Second col: v
+	# Subsequent cols: v^{c-1}
+	ones = tf.ones([m], dtype=tf.float64)
 
-  cols = [ones, v]
+	cols = [ones, v]
 
-  for i in range(n-2):
-    this_col = tf.pow(v, i+2)
-    cols.append(this_col)
+	for i in range(n-2):
+		this_col = tf.pow(v, i+2)
+		cols.append(this_col)
 
-  V = tf.transpose(tf.stack(cols))
+	V = tf.transpose(tf.stack(cols))
 
-  return tf.cast(V, tf.float64)
+	return tf.cast(V, tf.float64)
