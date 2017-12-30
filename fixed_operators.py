@@ -4,7 +4,7 @@ from utils import *
 from reconstruction import *
 
 def vandermonde_like(M, test_X, test_Y, r, steps=10, batch_size=100, lr=0.002, mom=0.9, 
-	test_freq=100, verbose=False):
+		penalty_weight=0.0, init='toeplitz', constraint_type=None, test_freq=100, verbose=False):
 
 	assert M.shape[0] == M.shape[1]
 	n = M.shape[0]
@@ -54,7 +54,8 @@ def vandermonde_like(M, test_X, test_Y, r, steps=10, batch_size=100, lr=0.002, m
 
 	return losses
 
-def hankel_like(M, test_X, test_Y, r, steps=10, batch_size=100, lr=0.1, mom=0.9, test_freq=100, verbose=False):
+def hankel_like(M, test_X, test_Y, r, steps=10, batch_size=100, lr=0.1, mom=0.9, 
+		penalty_weight=0.0, init='toeplitz', constraint_type=None, test_freq=100, verbose=False):
 	f_H = 0
 	g_H = 1
 
@@ -114,7 +115,7 @@ def hankel_like(M, test_X, test_Y, r, steps=10, batch_size=100, lr=0.1, mom=0.9,
 	return losses
 
 def toeplitz_like(M, test_X, test_Y, r, steps=10, batch_size=100, lr=0.002, mom=0.9, 
-	test_freq=100, verbose=False):
+		penalty_weight=0.0, init='toeplitz', constraint_type=None, test_freq=100, verbose=False):
 
 	A = gen_Z_f(M.shape[0], 1)
 	B = gen_Z_f(M.shape[1], -1)
