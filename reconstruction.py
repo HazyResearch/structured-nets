@@ -4,16 +4,13 @@ from utils import *
 # Implements inversion in Theorem 2.2 in NIPS '15 paper.
 def general_tf(A, B, G, H, r, m, n):
   M = tf.zeros([m,n], dtype=tf.float64)
-  Jh = tf.reverse(H, [0])
 
   for i in range(r):
     K_A_g = krylov_tf(A, G[:, i], m)
-
-
-    K_B_h = krylov_tf(B, Jh[:, i], n)
+    K_B_h = tf.transpose(krylov_tf(tf.transpose(B), H[:, i], n))
 
     this_prod = tf.matmul(K_A_g, K_B_h)
-    M = tf.add(M, tf.transpose(this_prod))
+    M = tf.add(M, this_prod)
 
   return 0.5*M
 
