@@ -10,7 +10,7 @@ np.random.seed(0)
 
 # Unconstrained SGD
 def unconstrained(M, test_X, test_Y, r, steps=10, batch_size=100, lr=0.002, mom=0.9, 
-		penalty_weight=0.0, init=None, test_freq=100, verbose=False):
+		penalty_weight=0.0, init=None, constraint_type=None, test_freq=100, verbose=False):
 	m = M.shape[0]
 	n = M.shape[1]
 
