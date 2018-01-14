@@ -1,47 +1,55 @@
 """
 Compare learned and fixed operators.
 """
-import sys, os
+import sys, os, datetime
+import pickle as pkl
 sys.path.insert(0, '../../')
-from learn_operators import *
+from learned_operators import *
 from fixed_operators import *
 from utils import *
-import pickle as pkl
+from model_params import ModelParams
+from dataset import Dataset
 
-np.random.seed(0)
-n = 50 # True matrix is n x n 
+n = 784
+out_size = 10
+num_layers = 1
+loss = 'cross_entropy'
 steps = 20000
 batch_size = 50
 test_size = 1000
-momentum = 0.99
-penalty_weight=20.0
-learn_rate = 1e-5
-displacement_rank = 2
-results_dir = '../../results/'
+momentums = [0.9]
+learn_rate = 0.002#1e-4
+displacement_rank = 1#2
+learn_corner = True
+n_diag_learneds = [0]#[1,2,5]
 init_type = 'toeplitz'
+test_freq = 100
+results_dir = '../../results/'
 
-# TODO: create separate results directory for each experiment, with timestamp
-# TODO: log settings + git commit ID
+test_fns = [circulant_sparsity]#[toeplitz_like, hankel_like, vandermonde_like, unconstrained] 
+dataset = Dataset('mnist')
 
-# Various settings to test
-test_fns = [unconstrained, tridiagonal_corner, circulant_sparsity, toeplitz_like, vandermonde_like, hankel_like]
-true_transforms = ['toeplitz', 'hankel', 'vandermonde', 'random', 'cauchy', 'tridiag_corner', 'circ_sparsity']
-constraint_types = ['project', 'project+penalty', 'penalty', 'none']
+# Iterate over 
+for mom in momentums:
+	for n_diag_learned in n_diag_learneds:
+		for fn in test_fns:
 
-# Create results dir
-if not os.path.exists(results_dir):
-    os.makedirs(results_dir)
+			# Current Toeplitz-like is a special case: inversion assumes Sylvester type displacement
+			disp_type = 'stein'
+			if fn.__name__ == 'toeplitz_like':
+				disp_type = 'sylvester'
 
-for true_transform in true_transforms:
-	M = gen_matrix(n, true_transform)
-	
-	fullprefix = results_dir + 'mom' + str(momentum) + '_' + true_transform
-	test_X, test_Y = gen_batch(M, test_size)
+			params = ModelParams(n, out_size, num_layers, loss, displacement_rank, steps, batch_size, 
+					learn_rate, mom, init_type, fn.__name__, disp_type, learn_corner, n_diag_learned)
+			
+			# Save params + git commit ID
+			this_results_dir = params.save(results_dir)
 
-	for fn in test_fns:
-		for constraint_type in constraint_types:
-			out_loc = fullprefix + '_' + fn.__name__ + '_losses_' + constraint_type + '_' + str(n) +'.p'
-			losses = fn(M, test_X, test_Y, displacement_rank, steps, batch_size, learn_rate, 
-				momentum, penalty_weight, init_type, constraint_type)
-			pkl.dump(losses, open(out_loc, 'wb'))
-			print 'Saved losses for ' + fn.__name__ + ' ' + constraint_type + ' to: ' + out_loc
+			losses, accuracies = fn(dataset, params, test_freq)
+
+			out_loc = os.path.join(this_results_dir, fn.__name__)
+			pkl.dump(losses, open(out_loc + '_losses.p', 'wb'))
+			pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'))
+
+			print 'Saved losses and accuracies for ' + fn.__name__ + ' to: ' + out_loc
+
