@@ -1,6 +1,63 @@
 import tensorflow as tf
 from utils import *
 
+def circ_sparsity_recon(G, H, n, r, learn_corner, n_diag_learned):
+  if learn_corner:
+    f_A = tf.Variable([1], dtype=tf.float64)
+    f_B = tf.Variable([-1], dtype=tf.float64)
+  else:
+    f_A = tf.constant([1], dtype=tf.float64)
+    f_B = tf.constant([-1], dtype=tf.float64)
+
+  # diag: first n_learned entries 
+  v_A = None
+  v_B = None
+  if n_diag_learned > 0:
+    v_A = tf.Variable(tf.ones(n_diag_learned, dtype=tf.float64))
+    v_B = tf.Variable(tf.ones(n_diag_learned, dtype=tf.float64))
+
+  scaling_mask = tf.constant(gen_circ_scaling_mask(n))
+
+  f_mask_pattern = tf.constant([[True if j > k else False for j in range(n)] for k in range(n)])
+  all_ones = tf.ones(f_mask_pattern.get_shape(), dtype=tf.float64)
+
+  f_A_mask = tf.where(f_mask_pattern, f_A*all_ones, all_ones)
+  f_B_mask = tf.where(f_mask_pattern, f_B*all_ones, all_ones)
+
+  # Reconstruct W1 from G and H
+  index_arr = gen_index_arr(n)
+
+  W1 = tf.zeros([n, n], dtype=tf.float64)
+  for i in range(r):
+    prod = circ_sparsity_recon_rank1(n, v_A, v_B, G[:, i], H[:, i], f_A_mask, f_B_mask, scaling_mask, index_arr, n_diag_learned)
+    W1 = tf.add(W1, prod)
+
+  # Compute a and b
+  a = f_A
+  b = f_B
+  if v_A is not None:
+    a *= tf.reduce_prod(v_A)
+  if v_B is not None:
+    b *= tf.reduce_prod(v_B)
+
+  coeff = 1.0/(1 - a*b)
+
+  #coeff = tf.Print(coeff,[coeff], message="my W1-values:") # <-------- TF PRINT STATMENT
+
+  W1_scaled = tf.scalar_mul(coeff[0], W1)
+
+  return W1_scaled, f_A, f_B, v_A, v_B 
+
+#assumes g and h are vectors.
+#K(Z_f^T, g)*K(Z_f^T, h)^T
+def circ_sparsity_recon_rank1(n, v_A, v_B, g, h, f_A_mask, f_B_mask, scaling_mask, index_arr, num_learned):
+  K1 = krylov_circ_transpose(n, v_A, g, num_learned, f_A_mask, scaling_mask, index_arr)
+  K2 = krylov_circ_transpose(n, v_B, h, num_learned, f_B_mask, scaling_mask, index_arr)
+
+  prod = tf.matmul(K1, tf.transpose(K2))
+
+  return prod
+
 # Implements inversion in Theorem 2.2 in NIPS '15 paper.
 def general_tf(A, B, G, H, r, m, n):
   M = tf.zeros([m,n], dtype=tf.float64)
@@ -47,6 +104,25 @@ def rect_recon_tf(G, H, B, m, n, e, f, r):
   recon_mat_partial = tf.matmul(recon_mat_partial, J_term)
 
   return recon_mat_partial
+
+
+def toep_recon(G, H, n, r):
+  W1 = tf.zeros([n, n], dtype=tf.float64)
+  f = 1
+  g = -1
+  f_mask = tf.constant([[f if j > k else 1 for j in range(n)] for k in range(n)], dtype=tf.float64)
+  g_mask = tf.constant([[g if j > k else 1 for j in range(n)] for k in range(n)], dtype=tf.float64)
+  index_arr = gen_index_arr(n)
+
+  for i in range(r):
+    Z_g_i = circulant_tf(G[:, i], index_arr, f_mask)
+    Z_h_i = circulant_tf(tf.reverse(H[:, i], tf.constant([0])), index_arr, g_mask)
+    prod = tf.matmul(Z_g_i, Z_h_i)
+    W1 = tf.add(W1, prod)
+
+  W1 = tf.scalar_mul(0.5, W1)
+
+  return W1
 
 
 # Pan's Vandermonde specific reconstruction.

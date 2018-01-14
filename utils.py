@@ -2,29 +2,93 @@ from scipy.linalg import toeplitz, circulant, solve_sylvester
 from scipy.sparse import diags
 import numpy as np
 import tensorflow as tf
-import time
+import time, subprocess
 
-def gen_init_operators(init, m, n):
-	if init == 'toeplitz':
-		A = tf.Variable(gen_Z_f(m, 1))
-		B = tf.Variable(gen_Z_f(n, -1))
-	elif init == 'hankel':
-		A = tf.Variable(gen_Z_f(m, 1))
-		B = tf.Variable(gen_Z_f(n, 0).T)
-	elif init == 't+h':
-		A = tf.Variable(gen_Z_f(m, 0) + gen_Z_f(m, 0).T)
-		B = tf.Variable(gen_Z_f(n, 0) + gen_Z_f(n, 0).T)
-	elif init == 'vandermonde':
-		v = np.random.random(n)
-		A = tf.Variable(np.diag(v))
-		B = tf.Variable(gen_Z_f(n, 0))
-	elif init == 'random':
-		A = tf.Variable(tf.truncated_normal([m, m], stddev=0.01, dtype=tf.float64))
-		B = tf.Variable(tf.truncated_normal([n, n], stddev=0.01, dtype=tf.float64))	
+# Returns loss, accuracy
+def compute_loss_and_accuracy(y, y_, params):
+	if params.loss == 'mse':
+		mse = tf.reduce_mean(tf.squared_difference(y, y_))
+		return mse, tf.constant([0])
+	elif params.loss == 'cross_entropy':
+		cross_entropy = tf.reduce_mean(
+		  tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y))
+
+		# Get prediction
+		correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
+		accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+		return cross_entropy, accuracy
 	else:
-		print 'Init type ' + prefix + ' not supported'
+		print 'Not supported: ', params.loss
+		assert 0
+
+
+def compute_y(x, W1, params):
+	if params.num_layers==0:
+		y = tf.matmul(x, W1)
+		return y
+	elif params.num_layers==1:
+		b1 = tf.Variable(tf.truncated_normal([params.n], stddev=0.01, dtype=tf.float64))
+		W2 = tf.Variable(tf.truncated_normal([params.n, params.out_size], stddev=0.01, dtype=tf.float64))
+		b2 = tf.Variable(tf.truncated_normal([params.out_size], stddev=0.01, dtype=tf.float64))
+		xW = tf.matmul(x, W1)
+
+		h = tf.nn.relu(xW + b1)
+		y = tf.matmul(h, W2) + b2
+		return y
+	else:
+		print 'Not supported: ', params.num_layers
+		assert 0
+
+def get_commit_id():
+	return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'])
+
+# Operators for Stein type displacement.
+def gen_sylvester_operators(class_type, m, n):
+	if class_type.startswith('toeplitz'):
+		A = gen_Z_f(m, 1)
+		B = gen_Z_f(n, -1)
+	elif class_type.startswith('hankel'):
+		A = gen_Z_f(m, 1)
+		B = gen_Z_f(n, 0).T
+	elif class_type.startswith('t+h'):
+		A = gen_Z_f(m, 0) + gen_Z_f(m, 0).T
+		B = gen_Z_f(n, 0) + gen_Z_f(n, 0).T
+	elif class_type.startswith('vandermonde'):
+		v = np.random.random(n)
+		A = np.diag(v)
+		B = gen_Z_f(n, 0)
+	elif class_type == 'random':
+		A = np.random.random((m, m))
+		B = np.random.random((n, n))
+	else:
+		print 'Class ' + prefix + ' not supported'
 		assert 0
 	return A,B
+
+# Operators for Stein type displacement.
+def gen_stein_operators(class_type, m, n):
+	if class_type.startswith('toeplitz'):
+		A = gen_Z_f(m, 1).T
+		B = gen_Z_f(n, -1)
+	elif class_type.startswith('hankel'):
+		A = gen_Z_f(m, 1)
+		B = gen_Z_f(n, 0)
+	elif class_type.startswith('vandermonde'):
+		v = np.random.random(n)
+		A = np.diag(v)
+		B = gen_Z_f(n, 0)
+	elif class_type == 'random':
+		A = np.random.random((m, m))
+		B = np.random.random((n, n))
+	else:
+		print 'Class ' + prefix + ' not supported'
+		assert 0
+	return A,B
+
+# Operators for Stein type displacement.
+def gen_stein_operators_tf(init, m, n):
+	A,B = gen_stein_operators(init, m, n)
+	return tf.Variable(A), tf.Variable(B)
 
 def gen_trid_mask(n):
 	ones1 = list(np.ones(n))
@@ -42,12 +106,63 @@ def gen_trid_corner_mask(n):
 
 	return mask
 
+# Circulant sparsity pattern
+def gen_Z_f(m, f, v=None):
+	if v is not None:
+		assert v.size == m-1
+	I_m = np.eye(m-1, m-1)
+	Z_f = np.hstack((I_m, np.zeros((m-1, 1))))
+	Z_f = np.vstack((np.zeros((1, m)), Z_f)) 
+	Z_f[0, -1] = f
+	if v is not None:
+		for i in range(v.size):
+			Z_f[i+1, i] = v[i]
+
+	return Z_f
+
+"""
 def gen_Z_f(m, f):
 	I_m = np.eye(m-1, m-1)
 	Z_f = np.hstack((I_m, np.zeros((m-1, 1))))
 	Z_f = np.vstack((np.zeros((1, m)), Z_f)) 
 	Z_f[0, -1] = f
 	return Z_f
+"""
+
+def gen_circ_scaling_mask(n):
+	M = np.zeros((n,n))
+	for i in range(n-1):
+		M[i, -(i+1):] = 1 #Last i+1
+
+	return np.roll(M, 2, 0).astype(np.bool)
+
+# Shift rows circularly by num_shifts shifts.
+def tf_roll_rows(x, num_shifts):
+	if num_shifts == 0:
+		return x
+
+	x = tf.transpose(x)
+	x_len = x.get_shape().as_list()[1] 
+	y = tf.concat([x[:,x_len-num_shifts:], x[:,:x_len-num_shifts]], axis=1)
+	return tf.transpose(y)
+
+
+# Replace all 0's with 1's
+def update_mask(scale, mask):
+	all_ones = tf.ones(mask.get_shape(), dtype=tf.float64)
+	return tf.where(mask, scale*all_ones, all_ones)
+
+def gen_circ_scaling_tf(x, mask, num_learned):
+	if x is None:
+		return tf.ones(mask.get_shape(), dtype=tf.float64)
+
+	final_mask = update_mask(x[0], mask)
+	for i in np.arange(1, num_learned):
+		# Shift mask
+		shifted_mask = update_mask(x[i], tf_roll_rows(mask, i))
+		final_mask = tf.multiply(final_mask, shifted_mask)
+
+	return final_mask
 
 def gen_f_mask(f, m,n):
 	mask = np.ones((m, n))
@@ -105,7 +220,9 @@ def gen_matrix(n, prefix, r=2):
 		v = np.random.random(n)
 		return np.vander(v, n, increasing=True)
 	elif prefix == 'cauchy':
-		return gen_cauchy(n)
+		s = np.random.random(n)
+		t = np.random.random(n)
+		return 1.0 / (s.reshape((-1,1)) - t)		
 	elif prefix == 'random':
 		return np.random.random((n,n))
 	elif prefix == 'toeplitz-like':
@@ -248,6 +365,26 @@ def circulant_mn_tf(v, index_arr, n, num_reps, f_mask):
 
 	return masked  
 
+# K(Z_f^T, g) = scaling_term*J*Z_f(Jg)
+# x.size == num_learned
+def krylov_circ_transpose(n, x, v, num_learned, f_mask, scaling_mask, index_arr):
+	# Generate mask
+	t2 = time.time()
+	# Get scaling term
+	scale_term = gen_circ_scaling_tf(x, scaling_mask, num_learned)
+	print 'time of gen_circ_scaling_tf', time.time() - t2
+
+	# Call circulant_tf on flipped v
+	t3 = time.time()
+	Z = circulant_tf(tf.reverse(v, [0]), index_arr, f_mask)
+	print 'time of circulant_tf', time.time() - t3
+
+	# Flip row-wise
+	JZ = tf.reverse(Z, [0])
+
+	# Elementwise multiplication by scale_term
+	return tf.multiply(scale_term, JZ)
+
 def krylov_tf(A, v, n):
 	v_exp = tf.expand_dims(v,1)
 	cols = [v_exp]
@@ -261,7 +398,8 @@ def krylov_tf(A, v, n):
 		cols.append(this_col)
 
 		K = tf.stack(cols)
-	return tf.squeeze(K)
+
+	return tf.transpose(tf.squeeze(K))
 
 
 def V_mn(v, m, n):
