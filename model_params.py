@@ -26,13 +26,13 @@ class ModelParams:
 		self.learn_corner = learn_corner
 		self.n_diag_learned = n_diag_learned
 	
-	def save(self, results_dir):
+	def save(self, results_dir, name):
 		# Append git commit ID
 		commit_id = get_commit_id()
 		param_str = commit_id + '\n' + str(self)
 
 		# Make new dir with timestamp
-		this_results_dir = results_dir + str(datetime.datetime.now())
+		this_results_dir = results_dir + name + '_' + str(datetime.datetime.now())
 		if not os.path.exists(this_results_dir):
 		    os.makedirs(this_results_dir)
 

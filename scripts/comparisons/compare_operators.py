@@ -9,6 +9,11 @@ from fixed_operators import *
 from utils import *
 from model_params import ModelParams
 from dataset import Dataset
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("name")
+args = parser.parse_args()
 
 n = 784
 out_size = 10
@@ -18,15 +23,16 @@ steps = 20000
 batch_size = 50
 test_size = 1000
 momentums = [0.9]
-learn_rate = 0.002#1e-4
-displacement_rank = 1#2
+learn_rate = 0.002
+displacement_rank = 1
 learn_corner = True
-n_diag_learneds = [0]#[1,2,5]
+n_diag_learneds = [0]
 init_type = 'toeplitz'
 test_freq = 100
 results_dir = '../../results/'
 
-test_fns = [circulant_sparsity]#[toeplitz_like, hankel_like, vandermonde_like, unconstrained] 
+#Available test_fns: [toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
+test_fns = [circulant_sparsity]  
 dataset = Dataset('mnist')
 
 # Iterate over 
@@ -43,7 +49,7 @@ for mom in momentums:
 					learn_rate, mom, init_type, fn.__name__, disp_type, learn_corner, n_diag_learned)
 			
 			# Save params + git commit ID
-			this_results_dir = params.save(results_dir)
+			this_results_dir = params.save(results_dir, args.name)
 
 			losses, accuracies = fn(dataset, params, test_freq)
 
