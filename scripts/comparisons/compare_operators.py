@@ -19,7 +19,7 @@ n = 784
 out_size = 10
 num_layers = 1
 loss = 'cross_entropy'
-steps = 20000
+steps = 50000
 batch_size = 50
 test_size = 1000
 momentums = [0.9]
@@ -29,7 +29,7 @@ learn_corner = True
 n_diag_learneds = [0]
 init_type = 'toeplitz'
 test_freq = 100
-n_trials = 5
+n_trials = 10
 results_dir = '../../results/'
 
 #Available test_fns: [toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
