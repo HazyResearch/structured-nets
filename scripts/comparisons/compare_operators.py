@@ -29,10 +29,11 @@ learn_corner = True
 n_diag_learneds = [0]
 init_type = 'toeplitz'
 test_freq = 100
+n_trials = 5
 results_dir = '../../results/'
 
 #Available test_fns: [toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
-test_fns = [circulant_sparsity]  
+test_fns = [toeplitz_like]#[circulant_sparsity]  
 dataset = Dataset('mnist')
 
 # Iterate over 
@@ -51,11 +52,12 @@ for mom in momentums:
 			# Save params + git commit ID
 			this_results_dir = params.save(results_dir, args.name)
 
-			losses, accuracies = fn(dataset, params, test_freq)
+			for test_iter in range(n_trials):
+				losses, accuracies = fn(dataset, params, test_freq)
 
-			out_loc = os.path.join(this_results_dir, fn.__name__)
-			pkl.dump(losses, open(out_loc + '_losses.p', 'wb'))
-			pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'))
+				out_loc = os.path.join(this_results_dir, fn.__name__ + str(test_iter))
+				pkl.dump(losses, open(out_loc + '_losses.p', 'wb'))
+				pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'))
 
-			print 'Saved losses and accuracies for ' + fn.__name__ + ' to: ' + out_loc
+				print 'Saved losses and accuracies for ' + fn.__name__ + ' to: ' + out_loc
 
