@@ -26,12 +26,12 @@ momentums = [0.9]
 learn_rate = 0.002
 displacement_rank = 1
 learn_corner = True
-n_diag_learneds = [0]
-init_stddev = 0.01
-init_type = 'toeplitz'
+n_diag_learneds = [5]
+init_stddev = 0.1
+init_type = 'random'
 test_freq = 100
-n_trials = 10
-results_dir = '../../results/'
+n_trials = 5
+results_dir = '/dfs/scratch1/thomasat/results/1_21_18/'
 
 #Available test_fns: [toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
 test_fns = [circulant_sparsity]#[circulant_sparsity]  
