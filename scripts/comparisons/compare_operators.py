@@ -26,6 +26,7 @@ momentums = [0.9]
 learn_rate = 0.002
 displacement_rank = 1
 learn_corner = True
+fix_G = False
 n_diag_learneds = [0]
 init_stddev = 0.01
 init_type = 'toeplitz'
@@ -48,7 +49,8 @@ for mom in momentums:
 				disp_type = 'sylvester'
 
 			params = ModelParams(n, out_size, num_layers, loss, displacement_rank, steps, batch_size, 
-					learn_rate, mom, init_type, fn.__name__, disp_type, learn_corner, n_diag_learned, init_stddev)
+					learn_rate, mom, init_type, fn.__name__, disp_type, learn_corner, n_diag_learned, 
+					init_stddev, fix_G)
 			
 			# Save params + git commit ID
 			this_results_dir = params.save(results_dir, args.name)
