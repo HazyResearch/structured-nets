@@ -3,7 +3,8 @@ import datetime, os
 
 class ModelParams:
 	def __init__(self, n, out_size, num_layers, loss, r, steps, batch_size, 
-			lr, mom, init_type, class_type, disp_type, learn_corner, n_diag_learned, init_stddev):
+			lr, mom, init_type, class_type, disp_type, learn_corner, 
+			n_diag_learned, init_stddev, fix_G):
 		if disp_type not in ['stein', 'sylvester']:
 			print 'Displacement type ' + disp_type + ' not supported'
 			assert 0
@@ -16,6 +17,7 @@ class ModelParams:
 		self.num_layers = num_layers
 		self.loss = loss
 		self.r = r
+		self.fix_G = fix_G
 		self.steps = steps
 		self.batch_size = batch_size
 		self.lr = lr

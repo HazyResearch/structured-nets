@@ -110,17 +110,25 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 
 	return losses, accuracies
 
+"""
+def toeplitz(dataset, params, test_freq=100, verbose=False):
+	# Create the model
+	x = tf.placeholder(tf.float64, [None, params.n])
+
+
+	return 0
+"""
+
 def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	A = gen_Z_f(params.n, 1)
 	B = gen_Z_f(params.n, -1)
 
 	# Create the model
 	x = tf.placeholder(tf.float64, [None, params.n])
-	v = tf.Variable(tf.truncated_normal([params.n], stddev=0.01, dtype=tf.float64))
 	G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 
-	W1 = toep_recon(G, H, params.n, params.r)
+	W1 = toeplitz_like_recon(G, H, params.n, params.r)
 
 	y = compute_y(x, W1, params)
 	
@@ -162,7 +170,7 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	print('SGD final loss, Toeplitz-like: ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
 	print('SGD final accuracy, Toeplitz-like: ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
 
-	return losses, accuracies
+	return losses, accuracies, W1_real
 
 
 def unconstrained(dataset, params, test_freq=100, verbose=False):

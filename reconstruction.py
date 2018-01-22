@@ -120,7 +120,10 @@ def rect_recon_tf(G, H, B, m, n, e, f, r):
   return recon_mat_partial
 
 
-def toep_recon(G, H, n, r):
+def toeplitz_recon(r, c):
+  return 0
+
+def toeplitz_like_recon(G, H, n, r):
   W1 = tf.zeros([n, n], dtype=tf.float64)
   f = 1
   g = -1

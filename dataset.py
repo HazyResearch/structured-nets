@@ -1,7 +1,8 @@
 from tensorflow.examples.tutorials.mnist import input_data
+from utils import *
 
 class Dataset:
-	def __init__(self, name, test_size=1000):
+	def __init__(self, name, n, test_size=1000):
 		self.name = name
 		self.mnist = None
 		self.true_transform = None

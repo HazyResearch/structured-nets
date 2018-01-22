@@ -7,7 +7,10 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 	# Create the model
 	x = tf.placeholder(tf.float64, [None, params.n])
 	v = tf.Variable(tf.truncated_normal([params.n], stddev=0.01, dtype=tf.float64))
-	G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
+	if params.fix_G:
+		G = tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64)
+	else:
+		G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 
 	W1, f_A, f_B, v_A, v_B = circ_sparsity_recon(G, H, params.n, params.r, params.learn_corner, 
