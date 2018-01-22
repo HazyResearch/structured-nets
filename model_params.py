@@ -3,7 +3,7 @@ import datetime, os
 
 class ModelParams:
 	def __init__(self, n, out_size, num_layers, loss, r, steps, batch_size, 
-			lr, mom, init_type, class_type, disp_type, learn_corner, n_diag_learned):
+			lr, mom, init_type, class_type, disp_type, learn_corner, n_diag_learned, init_stddev):
 		if disp_type not in ['stein', 'sylvester']:
 			print 'Displacement type ' + disp_type + ' not supported'
 			assert 0
@@ -25,6 +25,7 @@ class ModelParams:
 		self.class_type = class_type
 		self.learn_corner = learn_corner
 		self.n_diag_learned = n_diag_learned
+		self.init_stddev = init_stddev
 	
 	def save(self, results_dir, name):
 		# Append git commit ID

@@ -27,13 +27,14 @@ learn_rate = 0.002
 displacement_rank = 1
 learn_corner = True
 n_diag_learneds = [0]
+init_stddev = 0.01
 init_type = 'toeplitz'
 test_freq = 100
 n_trials = 10
 results_dir = '../../results/'
 
 #Available test_fns: [toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
-test_fns = [toeplitz_like]#[circulant_sparsity]  
+test_fns = [circulant_sparsity]#[circulant_sparsity]  
 dataset = Dataset('mnist')
 
 # Iterate over 
@@ -47,7 +48,7 @@ for mom in momentums:
 				disp_type = 'sylvester'
 
 			params = ModelParams(n, out_size, num_layers, loss, displacement_rank, steps, batch_size, 
-					learn_rate, mom, init_type, fn.__name__, disp_type, learn_corner, n_diag_learned)
+					learn_rate, mom, init_type, fn.__name__, disp_type, learn_corner, n_diag_learned, init_stddev)
 			
 			# Save params + git commit ID
 			this_results_dir = params.save(results_dir, args.name)

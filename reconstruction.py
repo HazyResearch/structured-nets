@@ -1,10 +1,17 @@
 import tensorflow as tf
 from utils import *
 
-def circ_sparsity_recon(G, H, n, r, learn_corner, n_diag_learned):
+def circ_sparsity_recon(G, H, n, r, learn_corner, n_diag_learned, init_type, stddev):
   if learn_corner:
-    f_A = tf.Variable([1], dtype=tf.float64)
-    f_B = tf.Variable([-1], dtype=tf.float64)
+    if init_type == 'toeplitz':
+      f_A = tf.Variable([1], dtype=tf.float64)
+      f_B = tf.Variable([-1], dtype=tf.float64)
+    elif init_type == 'random':
+      f_A = tf.Variable(tf.truncated_normal([1], stddev=stddev, dtype=tf.float64), dtype=tf.float64)
+      f_B = tf.Variable(tf.truncated_normal([1], stddev=stddev, dtype=tf.float64), dtype=tf.float64)  
+    else:
+      print 'init_type not supported: ', init_type
+      assert 0   
   else:
     f_A = tf.constant([1], dtype=tf.float64)
     f_B = tf.constant([-1], dtype=tf.float64)
@@ -13,8 +20,15 @@ def circ_sparsity_recon(G, H, n, r, learn_corner, n_diag_learned):
   v_A = None
   v_B = None
   if n_diag_learned > 0:
-    v_A = tf.Variable(tf.ones(n_diag_learned, dtype=tf.float64))
-    v_B = tf.Variable(tf.ones(n_diag_learned, dtype=tf.float64))
+    if init_type == 'toeplitz':
+      v_A = tf.Variable(tf.ones(n_diag_learned, dtype=tf.float64))
+      v_B = tf.Variable(tf.ones(n_diag_learned, dtype=tf.float64))
+    elif init_type == 'random':
+      v_A = tf.Variable(tf.truncated_normal([n_diag_learned], stddev=stddev, dtype=tf.float64))
+      v_B = tf.Variable(tf.truncated_normal([n_diag_learned], stddev=stddev, dtype=tf.float64))     
+    else:
+      print 'init_type not supported: ', init_type
+      assert 0  
 
   scaling_mask = tf.constant(gen_circ_scaling_mask(n))
 
