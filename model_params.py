@@ -2,7 +2,7 @@ from utils import *
 import datetime, os
 
 class ModelParams:
-	def __init__(self, n, out_size, num_layers, loss, r, steps, batch_size, 
+	def __init__(self, dataset_name, n, out_size, num_layers, loss, r, steps, batch_size, 
 			lr, mom, init_type, class_type, disp_type, learn_corner, 
 			n_diag_learned, init_stddev, fix_G):
 		if disp_type not in ['stein', 'sylvester']:
@@ -11,7 +11,7 @@ class ModelParams:
 		if class_type not in ['toeplitz_like', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity']:
 			print 'Class type ' + class_type + ' not supported'
 			assert 0
-		
+		self.dataset_name = dataset_name
 		self.n = n
 		self.out_size = out_size
 		self.num_layers = num_layers

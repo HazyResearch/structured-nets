@@ -22,11 +22,11 @@ loss = 'cross_entropy'
 dataset_name = 'mnist_bg_rot'
 steps = 50000
 batch_size = 50
-test_size = 1000
+test_size = 2000
 momentums = [0.9]
 learn_rate = 0.002
 displacement_rank = 1
-learn_corner = False
+learn_corner = True
 fix_G = False
 n_diag_learneds = [0]
 init_stddev = 0.01
@@ -37,8 +37,8 @@ n_trials = 5
 results_dir = '../../results/'#'/dfs/scratch1/thomasat/results/1_21_18/'
 
 #Available test_fns: [toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
-test_fns = [circulant_sparsity]#[circulant_sparsity]  
-dataset = Dataset('mnist')
+test_fns = [toeplitz_like]#[circulant_sparsity]  
+dataset = Dataset(dataset_name, n)
 
 # Iterate over 
 for mom in momentums:

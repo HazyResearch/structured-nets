@@ -108,7 +108,7 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 	print('SGD final loss, Hankel-like: ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
 	print('SGD final accuracy, Hankel-like: ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
 
-	return losses, accuracies
+	return losses, accuracies, W1_real
 
 """
 def toeplitz(dataset, params, test_freq=100, verbose=False):
