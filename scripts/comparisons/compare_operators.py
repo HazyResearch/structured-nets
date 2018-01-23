@@ -19,20 +19,22 @@ n = 784
 out_size = 10
 num_layers = 1
 loss = 'cross_entropy'
+dataset_name = 'mnist_bg_rot'
 steps = 50000
 batch_size = 50
 test_size = 1000
 momentums = [0.9]
 learn_rate = 0.002
 displacement_rank = 1
-learn_corner = True
+learn_corner = False
 fix_G = False
 n_diag_learneds = [0]
 init_stddev = 0.01
 init_type = 'toeplitz'
+init_stddev = 0.1 # For random initialization
 test_freq = 100
-n_trials = 10
-results_dir = '../../results/'
+n_trials = 5
+results_dir = '../../results/'#'/dfs/scratch1/thomasat/results/1_21_18/'
 
 #Available test_fns: [toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
 test_fns = [circulant_sparsity]#[circulant_sparsity]  
@@ -48,7 +50,7 @@ for mom in momentums:
 			if fn.__name__ == 'toeplitz_like':
 				disp_type = 'sylvester'
 
-			params = ModelParams(n, out_size, num_layers, loss, displacement_rank, steps, batch_size, 
+			params = ModelParams(dataset_name, n, out_size, num_layers, loss, displacement_rank, steps, batch_size, 
 					learn_rate, mom, init_type, fn.__name__, disp_type, learn_corner, n_diag_learned, 
 					init_stddev, fix_G)
 			
