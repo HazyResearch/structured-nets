@@ -23,7 +23,7 @@ class Dataset:
 		elif self.name == 'mnist_rand_bg':
 			data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_train.amat'
 			self.load_data(data_loc)
-		elif self.name.startswith('mnist_noise_variation'):
+		elif self.name.startswith('mnist_noise'):
 			idx = self.name[-1]
 			data_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
 			self.load_data(data_loc)
