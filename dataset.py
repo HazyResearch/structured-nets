@@ -51,7 +51,7 @@ class Dataset:
 		elif self.name in ['convex', 'rect', 'rect_images']:
 			return 2
 		else:
-			return n
+			return self.n
 
 	def load_data(self, data_loc):
 		data = np.genfromtxt(data_loc)

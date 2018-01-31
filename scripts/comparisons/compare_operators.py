@@ -15,11 +15,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument("name")
 args = parser.parse_args()
 
-n = 784
+n = 500#784
 num_layers = 1
-loss = 'cross_entropy'
+loss = 'mse'
 # Available datasets: mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
-dataset_name = 'mnist_rand_bg'
+dataset_name = 'true_toeplitz'
 steps = 50000
 batch_size = 50
 test_size = 1000
@@ -28,7 +28,7 @@ learn_rate = 0.002
 displacement_rank = 1
 learn_corner = True
 fix_G = False
-n_diag_learneds = [0]
+n_diag_learneds = [499]
 init_stddev = 0.01
 init_type = 'toeplitz'
 init_stddev = 0.1 # For random initialization
@@ -37,7 +37,7 @@ n_trials = 5
 results_dir = '/dfs/scratch1/thomasat/results/1_27_18/' #'../../results/'#
 
 #Available test_fns: [toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
-test_fns = [toeplitz_like]#[circulant_sparsity]  
+test_fns = [circulant_sparsity]#[circulant_sparsity]  
 dataset = Dataset(dataset_name, n, test_size)
 out_size = dataset.out_size() # 10 for MNIST, 2 for convex, rect, rect_images
 

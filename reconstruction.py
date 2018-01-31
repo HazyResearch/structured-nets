@@ -1,5 +1,6 @@
 import tensorflow as tf
 from utils import *
+import time
 
 def circ_sparsity_recon(G, H, n, r, learn_corner, n_diag_learned, init_type, stddev):
   if learn_corner:
@@ -30,7 +31,11 @@ def circ_sparsity_recon(G, H, n, r, learn_corner, n_diag_learned, init_type, std
       print 'init_type not supported: ', init_type
       assert 0  
 
+  t0 = time.time()
   scaling_mask = tf.constant(gen_circ_scaling_mask(n))
+  print 'time to gen scaling mask: ', time.time() - t0
+
+  t1 = time.time()
 
   f_mask_pattern = tf.constant([[True if j > k else False for j in range(n)] for k in range(n)])
   all_ones = tf.ones(f_mask_pattern.get_shape(), dtype=tf.float64)
@@ -40,10 +45,14 @@ def circ_sparsity_recon(G, H, n, r, learn_corner, n_diag_learned, init_type, std
 
   # Reconstruct W1 from G and H
   index_arr = gen_index_arr(n)
+  print 'time for additional masks: ', time.time() - t1
+
 
   W1 = tf.zeros([n, n], dtype=tf.float64)
   for i in range(r):
+    t = time.time()
     prod = circ_sparsity_recon_rank1(n, v_A, v_B, G[:, i], H[:, i], f_A_mask, f_B_mask, scaling_mask, index_arr, n_diag_learned)
+    print 'time of rank 1 recon: ', time.time() - t
     W1 = tf.add(W1, prod)
 
   # Compute a and b
@@ -65,8 +74,12 @@ def circ_sparsity_recon(G, H, n, r, learn_corner, n_diag_learned, init_type, std
 #assumes g and h are vectors.
 #K(Z_f^T, g)*K(Z_f^T, h)^T
 def circ_sparsity_recon_rank1(n, v_A, v_B, g, h, f_A_mask, f_B_mask, scaling_mask, index_arr, num_learned):
+  t1 = time.time()
   K1 = krylov_circ_transpose(n, v_A, g, num_learned, f_A_mask, scaling_mask, index_arr)
+  t2 = time.time()
   K2 = krylov_circ_transpose(n, v_B, h, num_learned, f_B_mask, scaling_mask, index_arr)
+  print 'time of K(A, g_i): ', t2 - t1
+  print 'time of K(B, h_i): ', time.time() - t2
 
   prod = tf.matmul(K1, tf.transpose(K2))
 

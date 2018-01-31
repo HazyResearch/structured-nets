@@ -137,6 +137,7 @@ def gen_circ_scaling_mask(n):
 	return np.roll(M, 2, 0).astype(np.bool)
 
 # Shift rows circularly by num_shifts shifts.
+# Or just multiply by Z_1 - which is faster?
 def tf_roll_rows(x, num_shifts):
 	if num_shifts == 0:
 		return x
@@ -145,7 +146,6 @@ def tf_roll_rows(x, num_shifts):
 	x_len = x.get_shape().as_list()[1] 
 	y = tf.concat([x[:,x_len-num_shifts:], x[:,:x_len-num_shifts]], axis=1)
 	return tf.transpose(y)
-
 
 # Replace all 0's with 1's
 def update_mask(scale, mask):
@@ -156,12 +156,24 @@ def gen_circ_scaling_tf(x, mask, num_learned):
 	if x is None:
 		return tf.ones(mask.get_shape(), dtype=tf.float64)
 
+	t0 = time.time()
 	final_mask = update_mask(x[0], mask)
+	print 'time of first update_mask call: ', time.time() - t0
+
+	sum_update = 0
+	sum_mult = 0
+
 	for i in np.arange(1, num_learned):
 		# Shift mask
+		t1 = time.time()
 		shifted_mask = update_mask(x[i], tf_roll_rows(mask, i))
+		sum_update += (time.time() - t1)
+		t2 = time.time()
 		final_mask = tf.multiply(final_mask, shifted_mask)
+		sum_mult += (time.time() - t2)
 
+	print 'time of all update_mask calls: ', sum_update
+	print 'time of all tf.multiply calls: ', sum_mult		
 	return final_mask
 
 def gen_f_mask(f, m,n):
@@ -401,6 +413,26 @@ def krylov_tf(A, v, n):
 
 	return tf.transpose(tf.squeeze(K))
 
+def Ax_circ(f_v, x, n):
+	# Circular shift x to the right
+	y = tf.concat([x[n-1:], x[:n-1]], axis=0)
+	
+	# Scale by [f v]
+	return tf.multiply(y, f_v)
+
+def krylov_tf_circ(f_x, v, n):
+	v_exp = tf.expand_dims(v,1)
+	cols = [v_exp]
+	this_col = v
+
+	for i in range(n-1):
+		this_col = Ax_circ(f_x, this_col, n)
+
+		cols.append(tf.expand_dims(this_col,1))
+
+	K = tf.stack(cols)
+
+	return tf.transpose(tf.squeeze(K))
 
 def V_mn(v, m, n):
 	# Stack columns
