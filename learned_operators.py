@@ -2,6 +2,8 @@ import numpy as np
 import tensorflow as tf
 from utils import *
 from reconstruction import *
+from krylov import *
+import functools
 import time
 
 def circulant_sparsity_fast(dataset, params, test_freq=100, verbose=False):
@@ -13,19 +15,23 @@ def circulant_sparsity_fast(dataset, params, test_freq=100, verbose=False):
 		G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 
-	f_x = tf.Variable(tf.truncated_normal([params.n], stddev=0.01, dtype=tf.float64))
+	f_x_A = tf.Variable(tf.truncated_normal([params.n], stddev=0.01, dtype=tf.float64))
+	f_x_B = tf.Variable(tf.truncated_normal([params.n], stddev=0.01, dtype=tf.float64))
+
+	fn_A = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_A, [0]))
+	fn_B = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_B, [0]))
 
 	W1 = tf.zeros([params.n, params.n], dtype=tf.float64)
 	for i in range(params.r):
-		K_A = krylov_tf_circ(f_x, G[:, i], params.n)
-		K_B = krylov_tf_circ(f_x, H[:, i], params.n)
+		K_A = krylov(fn_A, G[:, i], params.n)
+		K_B = krylov(fn_B, H[:, i], params.n)
 		prod = tf.matmul(K_A, tf.transpose(K_B))
 		W1 = tf.add(W1, prod)
 
 	# Compute a and b
 
-	a = tf.reduce_prod(f_x)
-	b = tf.reduce_prod(f_x)
+	a = tf.reduce_prod(f_x_A)
+	b = tf.reduce_prod(f_x_B)
 
 	coeff = 1.0/(1 - a*b)
 
