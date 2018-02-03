@@ -43,6 +43,12 @@ def circulant_sparsity_fast(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
+	tf.summary.scalar('loss', loss)
+	tf.summary.scalar('accuracy', accuracy)
+
+	merged_summary_op = tf.summary.merge_all()
+	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
+
 	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
@@ -53,8 +59,10 @@ def circulant_sparsity_fast(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		_, = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
-	 
+		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+
+		summary_writer.add_summary(summary, step)
+
 		if step % test_freq == 0:
 			print('Training step: ', step)
 			this_loss, this_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
@@ -93,6 +101,12 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
+	tf.summary.scalar('loss', loss)
+	tf.summary.scalar('accuracy', accuracy)
+
+	merged_summary_op = tf.summary.merge_all()
+	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
+
 	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
@@ -103,7 +117,9 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		_, = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
+		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+
+		summary_writer.add_summary(summary, step)
 	 
 		if step % test_freq == 0:
 			print('Training step: ', step)

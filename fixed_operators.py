@@ -21,6 +21,12 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
+	tf.summary.scalar('loss', loss)
+	tf.summary.scalar('accuracy', accuracy)
+
+	merged_summary_op = tf.summary.merge_all()
+	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
+
 	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
@@ -76,6 +82,12 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
+	tf.summary.scalar('loss', loss)
+	tf.summary.scalar('accuracy', accuracy)
+
+	merged_summary_op = tf.summary.merge_all()
+	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
+
 	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
@@ -86,7 +98,9 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		_, = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
+		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+
+		summary_writer.add_summary(summary, step)
 	 
 		if step % test_freq == 0:
 			print('Training step: ', step)
@@ -110,14 +124,6 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 
 	return losses, accuracies
 
-"""
-def toeplitz(dataset, params, test_freq=100, verbose=False):
-	# Create the model
-	x = tf.placeholder(tf.float64, [None, params.n])
-
-
-	return 0
-"""
 
 def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	A = gen_Z_f(params.n, 1)
@@ -135,6 +141,12 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	y_ = tf.placeholder(tf.float64, [None, params.out_size])
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
+
+	tf.summary.scalar('loss', loss)
+	tf.summary.scalar('accuracy', accuracy)
+
+	merged_summary_op = tf.summary.merge_all()
+	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 	
 	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
 	sess = tf.InteractiveSession()
@@ -146,7 +158,9 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		_, = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
+		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+
+		summary_writer.add_summary(summary, step)
 	 
 		if step % test_freq == 0:
 			print('Training step: ', step)
@@ -181,6 +195,11 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 	y_ = tf.placeholder(tf.float64, [None, params.out_size])
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
+	tf.summary.scalar('loss', loss)
+	tf.summary.scalar('accuracy', accuracy)
+
+	merged_summary_op = tf.summary.merge_all()
+	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 	
 	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
 
@@ -193,7 +212,9 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		_, = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
+		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+
+		summary_writer.add_summary(summary, step)
 	 
 		if step % test_freq == 0:
 			print('Training step: ', step)

@@ -11,59 +11,61 @@ from model_params import ModelParams
 from dataset import Dataset
 import argparse
 
+# Available datasets: mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
+# Example command: 
+# python compare_operators.py circ_mnist circulant_sparsity mnist 1_27_18 1 1 5 1e-3 0.9
 parser = argparse.ArgumentParser()
 parser.add_argument("name")
+parser.add_argument("fn")
+parser.add_argument("dataset")
+parser.add_argument("result_dir")
+parser.add_argument("dr", type=int)
+parser.add_argument("learn_corner", type=int)
+parser.add_argument("n_diag_learned", type=int)
+parser.add_argument('lr', type=float)
+parser.add_argument('mom', type=float)
 args = parser.parse_args()
 
-n = 500#784
+n = 784
 num_layers = 1
-loss = 'mse'
-# Available datasets: mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
-dataset_name = 'true_toeplitz'
+out_dir = '/dfs/scratch1/thomasat/'
+loss = 'cross_entropy'
 steps = 50000
 batch_size = 50
 test_size = 1000
-momentums = [0.9]
-learn_rate = 0.002
-displacement_rank = 1
-learn_corner = True
 fix_G = False
-n_diag_learneds = [499]
-init_stddev = 0.01
 init_type = 'toeplitz'
 init_stddev = 0.1 # For random initialization
 test_freq = 100
 n_trials = 5
-results_dir = '/dfs/scratch1/thomasat/results/1_27_18/' #'../../results/'#
+log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
+results_dir = os.path.join(out_dir, 'results', args.result_dir) 
 
 #Available test_fns: [toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
-test_fns = [circulant_sparsity]#[circulant_sparsity]  
-dataset = Dataset(dataset_name, n, test_size)
+fn = locals()[args.fn]  
+dataset = Dataset(args.dataset, n, test_size)
 out_size = dataset.out_size() # 10 for MNIST, 2 for convex, rect, rect_images
 
-# Iterate over 
-for mom in momentums:
-	for n_diag_learned in n_diag_learneds:
-		for fn in test_fns:
+# Current Toeplitz-like is a special case: inversion assumes Sylvester type displacement
+disp_type = 'stein'
+if fn.__name__ == 'toeplitz_like':
+	disp_type = 'sylvester'
 
-			# Current Toeplitz-like is a special case: inversion assumes Sylvester type displacement
-			disp_type = 'stein'
-			if fn.__name__ == 'toeplitz_like':
-				disp_type = 'sylvester'
+params = ModelParams(args.dataset, log_path, n, out_size, num_layers, loss, args.dr, steps, batch_size, 
+		args.lr, args.mom, init_type, fn.__name__, disp_type, args.learn_corner, args.n_diag_learned, 
+		init_stddev, fix_G)
 
-			params = ModelParams(dataset_name, n, out_size, num_layers, loss, displacement_rank, steps, batch_size, 
-					learn_rate, mom, init_type, fn.__name__, disp_type, learn_corner, n_diag_learned, 
-					init_stddev, fix_G)
-			
-			# Save params + git commit ID
-			this_results_dir = params.save(results_dir, args.name)
+print 'Params:\n', params
 
-			for test_iter in range(n_trials):
-				losses, accuracies = fn(dataset, params, test_freq)
+# Save params + git commit ID
+this_results_dir = params.save(results_dir, args.name)
 
-				out_loc = os.path.join(this_results_dir, fn.__name__ + str(test_iter))
-				pkl.dump(losses, open(out_loc + '_losses.p', 'wb'))
-				pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'))
+for test_iter in range(n_trials):
+	losses, accuracies = fn(dataset, params, test_freq)
 
-				print 'Saved losses and accuracies for ' + fn.__name__ + ' to: ' + out_loc
+	out_loc = os.path.join(this_results_dir, fn.__name__ + str(test_iter))
+	pkl.dump(losses, open(out_loc + '_losses.p', 'wb'))
+	pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'))
+
+	print 'Saved losses and accuracies for ' + fn.__name__ + ' to: ' + out_loc
 
