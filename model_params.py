@@ -36,7 +36,7 @@ class ModelParams:
 		param_str = commit_id + '\n' + str(self)
 
 		# Make new dir with timestamp
-		this_results_dir = results_dir + name + '_' + str(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
+		this_results_dir = os.path.join(results_dir, name + '_' + str(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))
 		if not os.path.exists(this_results_dir):
 		    os.makedirs(this_results_dir)
 

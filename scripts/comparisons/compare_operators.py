@@ -30,7 +30,7 @@ n = 784
 num_layers = 1
 out_dir = '/dfs/scratch1/thomasat/'
 loss = 'cross_entropy'
-steps = 50000
+steps = 200#50000
 batch_size = 50
 test_size = 1000
 fix_G = False
@@ -61,9 +61,14 @@ print 'Params:\n', params
 this_results_dir = params.save(results_dir, args.name)
 
 for test_iter in range(n_trials):
+	this_iter_name = fn.__name__ + str(test_iter)
+	params.log_path = os.path.join(log_path, args.name + '_' + str(test_iter))
+
+	print 'Tensorboard log path: ', params.log_path
+
 	losses, accuracies = fn(dataset, params, test_freq)
 
-	out_loc = os.path.join(this_results_dir, fn.__name__ + str(test_iter))
+	out_loc = os.path.join(this_results_dir, this_iter_name)
 	pkl.dump(losses, open(out_loc + '_losses.p', 'wb'))
 	pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'))
 
