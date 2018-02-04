@@ -51,6 +51,14 @@ def get_f_x(n, init_type, learn_corner, n_diag_learned, stddev=0.01):
 
 	return f_x_A, f_x_B
 
+get get_symm_pos_tridiag_vars(n, init_type, stddev=0.01):
+	# Constraint to be positive
+	diag = tf.Variable(tf.truncated_normal([n], stddev=stddev, dtype=tf.float64))
+	off_diag = tf.get_variable(initializer=tf.truncated_normal([n-1], stddev=stddev, dtype=tf.float64), 
+		constraint=lambda x: tf.clip_by_value(x, 0, np.infty))
+
+	return diag, off_diag
+
 def get_tridiag_vars(n, init_type, stddev=0.01):
 	if init_type == 'toeplitz':
 		subdiag = tf.Variable(tf.ones([n-1], dtype=tf.float64))

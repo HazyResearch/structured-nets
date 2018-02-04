@@ -23,6 +23,15 @@ def circ_mult_fn(f_v, x, n):
 	# Scale by [f v]
 	return tf.multiply(y, f_v)
 
+def symm_tridiag_mult_fn(diag, off_diag, x, n):
+	sub_result = tf.multiply(x[1:], off_diag)
+	sup_result = tf.multiply(x[:n-1], off_diag)
+
+	sup_result = tf.concat([[0], sup_result], axis=0)
+	sub_result = tf.concat([sub_result, [0]], axis=0)	
+
+	return sup_result + sub_result + tf.multiply(x, diag)
+
 def tridiag_corner_transpose_mult_fn(subdiag, diag, supdiag, f, x, n):
 	sub_result = tf.multiply(x[1:], subdiag)
 	sup_result = tf.multiply(x[:n-1], supdiag)
@@ -71,7 +80,7 @@ def krylov(fn, v, n):
 
 	return tf.transpose(tf.squeeze(K))
 
-if __name__ == '__main__':
+def test_tridiag_corner():
 	n = 4
 	subdiag = np.array([2,3,4])
 	supdiag = np.array([4,5,6])
@@ -96,4 +105,35 @@ if __name__ == '__main__':
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
 
-	print sess.run(result)
+	print sess.run(result)	
+
+def test_symm_tridiag():
+	n = 4
+	off_diag = np.array([2,3,4])
+	diag = np.array([1,1,1,1])
+
+	A = diags([off_diag, diag, off_diag], [-1, 0, 1], (n,n)).toarray()
+
+	print A
+
+	print np.linalg.norm(A - A.T)
+
+	x = np.array([1,2,3,4])
+
+	print np.dot(np.linalg.matrix_power(A, 3), x)
+
+	fn = functools.partial(symm_tridiag_mult_fn, tf.constant(diag, dtype=tf.float64), 
+		tf.constant(off_diag, dtype=tf.float64))
+
+	x = tf.constant(x, dtype=tf.float64)
+	result = krylov(fn, x, n)
+
+	sess = tf.InteractiveSession()
+	tf.initialize_all_variables().run()
+
+	print sess.run(result)	
+
+if __name__ == '__main__':
+	#test_tridiag_corner()
+	test_symm_tridiag()
+

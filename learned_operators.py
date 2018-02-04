@@ -75,12 +75,12 @@ def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 		step += 1
 
 	# Test trained model
-	print('SGD final loss, learned operators (OP transforms): ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
-	print('SGD final accuracy, learned operators (OP transforms): ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
+	print('SGD final loss, learned operators (tridiagonal+corner): ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
+	print('SGD final accuracy, learned operators (tridiagonal+corner): ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
 
 	return losses, accuracies
 
-def OP_transform(dataset, params, test_freq=100, verbose=False):
+def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 	# Create the model
 	x = tf.placeholder(tf.float64, [None, params.n])
 	if params.fix_G:
@@ -89,10 +89,11 @@ def OP_transform(dataset, params, test_freq=100, verbose=False):
 		G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 
-	f_x_A, f_x_B = get_f_x(params)
+	diag_A, off_diag_A  = get_symm_pos_tridiag_vars(params.n, params.init_type, params.init_stddev)
+	diag_B, off_diag_B  = get_symm_pos_tridiag_vars(params.n, params.init_type, params.init_stddev)
 
-	fn_A = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_A, [0]))
-	fn_B = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_B, [0]))
+	fn_A = functools.partial(symm_tridiag_mult_fn, diag_A, off_diag_A)
+	fn_B = functools.partial(symm_tridiag_mult_fn, diag_B, off_diag_B)
 
 	W1 = tf.zeros([params.n, params.n], dtype=tf.float64)
 	for i in range(params.r):
@@ -132,13 +133,12 @@ def OP_transform(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
-
-		summary_writer.add_summary(summary, step)
+		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			this_loss, this_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			this_loss, this_accuracy, summary = sess.run([loss, accuracy, merged_summary_op], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			summary_writer.add_summary(summary, step)
 			losses.append(this_loss)
 			accuracies.append(this_accuracy)
 			print('Test loss: ', this_loss)
@@ -149,8 +149,8 @@ def OP_transform(dataset, params, test_freq=100, verbose=False):
 		step += 1
 
 	# Test trained model
-	print('SGD final loss, learned operators (OP transforms): ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
-	print('SGD final accuracy, learned operators (OP transforms): ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
+	print('SGD final loss, learned operators (polynomial transforms): ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
+	print('SGD final accuracy, learned operators (polynomial transforms): ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
 
 	return losses, accuracies
 
