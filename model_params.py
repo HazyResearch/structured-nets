@@ -8,7 +8,7 @@ class ModelParams:
 		if disp_type not in ['stein', 'sylvester']:
 			print 'Displacement type ' + disp_type + ' not supported'
 			assert 0
-		if class_type not in ['toeplitz_like', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity']:
+		if class_type not in ['toeplitz_like', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner']:
 			print 'Class type ' + class_type + ' not supported'
 			assert 0
 		self.dataset_name = dataset_name

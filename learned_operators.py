@@ -16,7 +16,7 @@ def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 		G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 
-	subdiag_A, supdiag_A, diag_A, f_A, subdiag_B, supdiag_B, diag_B, f_B = get_tridiag_corner_vars(params.n, params.init_type, params.stddev, params.learn_corner)
+	subdiag_A, supdiag_A, diag_A, f_A, subdiag_B, supdiag_B, diag_B, f_B = get_tridiag_corner_vars(params.n, params.init_type, params.init_stddev, params.learn_corner)
 
 	fn_A = functools.partial(tridiag_corner_transpose_mult_fn, subdiag_A, diag_A, supdiag_A, f_A)
 	fn_B = functools.partial(tridiag_corner_transpose_mult_fn, subdiag_B, diag_B, supdiag_B, f_B)
@@ -34,7 +34,7 @@ def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 
 	coeff = 1.0/(1 - a*b)
 
-	W1 = tf.scalar_mul(coeff, W1)
+	W1 = tf.multiply(coeff, W1)
 
 	y = compute_y(x, W1, params)
 	
@@ -154,7 +154,7 @@ def OP_transform(dataset, params, test_freq=100, verbose=False):
 
 	return losses, accuracies
 
-def circulant_sparsity_fast(dataset, params, test_freq=100, verbose=False):
+def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 	# Create the model
 	x = tf.placeholder(tf.float64, [None, params.n])
 	if params.fix_G:
@@ -163,7 +163,7 @@ def circulant_sparsity_fast(dataset, params, test_freq=100, verbose=False):
 		G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 
-	f_x_A, f_x_B = get_f_x(params.n, params.init_type, params.learn_corner, params.n_diag_learned, params.stddev)
+	f_x_A, f_x_B = get_f_x(params.n, params.init_type, params.learn_corner, params.n_diag_learned, params.init_stddev)
 
 	fn_A = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_A, [0]))
 	fn_B = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_B, [0]))
@@ -227,7 +227,7 @@ def circulant_sparsity_fast(dataset, params, test_freq=100, verbose=False):
 
 	return losses, accuracies
 
-def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
+def circulant_sparsity_hadamard(dataset, params, test_freq=100, verbose=False):
 	# Create the model
 	x = tf.placeholder(tf.float64, [None, params.n])
 	if params.fix_G:

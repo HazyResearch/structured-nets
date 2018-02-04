@@ -17,6 +17,9 @@ class Dataset:
 			self.mnist = input_data.read_data_sets(data_dir, one_hot=True)
 			self.test_X = self.mnist.test.images
 			self.test_Y = self.mnist.test.labels
+		elif self.name == 'mnist_rot':
+			data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_train_valid.amat'
+			self.load_data(data_loc)
 		elif self.name == 'mnist_bg_rot':
 			data_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat'
 			self.load_data(data_loc)
