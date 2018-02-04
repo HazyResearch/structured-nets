@@ -187,6 +187,56 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	return losses, accuracies
 
 
+def low_rank(dataset, params, test_freq=100, verbose=False):
+	# Create the model
+	x = tf.placeholder(tf.float64, [None, params.n])
+	G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
+	H = tf.Variable(tf.truncated_normal([params.r, params.n], stddev=0.01, dtype=tf.float64))
+	W1 = tf.matmul(G, H)
+
+	y = compute_y(x, W1, params)
+	y_ = tf.placeholder(tf.float64, [None, params.out_size])
+	
+	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
+	tf.summary.scalar('loss', loss)
+	tf.summary.scalar('accuracy', accuracy)
+
+	merged_summary_op = tf.summary.merge_all()
+	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
+	
+	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
+
+	sess = tf.InteractiveSession()
+	tf.initialize_all_variables().run()
+
+	step = 0
+
+	losses = []
+	accuracies = []
+	while step < params.steps:
+		batch_xs, batch_ys = dataset.batch(params.batch_size)
+		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+
+		summary_writer.add_summary(summary, step)
+	 
+		if step % test_freq == 0:
+			print('Training step: ', step)
+			this_loss, this_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			losses.append(this_loss)
+			accuracies.append(this_accuracy)
+			print('Test loss: ', this_loss)
+			print('Test accuracy: ', this_accuracy)
+			if verbose:
+				print('Current W1: ', W1_real)
+
+		step += 1
+
+	# Test trained model
+	print('SGD final loss, low rank: ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
+	print('SGD final accuracy, low rank: ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
+
+	return losses, accuracies
+
 def unconstrained(dataset, params, test_freq=100, verbose=False):
 	# Create the model
 	x = tf.placeholder(tf.float64, [None, params.n])

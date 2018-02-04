@@ -19,7 +19,7 @@ parser.add_argument("name")
 parser.add_argument("fn")
 parser.add_argument("dataset")
 parser.add_argument("result_dir")
-parser.add_argument("dr", type=int)
+parser.add_argument("r", type=int)
 parser.add_argument("learn_corner", type=int)
 parser.add_argument("n_diag_learned", type=int)
 parser.add_argument('lr', type=float)
@@ -51,7 +51,7 @@ disp_type = 'stein'
 if fn.__name__ == 'toeplitz_like':
 	disp_type = 'sylvester'
 
-params = ModelParams(args.dataset, log_path, n, out_size, num_layers, loss, args.dr, steps, batch_size, 
+params = ModelParams(args.dataset, log_path, n, out_size, num_layers, loss, args.r, steps, batch_size, 
 		args.lr, args.mom, init_type, fn.__name__, disp_type, args.learn_corner, args.n_diag_learned, 
 		init_stddev, fix_G)
 

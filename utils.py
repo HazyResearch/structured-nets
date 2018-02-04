@@ -3,6 +3,75 @@ from scipy.sparse import diags
 import numpy as np
 import tensorflow as tf
 import time, subprocess
+import functools
+
+def get_f(learn_corner, init_type, stddev):
+  if learn_corner:
+    if init_type == 'toeplitz':
+      f_A = tf.Variable([1], dtype=tf.float64)
+      f_B = tf.Variable([-1], dtype=tf.float64)
+    elif init_type == 'random':
+      f_A = tf.Variable(tf.truncated_normal([1], stddev=stddev, dtype=tf.float64), dtype=tf.float64)
+      f_B = tf.Variable(tf.truncated_normal([1], stddev=stddev, dtype=tf.float64), dtype=tf.float64)
+    else:
+      print 'init_type not supported: ', init_type
+      assert 0   
+  else:
+    f_A = tf.constant([1], dtype=tf.float64)
+    f_B = tf.constant([-1], dtype=tf.float64)
+
+  return f_A, f_B
+
+def get_subdiag(n_diag_learned, init_type, stddev):
+  if n_diag_learned > 0:
+    if init_type == 'toeplitz':
+      x = tf.Variable(tf.ones(n_diag_learned, dtype=tf.float64))
+    elif init_type == 'random':
+      x = tf.Variable(tf.truncated_normal([n_diag_learned], stddev=stddev, dtype=tf.float64))
+    else:
+      print 'init_type not supported: ', init_type
+      assert 0 
+  return x
+
+# Produce tf.Variable for corner + subdiagonal depending on params (initialization, num learned entries, etc.)
+def get_f_x(n, init_type, learn_corner, n_diag_learned, stddev=0.01):
+	f_A, f_B = get_f(learn_corner, init_type, stddev)
+	x_A =  get_subdiag(n_diag_learned, init_type, stddev)
+	x_B =  get_subdiag(n_diag_learned, init_type, stddev)
+
+	# Concatenate
+	f_x_A = tf.concat([f_A, x_A], axis=0)
+	f_x_B = tf.concat([f_B, x_B], axis=0)
+
+	# Pad
+	if n_diag_learned < (n-1):
+		ones = tf.ones(n-1-n_diag_learned)
+		f_x_A = tf.constant([f_x_A, ones], axis=0)
+		f_x_B = tf.constant([f_x_B, ones], axis=0)
+
+	return f_x_A, f_x_B
+
+def get_tridiag_vars(n, init_type, stddev=0.01):
+	if init_type == 'toeplitz':
+		subdiag = tf.Variable(tf.ones([n-1], dtype=tf.float64))
+		supdiag = tf.Variable(tf.zeros([n-1], dtype=tf.float64))
+		diag = tf.Variable(tf.zeros([n], dtype=tf.float64))
+	elif init_type == 'random':
+		subdiag = tf.Variable(tf.truncated_normal([n-1], stddev=stddev, dtype=tf.float64))
+		supdiag = tf.Variable(tf.truncated_normal([n-1], stddev=stddev, dtype=tf.float64))
+		diag = tf.Variable(tf.truncated_normal([n], stddev=stddev, dtype=tf.float64))
+	else:
+		print 'init_type not supported: ', init_type
+		assert 0 
+	return subdiag, supdiag, diag	
+
+# Returns subdiag, supdiag, diag, f
+def get_tridiag_corner_vars(n, init_type, stddev=0.01, learn_corner=True):
+	subdiag_A, supdiag_A, diag_A = get_tridiag_vars(n, init_type, stddev)
+	subdiag_B, supdiag_B, diag_B = get_tridiag_vars(n, init_type, stddev)
+	
+	f_A, f_B = get_f(learn_corner, init_type, stddev)
+	return subdiag_A, supdiag_A, diag_A, f_A, subdiag_B, supdiag_B, diag_B, f_B
 
 # Returns loss, accuracy
 def compute_loss_and_accuracy(y, y_, params):
