@@ -149,7 +149,7 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
  
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			if params.check_disp
+			if params.check_disp:
 				# Verify displacement rank
 				W1_real = sess.run(W1, feed_dict={x: batch_xs, y_: batch_ys})
 				E = W1_real - np.dot(A, np.dot(W1_real, B))
