@@ -5,8 +5,6 @@ from sklearn.preprocessing import OneHotEncoder
 sys.path.insert(0, '../../../../')
 from utils import *
 
-supported_datasets = ['mnist', 'mnist_rot', 'mnist_bg_rot', 'mnist_rand_bg', 'mnist_noise', 'convex', 'rect', 
-	'rect_images']
 
 class Dataset:
 	# true_test: if True, we test on test set. Otherwise, split training set into train/validation.
@@ -17,42 +15,41 @@ class Dataset:
 		self.test_size = test_size
 		self.true_test = true_test
 		self.n = n
-		if self.name in supported_datasets:
-			if self.name == 'mnist':
-				data_dir = '/tmp/tensorflow/mnist/input_data'
-				self.mnist = input_data.read_data_sets(data_dir, one_hot=True)
-				self.test_X = self.mnist.test.images
-				self.test_Y = self.mnist.test.labels
-			elif self.name == 'mnist_rot':
-				train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_train_valid.amat'
-				test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_test.amat'
-				self.load_data(train_data_loc, test_data_loc)
-			elif self.name == 'mnist_bg_rot':
-				train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat'
-				test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_test.amat'
-				self.load_data(train_data_loc, test_data_loc)
-			elif self.name == 'mnist_rand_bg':
-				train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_train.amat'
-				test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_test.amat'
-				self.load_data(train_data_loc, test_data_loc)
-			elif self.name.startswith('mnist_noise'):
-				idx = self.name[-1]
-				train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
-				test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
-				self.test_size = 2000 # As specified in http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/DeepVsShallowComparisonICML2007#Downloadable_datasets
-				self.load_data(train_data_loc, test_data_loc)
-			elif self.name == 'convex':
-				train_data_loc = '/dfs/scratch1/thomasat/datasets/convex/convex_train.amat'
-				test_data_loc = '/dfs/scratch1/thomasat/datasets/convex/50k/convex_test.amat'
-				self.load_data(train_data_loc, test_data_loc)
-			elif self.name == 'rect':
-				train_data_loc = '/dfs/scratch1/thomasat/datasets/rect/rectangles_train.amat'
-				test_data_loc = '/dfs/scratch1/thomasat/datasets/rect/rectangles_test.amat'
-				self.load_data(train_data_loc, test_data_loc)
-			elif self.name == 'rect_images':
-				train_data_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_train.amat'
-				test_data_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_test.amat'
-				self.load_data(train_data_loc, test_data_loc)
+		if self.name == 'mnist':
+			data_dir = '/tmp/tensorflow/mnist/input_data'
+			self.mnist = input_data.read_data_sets(data_dir, one_hot=True)
+			self.test_X = self.mnist.test.images
+			self.test_Y = self.mnist.test.labels
+		elif self.name == 'mnist_rot':
+			train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_train_valid.amat'
+			test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_test.amat'
+			self.load_data(train_data_loc, test_data_loc)
+		elif self.name == 'mnist_bg_rot':
+			train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat'
+			test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_test.amat'
+			self.load_data(train_data_loc, test_data_loc)
+		elif self.name == 'mnist_rand_bg':
+			train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_train.amat'
+			test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_test.amat'
+			self.load_data(train_data_loc, test_data_loc)
+		elif self.name.startswith('mnist_noise'):
+			idx = self.name[-1]
+			train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
+			test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
+			self.test_size = 2000 # As specified in http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/DeepVsShallowComparisonICML2007#Downloadable_datasets
+			self.load_data(train_data_loc, test_data_loc)
+		elif self.name == 'convex':
+			train_data_loc = '/dfs/scratch1/thomasat/datasets/convex/convex_train.amat'
+			test_data_loc = '/dfs/scratch1/thomasat/datasets/convex/50k/convex_test.amat'
+			self.load_data(train_data_loc, test_data_loc)
+		elif self.name == 'rect':
+			train_data_loc = '/dfs/scratch1/thomasat/datasets/rect/rectangles_train.amat'
+			test_data_loc = '/dfs/scratch1/thomasat/datasets/rect/rectangles_test.amat'
+			self.load_data(train_data_loc, test_data_loc)
+		elif self.name == 'rect_images':
+			train_data_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_train.amat'
+			test_data_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_test.amat'
+			self.load_data(train_data_loc, test_data_loc)
 		elif self.name.startswith('true'):
 			self.true_transform = gen_matrix(n, self.name.split("true_",1)[1] )
 			test_X, test_Y = gen_batch(self.true_transform, self.test_size)
@@ -104,7 +101,7 @@ class Dataset:
 			self.test_Y = enc.fit_transform(self.test_Y).todense()
 
 		print self.train_X.shape, self.train_Y.shape, self.test_X.shape, self.test_Y.shape
-
+		quit()
 	def batch(self, batch_size):
 		if self.name == 'mnist':
 			batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)

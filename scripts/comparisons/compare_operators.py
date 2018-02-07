@@ -13,7 +13,7 @@ import argparse
 
 # Available datasets: mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
 # Example command: 
-# python compare_operators.py circ_mnist circulant_sparsity mnist 1_27_18 1 1 5 1e-3 0.9
+# python compare_operators.py circ_mnist circulant_sparsity mnist 1_27_18 1 1 5 1e-3 0.9 0
 parser = argparse.ArgumentParser()
 parser.add_argument("name")
 parser.add_argument("fn")
@@ -24,6 +24,7 @@ parser.add_argument("learn_corner", type=int)
 parser.add_argument("n_diag_learned", type=int)
 parser.add_argument('lr', type=float)
 parser.add_argument('mom', type=float)
+parser.add_argument('test', type=int)
 args = parser.parse_args()
 
 n = 784
@@ -43,7 +44,7 @@ results_dir = os.path.join(out_dir, 'results', args.result_dir)
 
 #Available test_fns: [low_rank, toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
 fn = locals()[args.fn]  
-dataset = Dataset(args.dataset, n, test_size)
+dataset = Dataset(args.dataset, n, test_size, args.test)
 out_size = dataset.out_size() # 10 for MNIST, 2 for convex, rect, rect_images
 
 # Current Toeplitz-like is a special case: inversion assumes Sylvester type displacement
@@ -51,7 +52,7 @@ disp_type = 'stein'
 if fn.__name__ == 'toeplitz_like':
 	disp_type = 'sylvester'
 
-params = ModelParams(args.dataset, log_path, n, out_size, num_layers, loss, args.r, steps, batch_size, 
+params = ModelParams(args.dataset, args.test, log_path, n, out_size, num_layers, loss, args.r, steps, batch_size, 
 		args.lr, args.mom, init_type, fn.__name__, disp_type, args.learn_corner, args.n_diag_learned, 
 		init_stddev, fix_G)
 
