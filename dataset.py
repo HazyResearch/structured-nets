@@ -22,7 +22,7 @@ class Dataset:
 			self.test_Y = self.mnist.test.labels
 		elif self.name == 'mnist_rot':
 			self.train_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_train_valid.amat'
-			self.test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_test.amat'
+			self.test_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_test.amat'
 			self.load_train_data()
 		elif self.name == 'mnist_bg_rot':
 			self.train_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat'
