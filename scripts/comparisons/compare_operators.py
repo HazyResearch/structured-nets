@@ -43,6 +43,9 @@ checkpoint_freq = 1000
 n_trials = 3
 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
 results_dir = os.path.join(out_dir, 'results', args.result_dir) 
+checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
+
+print log_path, results_dir, checkpoint_path
 
 #Available test_fns: [low_rank, toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
 fn = locals()[args.fn]  
@@ -56,7 +59,7 @@ if fn.__name__ == 'toeplitz_like':
 
 params = ModelParams(args.dataset, args.test, log_path, n, out_size, num_layers, loss, args.r, steps, batch_size, 
 		args.lr, args.mom, init_type, fn.__name__, disp_type, args.learn_corner, args.n_diag_learned, 
-		init_stddev, fix_G, check_disp, checkpoint_freq)
+		init_stddev, fix_G, check_disp, checkpoint_freq, checkpoint_path)
 
 print 'Params:\n', params
 
@@ -66,8 +69,10 @@ this_results_dir = params.save(results_dir, args.name)
 for test_iter in range(n_trials):
 	this_iter_name = fn.__name__ + str(test_iter)
 	params.log_path = os.path.join(log_path, args.name + '_' + str(test_iter))
+	params.checkpoint_path = os.path.join(checkpoint_path, args.name + '_' + str(test_iter))
 
 	print 'Tensorboard log path: ', params.log_path
+	print 'Tensorboard checkpoint path: ', params.checkpoint_path
 
 	losses, accuracies = fn(dataset, params, test_freq)
 	tf.reset_default_graph()

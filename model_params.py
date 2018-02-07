@@ -4,7 +4,7 @@ import datetime, os
 class ModelParams:
 	def __init__(self, dataset_name, test, log_path, n, out_size, num_layers, loss, r, steps, batch_size, 
 			lr, mom, init_type, class_type, disp_type, learn_corner, 
-			n_diag_learned, init_stddev, fix_G, check_disp, checkpoint_freq):
+			n_diag_learned, init_stddev, fix_G, check_disp, checkpoint_freq, checkpoint_path):
 		if disp_type not in ['stein', 'sylvester']:
 			print 'Displacement type ' + disp_type + ' not supported'
 			assert 0
@@ -32,7 +32,8 @@ class ModelParams:
 		self.init_stddev = init_stddev
 		self.check_disp = check_disp
 		self.checkpoint_freq = checkpoint_freq
-	
+		self.checkpoint_path = checkpoint_path
+
 	def save(self, results_dir, name):
 		# Append git commit ID
 		commit_id = get_commit_id()
