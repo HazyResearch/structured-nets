@@ -81,7 +81,7 @@ class Dataset:
 		train_data = np.genfromtxt(self.train_loc)
 
 		self.train_X = train_data[:, :-1]
-		self.test_X = test_data[:, :-1]
+		self.train_Y = np.expand_dims(train_data[:, -1], 1)
 
 		# Y must be one-hot
 		enc = OneHotEncoder()
