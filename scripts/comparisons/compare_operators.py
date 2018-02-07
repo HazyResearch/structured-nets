@@ -13,7 +13,7 @@ import argparse
 
 # Available datasets: mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
 # Example command: 
-# python compare_operators.py circ_mnist circulant_sparsity mnist 1_27_18 1 1 5 1e-3 0.9 0
+# python compare_operators.py toep_rect toeplitz_like rect 1_27_18 1 1 5 1e-3 0.9 0
 parser = argparse.ArgumentParser()
 parser.add_argument("name")
 parser.add_argument("fn")
@@ -34,6 +34,7 @@ loss = 'cross_entropy'
 steps = 50000
 batch_size = 50
 test_size = 1000
+check_disp = False
 fix_G = False
 init_type = 'toeplitz'
 init_stddev = 0.1 # For random initialization
@@ -54,7 +55,7 @@ if fn.__name__ == 'toeplitz_like':
 
 params = ModelParams(args.dataset, args.test, log_path, n, out_size, num_layers, loss, args.r, steps, batch_size, 
 		args.lr, args.mom, init_type, fn.__name__, disp_type, args.learn_corner, args.n_diag_learned, 
-		init_stddev, fix_G)
+		init_stddev, fix_G, check_disp)
 
 print 'Params:\n', params
 

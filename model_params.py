@@ -2,9 +2,9 @@ from utils import *
 import datetime, os
 
 class ModelParams:
-	def __init__(self, dataset_name, true_test, log_path, n, out_size, num_layers, loss, r, steps, batch_size, 
+	def __init__(self, dataset_name, test, log_path, n, out_size, num_layers, loss, r, steps, batch_size, 
 			lr, mom, init_type, class_type, disp_type, learn_corner, 
-			n_diag_learned, init_stddev, fix_G):
+			n_diag_learned, init_stddev, fix_G, check_disp):
 		if disp_type not in ['stein', 'sylvester']:
 			print 'Displacement type ' + disp_type + ' not supported'
 			assert 0
@@ -12,7 +12,7 @@ class ModelParams:
 			print 'Class type ' + class_type + ' not supported'
 			assert 0
 		self.dataset_name = dataset_name
-		self.true_test = true_test
+		self.test = test
 		self.log_path = log_path
 		self.n = n
 		self.out_size = out_size
@@ -30,6 +30,7 @@ class ModelParams:
 		self.learn_corner = learn_corner
 		self.n_diag_learned = n_diag_learned
 		self.init_stddev = init_stddev
+		self.check_disp = check_disp
 	
 	def save(self, results_dir, name):
 		# Append git commit ID

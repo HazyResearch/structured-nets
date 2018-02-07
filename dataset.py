@@ -21,35 +21,35 @@ class Dataset:
 			self.test_X = self.mnist.test.images
 			self.test_Y = self.mnist.test.labels
 		elif self.name == 'mnist_rot':
-			train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_train_valid.amat'
-			test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_test.amat'
-			self.load_data(train_data_loc, test_data_loc)
+			self.train_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_train_valid.amat'
+			self.test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rot/mnist_all_rotation_normalized_float_test.amat'
+			self.load_train_data()
 		elif self.name == 'mnist_bg_rot':
-			train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat'
-			test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_test.amat'
-			self.load_data(train_data_loc, test_data_loc)
+			self.train_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat'
+			self.test_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_test.amat'
+			self.load_train_data()
 		elif self.name == 'mnist_rand_bg':
-			train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_train.amat'
-			test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_test.amat'
-			self.load_data(train_data_loc, test_data_loc)
+			self.train_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_train.amat'
+			self.test_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_test.amat'
+			self.load_train_data()
 		elif self.name.startswith('mnist_noise'):
 			idx = self.name[-1]
-			train_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
-			test_data_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
+			self.train_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
+			self.test_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
 			self.test_size = 2000 # As specified in http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/DeepVsShallowComparisonICML2007#Downloadable_datasets
-			self.load_data(train_data_loc, test_data_loc)
+			self.load_train_data()
 		elif self.name == 'convex':
-			train_data_loc = '/dfs/scratch1/thomasat/datasets/convex/convex_train.amat'
-			test_data_loc = '/dfs/scratch1/thomasat/datasets/convex/50k/convex_test.amat'
-			self.load_data(train_data_loc, test_data_loc)
+			self.train_loc = '/dfs/scratch1/thomasat/datasets/convex/convex_train.amat'
+			self.test_loc = '/dfs/scratch1/thomasat/datasets/convex/50k/convex_test.amat'
+			self.load_train_data()
 		elif self.name == 'rect':
-			train_data_loc = '/dfs/scratch1/thomasat/datasets/rect/rectangles_train.amat'
-			test_data_loc = '/dfs/scratch1/thomasat/datasets/rect/rectangles_test.amat'
-			self.load_data(train_data_loc, test_data_loc)
+			self.train_loc = '/dfs/scratch1/thomasat/datasets/rect/rectangles_train.amat'
+			self.test_loc = '/dfs/scratch1/thomasat/datasets/rect/rectangles_test.amat'
+			self.load_train_data()
 		elif self.name == 'rect_images':
-			train_data_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_train.amat'
-			test_data_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_test.amat'
-			self.load_data(train_data_loc, test_data_loc)
+			self.train_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_train.amat'
+			self.test_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_test.amat'
+			self.load_train_data()
 		elif self.name.startswith('true'):
 			self.true_transform = gen_matrix(n, self.name.split("true_",1)[1] )
 			test_X, test_Y = gen_batch(self.true_transform, self.test_size)
@@ -67,24 +67,31 @@ class Dataset:
 		else:
 			return self.n
 
-	def load_data(self, train_loc, test_loc):
-		if train_loc == test_loc:
-			assert not self.true_test or self.name.startswith('mnist_noise')
+	def load_test_data(self):
+		test_data = np.genfromtxt(self.test_loc)
 
-		if self.true_test and train_loc != test_loc:
-			train_data = np.genfromtxt(train_loc)
-			test_data = np.genfromtxt(test_loc)
+		self.test_X = test_data[:, :-1]
+		self.test_Y = np.expand_dims(test_data[:, -1], 1)
 
-			self.train_X = train_data[:, :-1]
-			self.train_Y = np.expand_dims(train_data[:, -1], 1)
-			self.test_X = test_data[:, :-1]
-			self.test_Y = np.expand_dims(test_data[:, -1], 1)
+		# Y must be one-hot
+		enc = OneHotEncoder()
+		self.test_Y = enc.fit_transform(self.test_Y).todense()		
 
-			# Y must be one-hot
-			enc = OneHotEncoder()
-			self.train_Y = enc.fit_transform(self.train_Y).todense()
-			self.test_Y = enc.fit_transform(self.test_Y).todense()
+	def load_train_data(self):
+		train_data = np.genfromtxt(self.train_loc)
 
+		self.train_X = train_data[:, :-1]
+		self.test_X = test_data[:, :-1]
+
+		# Y must be one-hot
+		enc = OneHotEncoder()
+		self.train_Y = enc.fit_transform(self.train_Y).todense()
+
+		# HACK
+		self.val_X = self.train_X
+		self.val_Y = self.train_Y
+
+		"""
 		else: # Use train_loc only
 			data = np.genfromtxt(train_loc)
 			# Last self.test_size examples are for validation
@@ -99,9 +106,8 @@ class Dataset:
 			enc = OneHotEncoder()
 			self.train_Y = enc.fit_transform(self.train_Y).todense()
 			self.test_Y = enc.fit_transform(self.test_Y).todense()
+		"""
 
-		print self.train_X.shape, self.train_Y.shape, self.test_X.shape, self.test_Y.shape
-		quit()
 	def batch(self, batch_size):
 		if self.name == 'mnist':
 			batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
