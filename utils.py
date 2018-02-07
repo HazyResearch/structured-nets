@@ -45,19 +45,22 @@ def get_f_x(n, init_type, learn_corner, n_diag_learned, stddev=0.01):
 
 	# Pad
 	if n_diag_learned < (n-1):
-		ones = tf.ones(n-1-n_diag_learned)
-		f_x_A = tf.constant([f_x_A, ones], axis=0)
-		f_x_B = tf.constant([f_x_B, ones], axis=0)
+		ones = tf.ones(n-1-n_diag_learned, dtype=tf.float64)
+		f_x_A = tf.concat([f_x_A, ones], axis=0)
+		f_x_B = tf.concat([f_x_B, ones], axis=0)
 
 	return f_x_A, f_x_B
 
-get get_symm_pos_tridiag_vars(n, init_type, stddev=0.01):
+def get_symm_pos_tridiag_vars(n, init_type, stddev=0.01):
 	# Constraint to be positive
-	diag = tf.Variable(tf.truncated_normal([n], stddev=stddev, dtype=tf.float64))
-	off_diag = tf.get_variable(initializer=tf.truncated_normal([n-1], stddev=stddev, dtype=tf.float64), 
+	diag_A = tf.Variable(tf.truncated_normal([n], stddev=stddev, dtype=tf.float64))
+	off_diag_A = tf.get_variable('off_diag_A', initializer=tf.truncated_normal([n-1], stddev=stddev, dtype=tf.float64), 
+		constraint=lambda x: tf.clip_by_value(x, 0, np.infty))
+	diag_B = tf.Variable(tf.truncated_normal([n], stddev=stddev, dtype=tf.float64))
+	off_diag_B = tf.get_variable('off_diag_B', initializer=tf.truncated_normal([n-1], stddev=stddev, dtype=tf.float64), 
 		constraint=lambda x: tf.clip_by_value(x, 0, np.infty))
 
-	return diag, off_diag
+	return diag_A, off_diag_A, diag_B, off_diag_B
 
 def get_tridiag_vars(n, init_type, stddev=0.01):
 	if init_type == 'toeplitz':
