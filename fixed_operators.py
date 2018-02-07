@@ -91,7 +91,7 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 	# Test trained model
 	if params.test:
 		# Load test
-		self.load_test_data()
+		dataset.load_test_data()
 		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
 		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
 		print('SGD test loss, Vandermonde-like: ', test_loss)
@@ -190,7 +190,7 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 	# Test trained model
 	if params.test:
 		# Load test
-		self.load_test_data()
+		dataset.load_test_data()
 
 		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
 		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
@@ -289,7 +289,7 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	# Test trained model
 	if params.test:
 		# Load test
-		self.load_test_data()
+		dataset.load_test_data()
 
 		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
 		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
@@ -376,7 +376,7 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 	# Test trained model
 	if params.test:
 		# Load test
-		self.load_test_data()
+		dataset.load_test_data()
 
 		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
 		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
@@ -460,7 +460,7 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 	# Test trained model
 	if params.test:
 		# Load test
-		self.load_test_data()
+		dataset.load_test_data()
 
 		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
 		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
