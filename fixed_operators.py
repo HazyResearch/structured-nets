@@ -98,17 +98,17 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
-
-		summary_writer.add_summary(summary, step)
-	 
+		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
+ 
 		if step % test_freq == 0:
 			print('Training step: ', step)
 			# Verify displacement rank
 			W1_real = sess.run(W1, feed_dict={x: batch_xs, y_: batch_ys})
 			E = W1_real - np.dot(A, np.dot(W1_real, B))
 			print('Disp rank: ', np.linalg.matrix_rank(E))
-			this_loss, this_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			this_loss, this_accuracy, summary = sess.run([loss, accuracy, merged_summary_op], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+
+			summary_writer.add_summary(summary, step)
 			losses.append(this_loss)
 			accuracies.append(this_accuracy)
 			print('Test loss: ', this_loss)
@@ -158,9 +158,8 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+		_, = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
-		summary_writer.add_summary(summary, step)
 	 
 		if step % test_freq == 0:
 			print('Training step: ', step)
@@ -170,7 +169,8 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 			E_sylv = np.dot(A, W1_real) - np.dot(W1_real, B)
 			print('Disp rank, Sylv: ', np.linalg.matrix_rank(E_sylv))
 
-			this_loss, this_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			this_loss, this_accuracy, summary = sess.run([loss, accuracy, merged_summary_op], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			summary_writer.add_summary(summary, step)
 			losses.append(this_loss)
 			accuracies.append(this_accuracy)
 			print('Test loss: ', this_loss)
@@ -215,13 +215,13 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+		_, = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
-		summary_writer.add_summary(summary, step)
 	 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			this_loss, this_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			this_loss, this_accuracy, summary = sess.run([loss, accuracy, merged_summary_op], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			summary_writer.add_summary(summary, step)
 			losses.append(this_loss)
 			accuracies.append(this_accuracy)
 			print('Test loss: ', this_loss)
@@ -262,13 +262,14 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
-		summary_writer.add_summary(summary, step)
 	 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			this_loss, this_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			this_loss, this_accuracy, summary = sess.run([loss, accuracy, merged_summary_op], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+
+			summary_writer.add_summary(summary, step)
 			losses.append(this_loss)
 			accuracies.append(this_accuracy)
 			print('Test loss: ', this_loss)

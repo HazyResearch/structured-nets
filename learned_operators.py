@@ -58,13 +58,12 @@ def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
-
-		summary_writer.add_summary(summary, step)
+		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			this_loss, this_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			this_loss, this_accuracy, summary = sess.run([loss, accuracy, merged_summary_op], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			summary_writer.add_summary(summary, step)
 			losses.append(this_loss)
 			accuracies.append(this_accuracy)
 			print('Test loss: ', this_loss)
@@ -89,8 +88,7 @@ def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 		G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 
-	diag_A, off_diag_A  = get_symm_pos_tridiag_vars(params.n, params.init_type, params.init_stddev)
-	diag_B, off_diag_B  = get_symm_pos_tridiag_vars(params.n, params.init_type, params.init_stddev)
+	diag_A, off_diag_A, diag_B, off_diag_B  = get_symm_pos_tridiag_vars(params.n, params.init_type, params.init_stddev)
 
 	fn_A = functools.partial(symm_tridiag_mult_fn, diag_A, off_diag_A)
 	fn_B = functools.partial(symm_tridiag_mult_fn, diag_B, off_diag_B)
@@ -103,13 +101,14 @@ def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 		W1 = tf.add(W1, prod)
 
 	# Compute a and b
-
+	"""
 	a = tf.reduce_prod(f_x_A)
 	b = tf.reduce_prod(f_x_B)
 
 	coeff = 1.0/(1 - a*b)
 
 	W1 = tf.scalar_mul(coeff, W1)
+	"""
 
 	y = compute_y(x, W1, params)
 	
@@ -205,13 +204,13 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 	accuracies = []
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
-		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
+		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
-		summary_writer.add_summary(summary, step)
 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			this_loss, this_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			this_loss, this_accuracy, summary = sess.run([loss, accuracy, merged_summary_op], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+			summary_writer.add_summary(summary, step)
 			losses.append(this_loss)
 			accuracies.append(this_accuracy)
 			print('Test loss: ', this_loss)
