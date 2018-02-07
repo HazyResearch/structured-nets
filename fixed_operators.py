@@ -58,8 +58,8 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
-			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-				train_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
+			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
+				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
 			
 			summary_writer.add_summary(train_loss_summ, step)
 			summary_writer.add_summary(train_acc_summ, step)
@@ -157,8 +157,8 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 			
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
-			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-				train_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
+			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
+				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})	
 			
 			summary_writer.add_summary(train_loss_summ, step)
 			summary_writer.add_summary(train_acc_summ, step)
@@ -256,8 +256,8 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
-			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-				train_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
+			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
+				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})				
 			
 			summary_writer.add_summary(train_loss_summ, step)
 			summary_writer.add_summary(train_acc_summ, step)
@@ -343,8 +343,8 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 			print('Training step: ', step)
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
-			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-				train_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
+			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
+				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})				
 			
 			summary_writer.add_summary(train_loss_summ, step)
 			summary_writer.add_summary(train_acc_summ, step)
@@ -427,8 +427,8 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 			print('Training step: ', step)
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
-			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-				train_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
+			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
+				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})				
 			
 			summary_writer.add_summary(train_loss_summ, step)
 			summary_writer.add_summary(train_acc_summ, step)
