@@ -39,6 +39,7 @@ fix_G = False
 init_type = 'toeplitz'
 init_stddev = 0.1 # For random initialization
 test_freq = 100
+checkpoint_freq = 1000
 n_trials = 3
 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
 results_dir = os.path.join(out_dir, 'results', args.result_dir) 
@@ -55,7 +56,7 @@ if fn.__name__ == 'toeplitz_like':
 
 params = ModelParams(args.dataset, args.test, log_path, n, out_size, num_layers, loss, args.r, steps, batch_size, 
 		args.lr, args.mom, init_type, fn.__name__, disp_type, args.learn_corner, args.n_diag_learned, 
-		init_stddev, fix_G, check_disp)
+		init_stddev, fix_G, check_disp, checkpoint_freq)
 
 print 'Params:\n', params
 
