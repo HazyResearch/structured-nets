@@ -30,18 +30,18 @@ n = 784
 num_layers = 1
 out_dir = '/dfs/scratch1/thomasat/'
 loss = 'cross_entropy'
-steps = 100#50000
+steps = 50000
 batch_size = 50
 test_size = 1000
 fix_G = False
 init_type = 'toeplitz'
 init_stddev = 0.1 # For random initialization
 test_freq = 100
-n_trials = 5
+n_trials = 3
 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
 results_dir = os.path.join(out_dir, 'results', args.result_dir) 
 
-#Available test_fns: [toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
+#Available test_fns: [low_rank, toeplitz_like, hankel_like, vandermonde_like, unconstrained, circulant_sparsity]
 fn = locals()[args.fn]  
 dataset = Dataset(args.dataset, n, test_size)
 out_size = dataset.out_size() # 10 for MNIST, 2 for convex, rect, rect_images
