@@ -42,40 +42,76 @@ def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
-	tf.summary.scalar('loss', loss)
-	tf.summary.scalar('accuracy', accuracy)
+	train_loss_summary = tf.summary.scalar('train_loss', loss)
+	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
+	val_loss_summary = tf.summary.scalar('val_loss', loss)
+	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
 
-	merged_summary_op = tf.summary.merge_all()
 	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 
 	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
 
+	saver = tf.train.Saver()
+
 	step = 0
 
-	losses = []
-	accuracies = []
+	losses = {}
+	accuracies = {}
+	train_losses = []
+	train_accuracies = []
+	val_losses = []
+	val_accuracies = []
+
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			this_loss, this_accuracy, summary = sess.run([loss, accuracy, merged_summary_op], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
-			summary_writer.add_summary(summary, step)
-			losses.append(this_loss)
-			accuracies.append(this_accuracy)
-			print('Test loss: ', this_loss)
-			print('Test accuracy: ', this_accuracy)
+			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
+				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
+			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
+				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
+			
+			summary_writer.add_summary(train_loss_summ, step)
+			summary_writer.add_summary(train_acc_summ, step)
+			summary_writer.add_summary(val_loss_summ, step)
+			summary_writer.add_summary(val_acc_summ, step)
+
+			train_losses.append(train_loss)
+			train_accuracies.append(train_accuracy)
+			val_losses.append(val_loss)
+			val_accuracies.append(val_accuracy)
+			
+			print('Train loss, accuracy: ', train_loss, train_accuracy)
+			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+
 			if verbose:
 				print('Current W1: ', W1_real)
 
+		if step % params.checkpoint_freq == 0:
+			save_path = saver.save(sess, params.checkpoint_path)
+			print("Model saved in file: %s" % save_path)
+
 		step += 1
 
+	losses['train'] = train_losses
+	losses['val'] = val_losses
+	accuracies['train'] = train_accuracies
+	accuracies['val'] = val_accuracies
+
 	# Test trained model
-	print('SGD final loss, learned operators (tridiagonal+corner): ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
-	print('SGD final accuracy, learned operators (tridiagonal+corner): ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
+	if params.test:
+		# Load test
+		dataset.load_test_data()
+		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		print('SGD test loss, tridiagonal+corner: ', test_loss)
+		print('SGD test accuracy, tridiagonal+corner: ', test_accuracy)
+		losses['test'] = test_loss
+		accuracies['test'] = test_accuracy
 
 	return losses, accuracies
 
@@ -116,40 +152,76 @@ def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
-	tf.summary.scalar('loss', loss)
-	tf.summary.scalar('accuracy', accuracy)
+	train_loss_summary = tf.summary.scalar('train_loss', loss)
+	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
+	val_loss_summary = tf.summary.scalar('val_loss', loss)
+	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
 
-	merged_summary_op = tf.summary.merge_all()
 	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 
 	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
 
+	saver = tf.train.Saver()
+
 	step = 0
 
-	losses = []
-	accuracies = []
+	losses = {}
+	accuracies = {}
+	train_losses = []
+	train_accuracies = []
+	val_losses = []
+	val_accuracies = []
+
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			this_loss, this_accuracy, summary = sess.run([loss, accuracy, merged_summary_op], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
-			summary_writer.add_summary(summary, step)
-			losses.append(this_loss)
-			accuracies.append(this_accuracy)
-			print('Test loss: ', this_loss)
-			print('Test accuracy: ', this_accuracy)
+			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
+				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
+			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
+				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
+			
+			summary_writer.add_summary(train_loss_summ, step)
+			summary_writer.add_summary(train_acc_summ, step)
+			summary_writer.add_summary(val_loss_summ, step)
+			summary_writer.add_summary(val_acc_summ, step)
+
+			train_losses.append(train_loss)
+			train_accuracies.append(train_accuracy)
+			val_losses.append(val_loss)
+			val_accuracies.append(val_accuracy)
+			
+			print('Train loss, accuracy: ', train_loss, train_accuracy)
+			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+
 			if verbose:
 				print('Current W1: ', W1_real)
 
+		if step % params.checkpoint_freq == 0:
+			save_path = saver.save(sess, params.checkpoint_path)
+			print("Model saved in file: %s" % save_path)
+
 		step += 1
 
+	losses['train'] = train_losses
+	losses['val'] = val_losses
+	accuracies['train'] = train_accuracies
+	accuracies['val'] = val_accuracies
+
 	# Test trained model
-	print('SGD final loss, learned operators (polynomial transforms): ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
-	print('SGD final accuracy, learned operators (polynomial transforms): ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
+	if params.test:
+		# Load test
+		dataset.load_test_data()
+		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		print('SGD test loss, polynomial transform: ', test_loss)
+		print('SGD test accuracy, polynomial transform: ', test_accuracy)
+		losses['test'] = test_loss
+		accuracies['test'] = test_accuracy
 
 	return losses, accuracies
 
@@ -188,20 +260,28 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
-	tf.summary.scalar('loss', loss)
-	tf.summary.scalar('accuracy', accuracy)
+	train_loss_summary = tf.summary.scalar('train_loss', loss)
+	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
+	val_loss_summary = tf.summary.scalar('val_loss', loss)
+	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
 
-	merged_summary_op = tf.summary.merge_all()
 	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 
 	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
 
+	saver = tf.train.Saver()
+
 	step = 0
 
-	losses = []
-	accuracies = []
+	losses = {}
+	accuracies = {}
+	train_losses = []
+	train_accuracies = []
+	val_losses = []
+	val_accuracies = []
+
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
@@ -209,20 +289,48 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			this_loss, this_accuracy, summary = sess.run([loss, accuracy, merged_summary_op], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
-			summary_writer.add_summary(summary, step)
-			losses.append(this_loss)
-			accuracies.append(this_accuracy)
-			print('Test loss: ', this_loss)
-			print('Test accuracy: ', this_accuracy)
+			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
+				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
+			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
+				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
+			
+			summary_writer.add_summary(train_loss_summ, step)
+			summary_writer.add_summary(train_acc_summ, step)
+			summary_writer.add_summary(val_loss_summ, step)
+			summary_writer.add_summary(val_acc_summ, step)
+
+			train_losses.append(train_loss)
+			train_accuracies.append(train_accuracy)
+			val_losses.append(val_loss)
+			val_accuracies.append(val_accuracy)
+			
+			print('Train loss, accuracy: ', train_loss, train_accuracy)
+			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+
 			if verbose:
 				print('Current W1: ', W1_real)
 
+		if step % params.checkpoint_freq == 0:
+			save_path = saver.save(sess, params.checkpoint_path)
+			print("Model saved in file: %s" % save_path)
+
 		step += 1
 
+	losses['train'] = train_losses
+	losses['val'] = val_losses
+	accuracies['train'] = train_accuracies
+	accuracies['val'] = val_accuracies
+
 	# Test trained model
-	print('SGD final loss, learned operators (fixed circulant sparsity pattern): ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
-	print('SGD final accuracy, learned operators (fixed circulant sparsity pattern): ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
+	if params.test:
+		# Load test
+		dataset.load_test_data()
+		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		print('SGD test loss, circulant sparsity operators: ', test_loss)
+		print('SGD test accuracy, circulant sparsity operators: ', test_accuracy)
+		losses['test'] = test_loss
+		accuracies['test'] = test_accuracy
 
 	return losses, accuracies
 
@@ -246,20 +354,28 @@ def circulant_sparsity_hadamard(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
-	tf.summary.scalar('loss', loss)
-	tf.summary.scalar('accuracy', accuracy)
+	train_loss_summary = tf.summary.scalar('train_loss', loss)
+	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
+	val_loss_summary = tf.summary.scalar('val_loss', loss)
+	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
 
-	merged_summary_op = tf.summary.merge_all()
 	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 
 	train_step = tf.train.MomentumOptimizer(params.lr, params.mom).minimize(loss)
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
 
+	saver = tf.train.Saver()
+
 	step = 0
 
-	losses = []
-	accuracies = []
+	losses = {}
+	accuracies = {}
+	train_losses = []
+	train_accuracies = []
+	val_losses = []
+	val_accuracies = []
+
 	while step < params.steps:
 		batch_xs, batch_ys = dataset.batch(params.batch_size)
 		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
