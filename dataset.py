@@ -15,6 +15,8 @@ class Dataset:
 		self.test_size = test_size
 		self.true_test = true_test
 		self.n = n
+		self.train_loc = ''
+		self.test_loc = ''
 		if self.name == 'mnist':
 			data_dir = '/tmp/tensorflow/mnist/input_data'
 			self.mnist = input_data.read_data_sets(data_dir, one_hot=True)
@@ -34,10 +36,40 @@ class Dataset:
 			self.load_train_data()
 		elif self.name.startswith('mnist_noise'):
 			idx = self.name[-1]
-			self.train_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
-			self.test_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
-			self.test_size = 2000 # As specified in http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/DeepVsShallowComparisonICML2007#Downloadable_datasets
-			self.load_train_data()
+			data_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
+			train_size = 11000
+			test_size = 2000 # As specified in http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/DeepVsShallowComparisonICML2007#Downloadable_datasets
+			val_size = 1000
+
+			data = np.genfromtxt(data_loc)
+			X = data[:, :-1]
+			Y = np.expand_dims(data[:, -1], 1)
+
+			# Y must be one-hot
+			enc = OneHotEncoder()
+			Y = enc.fit_transform(Y).todense()
+			# Split into train, val, test
+			# Shuffle the data
+			idx = np.arange(0, X.shape[0])
+			np.random.shuffle(idx)
+
+			train_idx = idx[0:train_size]
+			val_idx = idx[train_size:train_size+val_size]
+			test_idx = idx[:-test_size]
+
+			assert train_idx.size == train_size
+			assert val_idx.size == val_size
+			assert test_idx.size == test_size
+
+			self.val_X = X[val_idx, :]
+			self.val_Y = Y[val_idx, :]
+			self.test_X = X[test_idx, :]
+			self.test_Y = Y[test_idx, :]
+			self.train_X = X[train_idx, :]
+			self.train_Y = Y[train_idx, :]
+
+			print self.val_X.shape, self.val_Y.shape, self.test_X.shape, self.test_Y.shape, self.train_X.shape, self.train_Y.shape 
+
 		elif self.name == 'convex':
 			self.train_loc = '/dfs/scratch1/thomasat/datasets/convex/convex_train.amat'
 			self.test_loc = '/dfs/scratch1/thomasat/datasets/convex/50k/convex_test.amat'
@@ -49,7 +81,35 @@ class Dataset:
 		elif self.name == 'rect_images':
 			self.train_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_train.amat'
 			self.test_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_test.amat'
-			self.load_train_data()
+
+			train_size = 11000
+			val_size = 1000
+			train_data = np.genfromtxt(self.train_loc)
+
+			# Shuffle
+			X = data[:, :-1]
+			Y = np.expand_dims(data[:, -1], 1)
+
+			# Y must be one-hot
+			enc = OneHotEncoder()
+			Y = enc.fit_transform(Y).todense()
+			idx = np.arange(0, X.shape[0])
+			np.random.shuffle(idx)
+
+			train_idx = idx[0:train_size]
+			val_idx = idx[:-val_size]
+
+			assert train_idx.size == train_size
+			assert val_idx.size == val_size
+
+			self.train_X = X[train_idx, :]
+			self.train_Y = Y[train_idx, :]
+			self.val_X = X[val_idx, :]
+			self.val_Y = Y[val_idx, :]
+
+			print self.val_X.shape, self.val_Y.shape, self.test_X.shape, self.test_Y.shape, self.train_X.shape, self.train_Y.shape 
+
+
 		elif self.name.startswith('true'):
 			self.true_transform = gen_matrix(n, self.name.split("true_",1)[1] )
 			test_X, test_Y = gen_batch(self.true_transform, self.test_size)
@@ -68,14 +128,18 @@ class Dataset:
 			return self.n
 
 	def load_test_data(self):
-		test_data = np.genfromtxt(self.test_loc)
+		if self.name.startswith('mnist_noise'):
+			return 
 
-		self.test_X = test_data[:, :-1]
-		self.test_Y = np.expand_dims(test_data[:, -1], 1)
+		if self.test_loc:
+			test_data = np.genfromtxt(self.test_loc)
 
-		# Y must be one-hot
-		enc = OneHotEncoder()
-		self.test_Y = enc.fit_transform(self.test_Y).todense()		
+			self.test_X = test_data[:, :-1]
+			self.test_Y = np.expand_dims(test_data[:, -1], 1)
+
+			# Y must be one-hot
+			enc = OneHotEncoder()
+			self.test_Y = enc.fit_transform(self.test_Y).todense()		
 
 	def load_train_data(self):
 		train_data = np.genfromtxt(self.train_loc)
@@ -86,10 +150,6 @@ class Dataset:
 		# Y must be one-hot
 		enc = OneHotEncoder()
 		self.train_Y = enc.fit_transform(self.train_Y).todense()
-
-		# HACK
-		self.val_X = self.train_X
-		self.val_Y = self.train_Y
 
 		"""
 		else: # Use train_loc only
