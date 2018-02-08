@@ -25,6 +25,8 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
+	test_loss_summary = tf.summary.scalar('test_loss', loss)
+	test_acc_summary = tf.summary.scalar('test_accuracy', accuracy)
 
 	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 
@@ -92,10 +94,14 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 	if params.test:
 		# Load test
 		dataset.load_test_data()
-		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
-		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		test_loss, test_accuracy, test_loss_summ, test_acc_summ = sess.run([loss, accuracy, test_loss_summary, test_acc_summary], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+
+		summary_writer.add_summary(test_loss_summ, step)
+		summary_writer.add_summary(test_acc_summ, step)
+
 		print('SGD test loss, Vandermonde-like: ', test_loss)
 		print('SGD test accuracy, Vandermonde-like: ', test_accuracy)
+
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy
 
@@ -125,6 +131,8 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
+	test_loss_summary = tf.summary.scalar('test_loss', loss)
+	test_acc_summary = tf.summary.scalar('test_accuracy', accuracy)
 
 	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 
@@ -159,7 +167,7 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
 				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})	
-			
+
 			summary_writer.add_summary(train_loss_summ, step)
 			summary_writer.add_summary(train_acc_summ, step)
 			summary_writer.add_summary(val_loss_summ, step)
@@ -192,8 +200,11 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 		# Load test
 		dataset.load_test_data()
 
-		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
-		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		test_loss, test_accuracy, test_loss_summ, test_acc_summ = sess.run([loss, accuracy, test_loss_summary, test_acc_summary], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+
+		summary_writer.add_summary(test_loss_summ, step)
+		summary_writer.add_summary(test_acc_summ, step)
+
 		print('SGD test loss, Hankel-like: ', test_loss)
 		print('SGD test accuracy, Hankel-like: ', test_accuracy)
 		losses['test'] = test_loss
@@ -223,6 +234,9 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
+	test_loss_summary = tf.summary.scalar('test_loss', loss)
+	test_acc_summary = tf.summary.scalar('test_accuracy', accuracy)
+
 
 	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 
@@ -291,8 +305,12 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 		# Load test
 		dataset.load_test_data()
 
-		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
-		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		test_loss, test_accuracy, test_loss_summ, test_acc_summ = sess.run([loss, accuracy, test_loss_summary, 
+			test_acc_summary], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+
+		summary_writer.add_summary(test_loss_summ, step)
+		summary_writer.add_summary(test_acc_summ, step)
+
 		print('SGD test loss, Toeplitz-like: ', test_loss)
 		print('SGD test accuracy, Toeplitz-like: ', test_accuracy)
 		losses['test'] = test_loss
@@ -316,6 +334,9 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
+	test_loss_summary = tf.summary.scalar('test_loss', loss)
+	test_acc_summary = tf.summary.scalar('test_accuracy', accuracy)
+
 
 	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 
@@ -378,8 +399,11 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 		# Load test
 		dataset.load_test_data()
 
-		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
-		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		test_loss, test_accuracy, test_loss_summ, test_acc_summ = sess.run([loss, accuracy, test_loss_summary, test_acc_summary], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+
+		summary_writer.add_summary(test_loss_summ, step)
+		summary_writer.add_summary(test_acc_summ, step)
+		
 		print('SGD test loss, low rank: ', test_loss)
 		print('SGD test accuracy, low rank: ', test_accuracy)
 		losses['test'] = test_loss
@@ -400,6 +424,9 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
+	test_loss_summary = tf.summary.scalar('test_loss', loss)
+	test_acc_summary = tf.summary.scalar('test_accuracy', accuracy)
+
 
 	summary_writer = tf.summary.FileWriter(params.log_path, graph=tf.get_default_graph())
 
@@ -462,8 +489,12 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 		# Load test
 		dataset.load_test_data()
 
-		test_loss = sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
-		test_accuracy = sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+		test_loss, test_accuracy, test_loss_summ, test_acc_summ = sess.run([loss, accuracy, test_loss_summary, 
+			test_acc_summary], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+
+		summary_writer.add_summary(test_loss_summ, step)
+		summary_writer.add_summary(test_acc_summ, step)
+		
 		print('SGD test loss, unconstrained: ', test_loss)
 		print('SGD test accuracy, unconstrained: ', test_accuracy)
 		losses['test'] = test_loss
