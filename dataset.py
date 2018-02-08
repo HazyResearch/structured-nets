@@ -84,7 +84,7 @@ class Dataset:
 
 			train_size = 11000
 			val_size = 1000
-			train_data = np.genfromtxt(self.train_loc)
+			data = np.genfromtxt(self.train_loc)
 
 			# Shuffle
 			X = data[:, :-1]
@@ -107,7 +107,7 @@ class Dataset:
 			self.val_X = X[val_idx, :]
 			self.val_Y = Y[val_idx, :]
 
-			print self.val_X.shape, self.val_Y.shape, self.test_X.shape, self.test_Y.shape, self.train_X.shape, self.train_Y.shape 
+			print self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape 
 
 
 		elif self.name.startswith('true'):
