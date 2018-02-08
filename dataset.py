@@ -55,7 +55,7 @@ class Dataset:
 
 			train_idx = idx[0:train_size]
 			val_idx = idx[train_size:train_size+val_size]
-			test_idx = idx[:-test_size]
+			test_idx = idx[-test_size:]
 
 			assert train_idx.size == train_size
 			assert val_idx.size == val_size
@@ -97,7 +97,7 @@ class Dataset:
 			np.random.shuffle(idx)
 
 			train_idx = idx[0:train_size]
-			val_idx = idx[:-val_size]
+			val_idx = idx[-val_size:]
 
 			assert train_idx.size == train_size
 			assert val_idx.size == val_size
