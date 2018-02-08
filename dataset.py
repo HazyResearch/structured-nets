@@ -29,7 +29,35 @@ class Dataset:
 		elif self.name == 'mnist_bg_rot':
 			self.train_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat'
 			self.test_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_test.amat'
-			self.load_train_data()
+
+			train_size = 11000
+			val_size = 1000
+			data = np.genfromtxt(self.train_loc)
+
+			# Shuffle
+			X = data[:, :-1]
+			Y = np.expand_dims(data[:, -1], 1)
+
+			# Y must be one-hot
+			enc = OneHotEncoder()
+			Y = enc.fit_transform(Y).todense()
+			idx = np.arange(0, X.shape[0])
+			np.random.shuffle(idx)
+
+			train_idx = idx[0:train_size]
+			val_idx = idx[-val_size:]
+
+			assert train_idx.size == train_size
+			assert val_idx.size == val_size
+
+			self.train_X = X[train_idx, :]
+			self.train_Y = Y[train_idx, :]
+			self.val_X = X[val_idx, :]
+			self.val_Y = Y[val_idx, :]
+
+			print self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape 
+
+
 		elif self.name == 'mnist_rand_bg':
 			self.train_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_train.amat'
 			self.test_loc = '/dfs/scratch1/thomasat/datasets/mnist_rand_bg/mnist_background_random_test.amat'
