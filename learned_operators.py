@@ -4,7 +4,7 @@ from utils import *
 from reconstruction import *
 from krylov import *
 import functools
-import time
+import time, os
 
 # Only an approximate reconstruction.
 def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
