@@ -81,7 +81,7 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 				print('Current W1: ', W1_real)
 
 		if step % params.checkpoint_freq == 0:
-			save_path = saver.save(sess, params.checkpoint_path)
+			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
 			print("Model saved in file: %s" % save_path)
 
 		step += 1
@@ -186,7 +186,7 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 				print('Current W1: ', W1_real)
 
 		if step % params.checkpoint_freq == 0:
-			save_path = saver.save(sess, params.checkpoint_path)
+			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
 			print("Model saved in file: %s" % save_path)
 
 		step += 1
@@ -475,7 +475,7 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 				print('Current W1: ', W1_real)
 
 		if step % params.checkpoint_freq == 0:
-			save_path = saver.save(sess, params.checkpoint_path)
+			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
 			print("Model saved in file: %s" % save_path)
 
 		step += 1
