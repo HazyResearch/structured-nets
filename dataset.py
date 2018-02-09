@@ -1,6 +1,7 @@
 from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
 import sys
+import pickle as pkl
 from sklearn.preprocessing import OneHotEncoder
 sys.path.insert(0, '../../../../')
 from utils import *
@@ -8,16 +9,27 @@ from utils import *
 
 class Dataset:
 	# true_test: if True, we test on test set. Otherwise, split training set into train/validation.
-	def __init__(self, name, n, test_size=1000, true_test=False):
+	def __init__(self, name, n, total_iters, test_size=1000, true_test=False):
 		self.name = name
 		self.mnist = None
+		self.num_iters = num_iters
+		self.current_batch = 0
 		self.true_transform = None
 		self.test_size = test_size
 		self.true_test = true_test
 		self.n = n
 		self.train_loc = ''
 		self.test_loc = ''
-		if self.name == 'mnist':
+		
+		if self.name == 'cifar10':
+			# Load the first batch
+			data_dir = '/dfs/scratch1/thomasat/datasets/cifar10'
+
+			self.test_loc = '/dfs/scratch1/thomasat/datasets/cifar10/test_batch'
+			self.num_batches = 5
+			self.load_train_cifar10(0)
+
+		elif self.name == 'mnist':
 			data_dir = '/tmp/tensorflow/mnist/input_data'
 			self.mnist = input_data.read_data_sets(data_dir, one_hot=True)
 			self.test_X = self.mnist.test.images
@@ -147,6 +159,20 @@ class Dataset:
 			print 'Not supported: ', self.name
 			assert 0
 	
+	def load_train_cifar10(self, batch_num):
+		# 0-indexing of batch_num
+		loc = '/dfs/scratch1/thomasat/datasets/cifar10/data_batch_' + str(batch_num+1)
+		dict = pkl.load(open(loc, 'rb'))
+		data = dict['data']
+		labels = np.array(dict['labels'])
+
+		self.train_X = data
+		self.train_Y = np.expand_dims(labels, 1)
+
+		# Y must be one-hot
+		enc = OneHotEncoder()
+		self.train_Y = enc.fit_transform(self.train_Y).todense()			
+
 	def out_size(self):
 		if 'mnist' in self.name:
 			return 10
@@ -159,7 +185,20 @@ class Dataset:
 		if self.name.startswith('mnist_noise'):
 			return 
 
-		if self.test_loc:
+		if self.name == 'cifar10':
+			test_dict = pkl.load(open(self.test_loc, 'rb'))
+			test_data = test_dict['data']
+			test_labels = np.array(test_dict['labels'])
+
+			self.test_X = test_data
+			self.test_Y = np.expand_dims(test_labels, 1)
+
+			# Y must be one-hot
+			enc = OneHotEncoder()
+			self.test_Y = enc.fit_transform(self.test_Y).todense()		
+
+
+		elif self.test_loc:
 			test_data = np.genfromtxt(self.test_loc)
 
 			self.test_X = test_data[:, :-1]
@@ -196,7 +235,7 @@ class Dataset:
 			self.test_Y = enc.fit_transform(self.test_Y).todense()
 		"""
 
-	def batch(self, batch_size):
+	def batch(self, batch_size, step):
 		if self.name == 'mnist':
 			batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
 			return batch_xs, batch_ys
@@ -204,6 +243,13 @@ class Dataset:
 			# Randomly sample batch_size from train_X and train_Y
 			idx = np.random.randint(self.train_X.shape[0], size=batch_size)
 			return self.train_X[idx, :], self.train_Y[idx, :]
+		elif self.name == 'cifar10':
+			this_batch = int(self.num_iters/self.num_batches)
+			if this_batch != self.current_batch:
+				# Load new data
+				self.current_batch = this_batch
+			idx = np.random.randint(self.train_X.shape[0], size=batch_size)
+			return self.train_X[idx, :], self.train_Y[idx, :]			
 		elif self.name.startswith('true'):
 			return gen_batch(self.true_transform, batch_size)
 		else:
