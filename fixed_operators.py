@@ -47,7 +47,7 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 	val_accuracies = []
 
 	while step < params.steps:
-		batch_xs, batch_ys = dataset.batch(params.batch_size)
+		batch_xs, batch_ys = dataset.batch(params.batch_size, step)
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 	 
 		if step % test_freq == 0:
@@ -153,7 +153,7 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 	val_accuracies = []
 
 	while step < params.steps:
-		batch_xs, batch_ys = dataset.batch(params.batch_size)
+		batch_xs, batch_ys = dataset.batch(params.batch_size, step)
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
  
 		if step % test_freq == 0:
@@ -257,7 +257,7 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	val_accuracies = []
 
 	while step < params.steps:
-		batch_xs, batch_ys = dataset.batch(params.batch_size)
+		batch_xs, batch_ys = dataset.batch(params.batch_size, step)
 		_, = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 	 
@@ -357,7 +357,7 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 	val_accuracies = []
 
 	while step < params.steps:
-		batch_xs, batch_ys = dataset.batch(params.batch_size)
+		batch_xs, batch_ys = dataset.batch(params.batch_size, step)
 		_, = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 	 
@@ -447,7 +447,7 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 	val_accuracies = []
 
 	while step < params.steps:
-		batch_xs, batch_ys = dataset.batch(params.batch_size)
+		batch_xs, batch_ys = dataset.batch(params.batch_size, step)
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 	 

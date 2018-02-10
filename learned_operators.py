@@ -67,7 +67,7 @@ def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 	val_accuracies = []
 
 	while step < params.steps:
-		batch_xs, batch_ys = dataset.batch(params.batch_size)
+		batch_xs, batch_ys = dataset.batch(params.batch_size, step)
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if step % test_freq == 0:
@@ -129,10 +129,10 @@ def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 		G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 
-	diag_A, off_diag_A, diag_B, off_diag_B  = get_symm_pos_tridiag_vars(params.n, params.init_type, params.init_stddev)
+	diag_A, off_diag_A, diag_B  = get_symm_pos_tridiag_vars(params.n, params.init_type, params.init_stddev)
 
 	fn_A = functools.partial(symm_tridiag_mult_fn, diag_A, off_diag_A)
-	fn_B = functools.partial(symm_tridiag_mult_fn, diag_B, off_diag_B)
+	fn_B = functools.partial(diag_mult_fn, diag_B)
 
 	W1 = tf.zeros([params.n, params.n], dtype=tf.float64)
 	for i in range(params.r):
@@ -157,8 +157,8 @@ def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
-	train_loss_summary = tf.summary.scalar('train_loss', loss)
-	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
+	#train_loss_summary = tf.summary.scalar('train_loss', loss)
+	#train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
 	test_loss_summary = tf.summary.scalar('test_loss', loss)
@@ -182,27 +182,31 @@ def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 	val_accuracies = []
 
 	while step < params.steps:
-		batch_xs, batch_ys = dataset.batch(params.batch_size)
+		batch_xs, batch_ys = dataset.batch(params.batch_size, step)
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
-			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
-				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
+			#train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
+			#	train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
+			val_loss, val_accuracy, val_loss_summ, val_acc_summ, this_diag_A, this_off_diag_A, this_diag_B = sess.run([loss, accuracy, val_loss_summary, 
+				val_acc_summary, diag_A, off_diag_A, diag_B], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
 			
-			summary_writer.add_summary(train_loss_summ, step)
-			summary_writer.add_summary(train_acc_summ, step)
+			print 'diag_A: ', this_diag_A
+			print 'off_diag_A: ', this_off_diag_A
+			print 'diag_B: ', this_diag_B
+
+			#summary_writer.add_summary(train_loss_summ, step)
+			#summary_writer.add_summary(train_acc_summ, step)
 			summary_writer.add_summary(val_loss_summ, step)
 			summary_writer.add_summary(val_acc_summ, step)
 
-			train_losses.append(train_loss)
-			train_accuracies.append(train_accuracy)
+			#train_losses.append(train_loss)
+			#train_accuracies.append(train_accuracy)
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			print('Train loss, accuracy: ', train_loss, train_accuracy)
+			#print('Train loss, accuracy: ', train_loss, train_accuracy)
 			print('Validation loss, accuracy: ', val_loss, val_accuracy)
 
 			if verbose:
@@ -239,12 +243,14 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 	# Create the model
 	x = tf.placeholder(tf.float64, [None, params.n])
 	if params.fix_G:
-		G = tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64)
+		G = tf.truncated_normal([params.n, params.r], stddev=1.01, dtype=tf.float64)
 	else:
 		G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
 
 	f_x_A, f_x_B = get_f_x(params.n, params.init_type, params.learn_corner, params.n_diag_learned, params.init_stddev)
+	print f_x_A.name, f_x_B.name
+	quit()
 
 	fn_A = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_A, [0]))
 	fn_B = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_B, [0]))
@@ -295,7 +301,7 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 	val_accuracies = []
 
 	while step < params.steps:
-		batch_xs, batch_ys = dataset.batch(params.batch_size)
+		batch_xs, batch_ys = dataset.batch(params.batch_size, step)
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 
@@ -394,7 +400,7 @@ def circulant_sparsity_hadamard(dataset, params, test_freq=100, verbose=False):
 	val_accuracies = []
 
 	while step < params.steps:
-		batch_xs, batch_ys = dataset.batch(params.batch_size)
+		batch_xs, batch_ys = dataset.batch(params.batch_size, step)
 		summary, _, = sess.run([merged_summary_op, train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		summary_writer.add_summary(summary, step)

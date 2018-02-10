@@ -53,14 +53,24 @@ def get_f_x(n, init_type, learn_corner, n_diag_learned, stddev=0.01):
 
 def get_symm_pos_tridiag_vars(n, init_type, stddev=0.01):
 	# Constraint to be positive
-	diag_A = tf.Variable(tf.truncated_normal([n], stddev=stddev, dtype=tf.float64))
-	off_diag_A = tf.get_variable('off_diag_A', initializer=tf.truncated_normal([n-1], stddev=stddev, dtype=tf.float64), 
-		constraint=lambda x: tf.clip_by_value(x, 0, np.infty))
-	diag_B = tf.Variable(tf.truncated_normal([n], stddev=stddev, dtype=tf.float64))
-	off_diag_B = tf.get_variable('off_diag_B', initializer=tf.truncated_normal([n-1], stddev=stddev, dtype=tf.float64), 
-		constraint=lambda x: tf.clip_by_value(x, 0, np.infty))
+	if init_type == 'random':
+		diag_A = tf.Variable(tf.truncated_normal([n], stddev=stddev, dtype=tf.float64))
+		off_diag_A = tf.get_variable('off_diag_A', initializer=tf.truncated_normal([n-1], stddev=stddev, dtype=tf.float64), 
+			constraint=lambda x: tf.clip_by_value(x, 0, np.infty))
+		diag_B = tf.Variable(tf.truncated_normal([n], stddev=stddev, dtype=tf.float64))
+	elif init_type == 'chebyshev':
+		# A: 0 on diagonal
+		# A: 1/2 on on sub/super diagonal 
+		# B: uniform(-1, 1)	
+		print 'chebyshev initialization'
+		diag_A = tf.Variable(tf.zeros([n], dtype=tf.float64))
+		off_diag_A = tf.get_variable('off_diag_A', initializer=0.5*tf.ones([n-1], dtype=tf.float64), 
+			constraint=lambda x: tf.clip_by_value(x, 0, np.infty))
+		diag_B = tf.Variable(tf.random_uniform([n],minval=-1, maxval=1, dtype=tf.float64))
+	else:
+		print 'init_type not supported: ', init_type
 
-	return diag_A, off_diag_A, diag_B, off_diag_B
+	return diag_A, off_diag_A, diag_B
 
 def get_tridiag_vars(n, init_type, stddev=0.01):
 	if init_type == 'toeplitz':
