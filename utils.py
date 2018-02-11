@@ -167,8 +167,8 @@ def compute_y(x, W1, params):
 		y = tf.matmul(x, W1)
 		return y
 	elif params.num_layers==1:
-		b1 = tf.Variable(tf.truncated_normal([params.n], stddev=0.01, dtype=tf.float64))
-		W2 = tf.Variable(tf.truncated_normal([params.n, params.out_size], stddev=0.01, dtype=tf.float64))
+		b1 = tf.Variable(tf.truncated_normal([params.layer_size], stddev=0.01, dtype=tf.float64))
+		W2 = tf.Variable(tf.truncated_normal([params.layer_size, params.out_size], stddev=0.01, dtype=tf.float64))
 		b2 = tf.Variable(tf.truncated_normal([params.out_size], stddev=0.01, dtype=tf.float64))
 		xW = tf.matmul(x, W1)
 
