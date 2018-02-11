@@ -9,22 +9,22 @@ import time, os
 # Only an approximate reconstruction.
 def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 	# Create the model
-	x = tf.placeholder(tf.float64, [None, params.n])
+	x = tf.placeholder(tf.float64, [None, params.input_size])
 	if params.fix_G:
-		G = tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64)
+		G = tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64)
 	else:
-		G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
-	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
+		G = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
+	H = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
 
-	subdiag_A, supdiag_A, diag_A, f_A, subdiag_B, supdiag_B, diag_B, f_B = get_tridiag_corner_vars(params.n, params.init_type, params.init_stddev, params.learn_corner)
+	subdiag_A, supdiag_A, diag_A, f_A, subdiag_B, supdiag_B, diag_B, f_B = get_tridiag_corner_vars(params.layer_size, params.init_type, params.init_stddev, params.learn_corner)
 
 	fn_A = functools.partial(tridiag_corner_transpose_mult_fn, subdiag_A, diag_A, supdiag_A, f_A)
 	fn_B = functools.partial(tridiag_corner_transpose_mult_fn, subdiag_B, diag_B, supdiag_B, f_B)
 
-	W1 = tf.zeros([params.n, params.n], dtype=tf.float64)
+	W1 = tf.zeros([params.layer_size, params.layer_size], dtype=tf.float64)
 	for i in range(params.r):
-		K_A = krylov(fn_A, G[:, i], params.n)
-		K_B = krylov(fn_B, H[:, i], params.n)
+		K_A = krylov(fn_A, G[:, i], params.layer_size)
+		K_B = krylov(fn_B, H[:, i], params.layer_size)
 		prod = tf.matmul(K_A, tf.transpose(K_B))
 		W1 = tf.add(W1, prod)
 
@@ -122,7 +122,7 @@ def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 
 def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 	# Create the model
-	x = tf.placeholder(tf.float64, [None, params.n])
+	x = tf.placeholder(tf.float64, [None, params.input_size])
 	if params.fix_G:
 		G = tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64)
 	else:
@@ -241,24 +241,22 @@ def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 
 def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 	# Create the model
-	x = tf.placeholder(tf.float64, [None, params.n])
+	x = tf.placeholder(tf.float64, [None, params.input_size])
 	if params.fix_G:
-		G = tf.truncated_normal([params.n, params.r], stddev=1.01, dtype=tf.float64)
+		G = tf.truncated_normal([params.layer_size, params.r], stddev=1.01, dtype=tf.float64)
 	else:
-		G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
-	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
+		G = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
+	H = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
 
-	f_x_A, f_x_B = get_f_x(params.n, params.init_type, params.learn_corner, params.n_diag_learned, params.init_stddev)
-	print f_x_A.name, f_x_B.name
-	quit()
+	f_x_A, f_x_B = get_f_x(params.layer_size, params.init_type, params.learn_corner, params.n_diag_learned, params.init_stddev)
 
 	fn_A = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_A, [0]))
 	fn_B = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_B, [0]))
 
-	W1 = tf.zeros([params.n, params.n], dtype=tf.float64)
+	W1 = tf.zeros([params.layer_size, params.layer_size], dtype=tf.float64)
 	for i in range(params.r):
-		K_A = krylov(fn_A, G[:, i], params.n)
-		K_B = krylov(fn_B, H[:, i], params.n)
+		K_A = krylov(fn_A, G[:, i], params.layer_size)
+		K_B = krylov(fn_B, H[:, i], params.layer_size)
 		prod = tf.matmul(K_A, tf.transpose(K_B))
 		W1 = tf.add(W1, prod)
 
@@ -357,7 +355,7 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 
 def circulant_sparsity_hadamard(dataset, params, test_freq=100, verbose=False):
 	# Create the model
-	x = tf.placeholder(tf.float64, [None, params.n])
+	x = tf.placeholder(tf.float64, [None, params.input_size])
 	if params.fix_G:
 		G = tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64)
 	else:

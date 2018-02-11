@@ -6,15 +6,16 @@ from reconstruction import *
 
 def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 	# A is learned, B is fixed
-	B_vand = gen_Z_f(params.n, 0).T
+	B_vand = gen_Z_f(params.layer_size, 0).T
 	f_V = 0
 
 	# Create the model
-	x = tf.placeholder(tf.float64, [None, params.n])
-	v = tf.Variable(tf.truncated_normal([params.n], stddev=0.01, dtype=tf.float64))
-	G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
-	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
-	W1 = vand_recon(G, H, v, params.n, params.n, f_V, params.r)
+	x = tf.placeholder(tf.float64, [None, params.input_size])
+	v = tf.Variable(tf.truncated_normal([params.layer_size], stddev=0.01, dtype=tf.float64))
+	G = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
+	H = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
+
+	W1 = vand_recon(G, H, v, params.layer_size, params.layer_size, f_V, params.r)
 	
 	y = compute_y(x, W1, params)
 	
@@ -111,16 +112,17 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 def hankel_like(dataset, params, test_freq=100, verbose=False):
 	f = 0
 	g = 1
-	A = gen_Z_f(params.n, f)
-	B = gen_Z_f(params.n, g)
+	A = gen_Z_f(params.layer_size, f)
+	B = gen_Z_f(params.layer_size, g)
 
 	# Create the model
-	x = tf.placeholder(tf.float64, [None, params.n])
-	v = tf.Variable(tf.truncated_normal([params.n], stddev=0.01, dtype=tf.float64))
-	G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
-	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
+	x = tf.placeholder(tf.float64, [None, params.input_size])
+	v = tf.Variable(tf.truncated_normal([params.layer_size], stddev=0.01, dtype=tf.float64))
+	G = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
+	H = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
 
-	W1 = rect_recon_tf(G, H, B, params.n, params.n, f, g, params.r)
+
+	W1 = rect_recon_tf(G, H, B, params.layer_size, params.layer_size, f, g, params.r)
 
 	y = compute_y(x, W1, params)
 	
@@ -322,9 +324,10 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 
 def low_rank(dataset, params, test_freq=100, verbose=False):
 	# Create the model
-	x = tf.placeholder(tf.float64, [None, params.n])
-	G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
-	H = tf.Variable(tf.truncated_normal([params.r, params.n], stddev=0.01, dtype=tf.float64))
+	x = tf.placeholder(tf.float64, [None, params.input_size])
+	G = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
+	H = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
+
 	W1 = tf.matmul(G, H)
 
 	y = compute_y(x, W1, params)
@@ -414,8 +417,8 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 
 def unconstrained(dataset, params, test_freq=100, verbose=False):
 	# Create the model
-	x = tf.placeholder(tf.float64, [None, params.n])
-	W1 = tf.Variable(tf.truncated_normal([params.n, params.n], stddev=0.01, dtype=tf.float64))
+	x = tf.placeholder(tf.float64, [None, params.input_size])
+	W1 = tf.Variable(tf.truncated_normal([params.layer_size, params.layer_size], stddev=0.01, dtype=tf.float64))
 	y = compute_y(x, W1, params)
 	y_ = tf.placeholder(tf.float64, [None, params.out_size])
 	
