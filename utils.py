@@ -111,9 +111,59 @@ def compute_loss_and_accuracy(y, y_, params):
 		print 'Not supported: ', params.loss
 		assert 0
 
+def compute_y_cnn(x, W1, params):
+	input_layer = tf.reshape(x, [-1, 32, 32, 3])
+
+	input_layer = tf.cast(input_layer, tf.float32)
+	
+	# Reshape to x to 32x32x3
+	# Convolutional Layer #1
+	conv1 = tf.layers.conv2d(
+	inputs=input_layer,
+	filters=6,
+	kernel_size=[5, 5],
+	padding="same",
+	activation=tf.nn.relu)
+
+	# Pooling Layer #1
+	pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
+
+	# Convolutional Layer #2 and Pooling Layer #2
+	conv2 = tf.layers.conv2d(
+	  inputs=pool1,
+	  filters=16,
+	  kernel_size=[5, 5],
+	  padding="same",
+	  activation=tf.nn.relu)
+	pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
+
+		
+	# Dense Layer: replace with structured matrix
+	pool2_flat = tf.reshape(pool2, [-1, 4 * 4 * 64])
+	pool2_flat = tf.cast(pool2_flat, tf.float64)
+	dense = tf.nn.relu(tf.matmul(pool2_flat, W1))
+
+	#dense = tf.layers.dense(inputs=pool3_flat, units=1024, activation=tf.nn.relu)
+
+	# Logits Layer
+	logits = tf.layers.dense(inputs=dense, units=10)
+
+	
+	print 'input ', input_layer
+	print 'conv1', conv1
+	print 'pool1 ', pool1
+	print 'conv2 ', conv2
+	print 'pool2 ', pool2
+	print 'pool2_flat: ', pool2_flat
+	print 'dense ', dense
+	print 'logits', logits
+
+	return logits
 
 def compute_y(x, W1, params):
-	if params.num_layers==0:
+	if params.transform == 'cnn':
+		return compute_y_cnn(x, W1, params)
+	elif params.num_layers==0:
 		y = tf.matmul(x, W1)
 		return y
 	elif params.num_layers==1:

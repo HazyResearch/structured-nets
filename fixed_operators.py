@@ -215,15 +215,15 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 
 
 def toeplitz_like(dataset, params, test_freq=100, verbose=False):
-	A = gen_Z_f(params.n, 1)
-	B = gen_Z_f(params.n, -1)
+	A = gen_Z_f(params.layer_size, 1)
+	B = gen_Z_f(params.layer_size, -1)
 
 	# Create the model
-	x = tf.placeholder(tf.float64, [None, params.n])
-	G = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
-	H = tf.Variable(tf.truncated_normal([params.n, params.r], stddev=0.01, dtype=tf.float64))
+	x = tf.placeholder(tf.float64, [None, params.input_size])
+	G = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
+	H = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
 
-	W1 = toeplitz_like_recon(G, H, params.n, params.r)
+	W1 = toeplitz_like_recon(G, H, params.layer_size, params.r)
 
 	y = compute_y(x, W1, params)
 	

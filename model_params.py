@@ -2,7 +2,7 @@ from utils import *
 import datetime, os
 
 class ModelParams:
-	def __init__(self, dataset_name, transform, test, log_path, n, out_size, num_layers, loss, r, steps, batch_size, 
+	def __init__(self, dataset_name, transform, test, log_path, input_size, layer_size, out_size, num_layers, loss, r, steps, batch_size, 
 			lr, mom, init_type, class_type, disp_type, learn_corner, 
 			n_diag_learned, init_stddev, fix_G, check_disp, checkpoint_freq, checkpoint_path):
 		if disp_type not in ['stein', 'sylvester']:
@@ -15,7 +15,8 @@ class ModelParams:
 		self.transform = transform
 		self.test = test
 		self.log_path = log_path
-		self.n = n
+		self.input_size = input_size
+		self.layer_size = layer_size
 		self.out_size = out_size
 		self.num_layers = num_layers
 		self.loss = loss
