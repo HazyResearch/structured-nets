@@ -23,8 +23,8 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
-	#train_loss_summary = tf.summary.scalar('train_loss', loss)
-	#train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
+	train_loss_summary = tf.summary.scalar('train_loss', loss)
+	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
 	test_loss_summary = tf.summary.scalar('test_loss', loss)
@@ -60,22 +60,22 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 				E = W1_real - np.dot(A, np.dot(W1_real, B_vand))
 				print('Disp rank: ', np.linalg.matrix_rank(E))
 
-			#train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-			#	train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
+			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
+				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
 				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
 			
-			#summary_writer.add_summary(train_loss_summ, step)
-			#summary_writer.add_summary(train_acc_summ, step)
+			summary_writer.add_summary(train_loss_summ, step)
+			summary_writer.add_summary(train_acc_summ, step)
 			summary_writer.add_summary(val_loss_summ, step)
 			summary_writer.add_summary(val_acc_summ, step)
 
-			#train_losses.append(train_loss)
-			#train_accuracies.append(train_accuracy)
+			train_losses.append(train_loss)
+			train_accuracies.append(train_accuracy)
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			#print('Train loss, accuracy: ', train_loss, train_accuracy)
+			print('Train loss, accuracy: ', train_loss, train_accuracy)
 			print('Validation loss, accuracy: ', val_loss, val_accuracy)
 
 			if verbose:
@@ -130,8 +130,8 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
-	#train_loss_summary = tf.summary.scalar('train_loss', loss)
-	#train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
+	train_loss_summary = tf.summary.scalar('train_loss', loss)
+	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
 	test_loss_summary = tf.summary.scalar('test_loss', loss)
@@ -166,22 +166,22 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 				E = W1_real - np.dot(A, np.dot(W1_real, B))
 				print('Disp rank: ', np.linalg.matrix_rank(E))
 			
-			#train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-			#	train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
+			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
+				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
 				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})	
 
-			#summary_writer.add_summary(train_loss_summ, step)
-			#summary_writer.add_summary(train_acc_summ, step)
+			summary_writer.add_summary(train_loss_summ, step)
+			summary_writer.add_summary(train_acc_summ, step)
 			summary_writer.add_summary(val_loss_summ, step)
 			summary_writer.add_summary(val_acc_summ, step)
 
-			#train_losses.append(train_loss)
-			#train_accuracies.append(train_accuracy)
+			train_losses.append(train_loss)
+			train_accuracies.append(train_accuracy)
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			#print('Train loss, accuracy: ', train_loss, train_accuracy)
+			print('Train loss, accuracy: ', train_loss, train_accuracy)
 			print('Validation loss, accuracy: ', val_loss, val_accuracy)
 
 			if verbose:
@@ -233,8 +233,8 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 
-	#train_loss_summary = tf.summary.scalar('train_loss', loss)
-	#train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
+	train_loss_summary = tf.summary.scalar('train_loss', loss)
+	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
 	test_loss_summary = tf.summary.scalar('test_loss', loss)
@@ -271,22 +271,22 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 				E_sylv = np.dot(A, W1_real) - np.dot(W1_real, B)
 				print('Disp rank, Sylv: ', np.linalg.matrix_rank(E_sylv))
 
-			#train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-			#	train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
+			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
+				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
 				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})				
 			
-			#summary_writer.add_summary(train_loss_summ, step)
-			#summary_writer.add_summary(train_acc_summ, step)
+			summary_writer.add_summary(train_loss_summ, step)
+			summary_writer.add_summary(train_acc_summ, step)
 			summary_writer.add_summary(val_loss_summ, step)
 			summary_writer.add_summary(val_acc_summ, step)
 
-			#train_losses.append(train_loss)
-			#train_accuracies.append(train_accuracy)
+			train_losses.append(train_loss)
+			train_accuracies.append(train_accuracy)
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			#print('Train loss, accuracy: ', train_loss, train_accuracy)
+			print('Train loss, accuracy: ', train_loss, train_accuracy)
 			print('Validation loss, accuracy: ', val_loss, val_accuracy)
 
 			if verbose:
@@ -334,8 +334,8 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 	y_ = tf.placeholder(tf.float64, [None, params.out_size])
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
-	#train_loss_summary = tf.summary.scalar('train_loss', loss)
-	#train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
+	train_loss_summary = tf.summary.scalar('train_loss', loss)
+	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
 	test_loss_summary = tf.summary.scalar('test_loss', loss)
@@ -366,22 +366,22 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 	 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			#train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-			#	train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
+			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
+				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
 				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})				
 			
-			#summary_writer.add_summary(train_loss_summ, step)
-			#summary_writer.add_summary(train_acc_summ, step)
+			summary_writer.add_summary(train_loss_summ, step)
+			summary_writer.add_summary(train_acc_summ, step)
 			summary_writer.add_summary(val_loss_summ, step)
 			summary_writer.add_summary(val_acc_summ, step)
 
-			#train_losses.append(train_loss)
-			#train_accuracies.append(train_accuracy)
+			train_losses.append(train_loss)
+			train_accuracies.append(train_accuracy)
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			#print('Train loss, accuracy: ', train_loss, train_accuracy)
+			print('Train loss, accuracy: ', train_loss, train_accuracy)
 			print('Validation loss, accuracy: ', val_loss, val_accuracy)
 
 			if verbose:
@@ -424,8 +424,8 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 	
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
-	#train_loss_summary = tf.summary.scalar('train_loss', loss)
-	#train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
+	train_loss_summary = tf.summary.scalar('train_loss', loss)
+	train_acc_summary = tf.summary.scalar('train_accuracy', accuracy)
 	val_loss_summary = tf.summary.scalar('val_loss', loss)
 	val_acc_summary = tf.summary.scalar('val_accuracy', accuracy)
 	test_loss_summary = tf.summary.scalar('test_loss', loss)
@@ -456,22 +456,22 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 	 
 		if step % test_freq == 0:
 			print('Training step: ', step)
-			#train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-			#	train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
+			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
+				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
 				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})				
 			
-			#summary_writer.add_summary(train_loss_summ, step)
-			#summary_writer.add_summary(train_acc_summ, step)
+			summary_writer.add_summary(train_loss_summ, step)
+			summary_writer.add_summary(train_acc_summ, step)
 			summary_writer.add_summary(val_loss_summ, step)
 			summary_writer.add_summary(val_acc_summ, step)
 
-			#train_losses.append(train_loss)
-			#train_accuracies.append(train_accuracy)
+			train_losses.append(train_loss)
+			train_accuracies.append(train_accuracy)
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			#print('Train loss, accuracy: ', train_loss, train_accuracy)
+			print('Train loss, accuracy: ', train_loss, train_accuracy)
 			print('Validation loss, accuracy: ', val_loss, val_accuracy)
 
 			if verbose:
