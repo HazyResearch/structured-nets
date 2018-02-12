@@ -250,8 +250,15 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 
 	f_x_A, f_x_B = get_f_x(params.layer_size, params.init_type, params.learn_corner, params.n_diag_learned, params.init_stddev)
 
-	fn_A = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_A, [0]))
-	fn_B = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_B, [0]))
+	if params.learn_diagonal:
+		diag_A = tf.Variable(tf.zeros(params.layer_size, dtype=tf.float64))
+		diag_B = tf.Variable(tf.zeros(params.layer_size, dtype=tf.float64))
+		fn_A = functools.partial(circ_diag_transpose_mult_fn, tf.reverse(f_x_A, [0]), diag_A)
+		fn_B = functools.partial(circ_diag_transpose_mult_fn, tf.reverse(f_x_B, [0]), diag_B)
+
+	else:
+		fn_A = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_A, [0]))
+		fn_B = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_B, [0]))
 
 	W1 = tf.zeros([params.layer_size, params.layer_size], dtype=tf.float64)
 	for i in range(params.r):

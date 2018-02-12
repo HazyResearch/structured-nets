@@ -3,6 +3,19 @@ from scipy.sparse import diags
 import tensorflow as tf
 import functools
 
+# Multiplication by (Z_{f,v} + diag(d))^T
+def circ_diag_transpose_mult_fn(v_f, d, x, n):
+	#sess = tf.InteractiveSession()
+	#tf.initialize_all_variables().run()
+
+	#print sess.run(x)
+
+	# Circular shift x to the left
+	y = tf.concat([x[1:], [x[0]]], axis=0)
+	
+	# Scale by [v f]
+	return tf.multiply(y, v_f) + tf.multiply(d, x)
+
 # Multiplication by Z_{f,v}^T
 def circ_transpose_mult_fn(v_f, x, n):
 	#sess = tf.InteractiveSession()
