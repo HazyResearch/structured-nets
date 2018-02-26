@@ -1,8 +1,47 @@
 import tensorflow as tf
 from utils import *
+import numpy as np
+from scipy.linalg import solve_sylvester
 import time
+from krylov import *
 
-def krylov_recon(params, fn_A, fn_B):
+def eigendecomp(A):
+  d, P = tf.self_adjoint_eig(A)
+
+  return P, tf.diag(d), tf.matrix_inverse(P)
+
+def general_recon(G, H, A, B):
+  P,D_A, Pinv = eigendecomp(A)
+  Q, D_B, Qinv = eigendecomp(B)
+
+  #sess = tf.InteractiveSession()
+  #tf.initialize_all_variables().run()
+
+  eig_A = tf.diag_part(D_A) 
+  eig_B = tf.diag_part(D_B) 
+
+  eig_A_reshaped = tf.reshape(eig_A, [-1, 1])
+
+  print 'eig_A: ', eig_A
+  print 'eig_A_reshaped: ', eig_A_reshaped
+  print 'eig_B: ', eig_B
+
+  diff = eig_A_reshaped - eig_B
+  C = 1.0/diff
+
+  E = tf.matmul(G, tf.transpose(H))
+
+  term = tf.matmul(Pinv, tf.matmul(E, Q))
+  term = tf.multiply(term, C) # Elementwise
+  W = tf.matmul(P, tf.matmul(term, Qinv))
+
+  #print 'W: ', sess.run(W)
+  #print 'Q: ', sess.run(Q)
+  #quit()
+
+  return W
+
+def krylov_recon(params, G, H, fn_A, fn_B):
   W1 = tf.zeros([params.layer_size, params.layer_size], dtype=tf.float64)
   for i in range(params.r):
     K_A = krylov(fn_A, G[:, i], params.layer_size)
@@ -193,3 +232,40 @@ def vand_recon(G, H, v, m, n, f, r):
   recon = tf.matmul(D, recon)
 
   return recon
+
+def sylvester(M, N, n, r):
+  # Generate random rank r error matrix
+  G = np.random.random((n, r))
+  H = np.random.random((n, r))
+  GH = np.dot(G,H.T)
+
+  # Solve Sylvester equation to recover A
+  # Such that MA - AN^T = GH^T
+  A = solve_sylvester(M, -N, GH)
+
+  E = np.dot(M,A) - np.dot(A,N)
+
+  print 'Error in Sylvester solver: ', np.linalg.norm(E - GH)
+
+  return A,G,H
+
+if __name__ == '__main__':
+    n = 10
+    r = 1
+    A = np.random.random((n, n))
+    A = (A+A.T)/2.0
+    B = np.random.random((n, n))
+    B = (B+B.T)/2.0
+
+    M,G,H = sylvester(A,B,n,r)
+
+    W = general_recon(G, H, A, B)
+
+    sess = tf.InteractiveSession()
+    tf.initialize_all_variables().run()
+
+    W_real = sess.run(W)
+
+    print np.linalg.norm(W_real - M)
+
+    quit()

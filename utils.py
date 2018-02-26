@@ -72,6 +72,9 @@ def get_f_x(n, init_type, learn_corner, n_diag_learned, stddev=0.01):
 
 	return f_x_A, f_x_B
 
+def get_symm_tridiag_vars(n):
+	return 0
+
 def get_symm_pos_tridiag_vars(n, init_type, stddev=0.01):
 	# Constraint to be positive
 	if init_type == 'random':
@@ -447,14 +450,20 @@ def gen_matrix(n, prefix, r=2):
 		assert 0
 
 
-def gen_batch(A, N):
+def gen_batch(A, N, P=None):
 	"""
 	Generates N random x's, computes corresponding y's, such that Ax = y.
 	A: the matrix.
 	N: number of datapoints.
+	P: if not None, then with probability 0.5, return (Px, APx). Otherwise return (x, Ax).
 	"""
 
 	X = np.random.random((A.shape[1], N))
+
+	if P is not None:
+		if np.random.random() >= 0.5:
+			X = np.dot(P,X)
+
 	Y = np.dot(A, X)
 
 	assert np.isclose(np.linalg.norm(Y[:, 0] - np.dot(A, X[:, 0])), 0)

@@ -4,10 +4,11 @@ import datetime, os
 class ModelParams:
 	def __init__(self, dataset_name, transform, test, log_path, input_size, 
 			layer_size, out_size, num_layers, loss, r, steps, batch_size, 
-			lr, mom, init_type, class_type, learn_corner, 
-			n_diag_learned, init_stddev, fix_G, check_disp, checkpoint_freq, 
-			checkpoint_path, test_freq, verbose, decay_rate, decay_freq):
-		if class_type not in ['polynomial_transform', 'low_rank', 'toeplitz_like', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner']:
+			lr, mom, init_type, class_type, learn_corner, n_diag_learned, 
+			init_stddev, fix_G, check_disp, checkpoint_freq, checkpoint_path, 
+			test_freq, verbose, decay_rate, decay_freq, learn_diagonal, 
+			fix_A_identity):
+		if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner']:
 			print 'Class type ' + class_type + ' not supported'
 			assert 0
 		self.dataset_name = dataset_name
@@ -40,6 +41,9 @@ class ModelParams:
 		self.verbose = verbose
 		self.decay_rate = decay_rate
 		self.decay_freq = decay_freq
+		self.learn_diagonal = learn_diagonal
+		self.fix_A_identity = fix_A_identity
+
 
 	def save(self, results_dir, name):
 		# Append git commit ID

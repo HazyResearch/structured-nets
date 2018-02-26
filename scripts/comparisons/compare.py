@@ -41,25 +41,26 @@ test_size = 1000
 verbose = False
 check_disp = False
 fix_G = False
+fix_A_identity = True
 init_type = 'toeplitz'
 init_stddev = 0.01 # Random initializations
 test_freq = 100
 learn_corner = True
-n_diag_learned = 783
-checkpoint_freq = 1000
+learn_diagonal = False
+checkpoint_freq = 100000
 n_trials = 5
 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
 results_dir = os.path.join(out_dir, 'results', args.result_dir) 
 checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
 
 dataset = Dataset(args.dataset, args.layer_size, steps, args.transform, test_size, args.test)
-out_size = dataset.out_size() # 10 for MNIST, 2 for convex, rect, rect_images
+n_diag_learned = dataset.input_size - 1
 
 params = ModelParams(args.dataset, args.transform, args.test, log_path, dataset.input_size, args.layer_size, 
-		out_size, num_layers, loss, args.r, steps, batch_size, 
+		dataset.out_size(), num_layers, loss, args.r, steps, batch_size, 
 		args.lr, args.mom, init_type, args.method, learn_corner, 
 		n_diag_learned, init_stddev, fix_G, check_disp, checkpoint_freq, 
-		checkpoint_path, test_freq, verbose, args.decay_rate, decay_freq)
+		checkpoint_path, test_freq, verbose, args.decay_rate, decay_freq, learn_diagonal, fix_A_identity)
 
 print 'Params:\n', params
 

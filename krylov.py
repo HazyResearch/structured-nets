@@ -3,6 +3,10 @@ from scipy.sparse import diags
 import tensorflow as tf
 import functools
 
+
+def identity_mult_fn(v, n):
+	return v
+
 # Multiplication by (Z_{f,v} + diag(d))^T
 def circ_diag_transpose_mult_fn(v_f, d, x, n):
 	#sess = tf.InteractiveSession()
