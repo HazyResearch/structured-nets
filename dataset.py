@@ -17,6 +17,7 @@ class Dataset:
 		self.transform = transform
 		self.num_iters = num_iters
 		self.layer_size = layer_size
+		self.pert = None
 		self.current_batch = 0
 		self.true_transform = None
 		self.test_size = test_size
@@ -207,8 +208,9 @@ class Dataset:
 			M = solve_sylvester(I, -B, Q)
 
 			self.true_transform = M
-			test_X, test_Y = gen_batch(self.true_transform, self.test_size, B)
-			val_X, val_Y = gen_batch(self.true_transform, self.test_size, B)
+			self.pert = B
+			test_X, test_Y = gen_batch(self.true_transform, self.test_size, self.pert)
+			val_X, val_Y = gen_batch(self.true_transform, self.test_size, self.pert)
 			self.test_X = test_X	
 			self.test_Y = test_Y
 			self.val_X = val_X
@@ -369,7 +371,7 @@ class Dataset:
 			idx = np.random.randint(self.train_X.shape[0], size=batch_size)
 			return self.train_X[idx, :], self.train_Y[idx, :]			
 		elif self.name.startswith('true'):
-			return gen_batch(self.true_transform, batch_size)
+			return gen_batch(self.true_transform, batch_size, self.pert)
 		else:
 			print 'Not supported: ', name
 			assert 0
