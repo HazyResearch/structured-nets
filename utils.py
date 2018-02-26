@@ -5,6 +5,27 @@ import tensorflow as tf
 import time, subprocess
 import functools
 
+def sylvester_disp(M, A, B):
+	return np.dot(A,M) - np.dot(M,B)
+
+def stein_disp(M, A, B):
+	return M - np.dot(A,np.dot(M,B))
+
+def compute_disp(disp_type, M, A, B):
+	if disp_type == 'sylvester':
+		return sylvester_disp(M,A,B)
+	elif disp_type == 'stein':
+		return stein_disp(M,A,B)
+	else:
+		print 'disp_type not supported: ', disp_type
+		assert 0 		
+
+def gen_tridiag_corner(subdiag, supdiag, diag, f):
+	T = diags([subdiag, diag, supdiag], [-1, 0, 1]).toarray()
+	T[0, -1] = f
+
+	return T
+
 def get_f(learn_corner, init_type, stddev):
   if learn_corner:
     if init_type == 'toeplitz':
@@ -98,7 +119,7 @@ def get_tridiag_corner_vars(n, init_type, stddev=0.01, learn_corner=True):
 def compute_loss_and_accuracy(y, y_, params):
 	if params.loss == 'mse':
 		mse = tf.reduce_mean(tf.squared_difference(y, y_))
-		return mse, tf.constant([0])
+		return mse, tf.constant(0)
 	elif params.loss == 'cross_entropy':
 		cross_entropy = tf.reduce_mean(
 		  tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y))
@@ -160,27 +181,17 @@ def compute_y_cnn(x, W1, params):
 
 	return logits
 
-def compute_y(x, W1, params):
-	if params.transform == 'cnn':
-		return compute_y_cnn(x, W1, params)
-	elif params.num_layers==0:
-		y = tf.matmul(x, W1)
-		return y
-	elif params.num_layers==1:
-		b1 = tf.Variable(tf.truncated_normal([params.layer_size], stddev=0.01, dtype=tf.float64))
-		W2 = tf.Variable(tf.truncated_normal([params.layer_size, params.out_size], stddev=0.01, dtype=tf.float64))
-		b2 = tf.Variable(tf.truncated_normal([params.out_size], stddev=0.01, dtype=tf.float64))
-		xW = tf.matmul(x, W1)
-
-		h = tf.nn.relu(xW + b1)
-		y = tf.matmul(h, W2) + b2
-		return y
-	else:
-		print 'Not supported: ', params.num_layers
-		assert 0
-
 def get_commit_id():
 	return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'])
+
+def gen_operators(params):
+	if params.disp_type == 'sylvester':
+		return gen_sylvester_operators(params.class_type, params.layer_size, params.layer_size)
+	elif params.disp_type == 'stein':
+		return gen_stein_operators(params.class_type, params.layer_size, params.layer_size)
+	else:
+		print 'disp_type not supported: ', params.disp_type
+		assert 0
 
 # Operators for Stein type displacement.
 def gen_sylvester_operators(class_type, m, n):
@@ -211,8 +222,8 @@ def gen_stein_operators(class_type, m, n):
 		A = gen_Z_f(m, 1).T
 		B = gen_Z_f(n, -1)
 	elif class_type.startswith('hankel'):
-		A = gen_Z_f(m, 1)
-		B = gen_Z_f(n, 0)
+		A = gen_Z_f(m, 0)
+		B = gen_Z_f(n, 1)
 	elif class_type.startswith('vandermonde'):
 		v = np.random.random(n)
 		A = np.diag(v)

@@ -2,7 +2,17 @@ import tensorflow as tf
 from utils import *
 import time
 
-def circ_sparsity_recon(G, H, n, r, learn_corner, n_diag_learned, init_type, stddev):
+def krylov_recon(params, fn_A, fn_B):
+  W1 = tf.zeros([params.layer_size, params.layer_size], dtype=tf.float64)
+  for i in range(params.r):
+    K_A = krylov(fn_A, G[:, i], params.layer_size)
+    K_B = krylov(fn_B, H[:, i], params.layer_size)
+    prod = tf.matmul(K_A, tf.transpose(K_B))
+    W1 = tf.add(W1, prod)
+
+  return W1
+
+def circ_sparsity_recon_hadamard(G, H, n, r, learn_corner, n_diag_learned, init_type, stddev):
   if learn_corner:
     if init_type == 'toeplitz':
       f_A = tf.Variable([1], dtype=tf.float64)
