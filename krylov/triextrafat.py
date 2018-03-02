@@ -6,13 +6,17 @@ from scipy import signal
 p1 = np.full(5, 2)
 p2 = np.full(10, 3)
 
-def poly_add(p1, p2):
-    n = np.maximum(p1.shape[0], p2.shape[0])
-    q1 = np.pad(p1, (0,n-p1.shape[0]), 'constant')
-    q2 = np.pad(p2, (0,n-p2.shape[0]), 'constant')
+def poly_add(p1, p2, n):
+    """p1,p2 of degree exactly n-1"""
+    # TODO: change these to equals
+    # assert p1.shape == (n,)
+    # assert p2.shape == (n,)
+    # n = np.maximum(p1.shape[0], p2.shape[0])
+    # q1 = np.pad(p1, (0,n-p1.shape[0]), 'constant')
+    # q2 = np.pad(p2, (0,n-p2.shape[0]), 'constant')
     # print(q1)
     # print(q2)
-    return np.trim_zeros(q1 + q2, 'b')
+    return p1+p2
 
 def poly_mult_slow(p1, p2):
     d1 = p1.shape[0] - 1
@@ -22,7 +26,7 @@ def poly_mult_slow(p1, p2):
     for i in range(d1+1):
         for j in range(d2+1):
             prod[i+j] += p1[i]*p2[j]
-    prod = np.trim_zeros(prod, 'b')
+    # prod = np.trim_zeros(prod, 'b')
     # if prod.shape[0] < 1:
     #     prod = np.array([0])
     return prod
@@ -43,13 +47,13 @@ def poly_mult_fft(p1, p2):
     # prod = np.fft.irfft(f1*f2, n+1)
 
     # scipy fft (currently has bug because it stores output of rfft differently)
-    # f1 = fft.rfft(p1, n+1)
-    # f2 = fft.rfft(p2, n+1)
-    # prod = fft.irfft(f1*f2, n+1)
+    f1 = fft.rfft(p1, n+1)
+    f2 = fft.rfft(p2, n+1)
+    prod = fft.irfft(f1*f2, n+1)
 
-    prod = signal.convolve(p1, p2, method='auto')
+    # prod = signal.convolve(p1, p2, method='fft')
 
-    prod = np.trim_zeros(prod, 'b')
+    # prod = np.trim_zeros(prod, 'b')
     # if prod.shape[0] < 1:
     #     prod = np.array([0])
     return prod
@@ -57,7 +61,27 @@ def poly_mult_fft(p1, p2):
 # define an alias for easy testing
 def poly_mult(p1, p2):
     # return poly_mult_slow(p1, p2)
-    return poly_mult_slow(p1, p2)
+    d1 = p1.shape[0] - 1
+    d2 = p2.shape[0] - 1
+    n = d1 + d2
+    # if d1 < 0:
+    #     p1 = np.array([0])
+    #     d1 = 0
+    # if d2 < 0:
+    #     p2 = np.array([0])
+    #     d2 = 0
+    # q1 = np.pad(p1, (0,d2), 'constant')
+    # q2 = np.pad(p2, (0,d1), 'constant')
+    # assert q1.shape[0] == n+1
+    # assert q2.shape[0] == n+1
+    prod = signal.convolve(p1, p2, mode='full', method='auto')
+    # prod = np.convolve(p1, p2)
+    # if prod.shape[0] != n+1:
+    #     print(d1, d2, p1.shape, p2.shape, prod.shape)
+    #     assert false
+    # assert prod.shape[0] == n+1
+
+    return prod
 
 def poly_inv(p, n):
     """
@@ -83,8 +107,9 @@ def poly_inv(p, n):
     # but we know p_l^{-1} mod x^{n-k} since we already know it mod x^k
     q_high = poly_mult(-r[k:min(r.shape[0],n)], q_low)
 
-    q_low = np.pad(q_low, (0,k-q_low.shape[0]), 'constant')
-    q = np.trim_zeros(np.concatenate((q_low, q_high))[:n], 'b')
+    # q_low = np.pad(q_low, (0,k-q_low.shape[0]), 'constant')
+    q = np.concatenate((q_low, q_high))[:n]
+    # q = np.trim_zeros(q, 'b')
     return q
 
 
@@ -95,28 +120,38 @@ def resolvent_bilinear(A, v, u, n):
     (2x2 matrix of rational fractions)
     output: array of shape (2, 2, n), array shape (n)
     (numerator, denominator)
+
+    invariants:
+        numerator has degree n-1
+        denominator degree n
     """
     if n == 1:
         # don't know how write outer product in numpy
+        # print('fat2')
+        # print(A, u, v, n)
         return (np.array([[[ u[0]*v[0] ], [ u[0]*1 ]], [[ 1*v[0] ], [ 1*1 ]]]), np.array([1,-A[0,0]]))
-    k = n//2
 
+    k = n//2
     # Let M00 = M[0:k, 0:k], M10 = M[k:n, 0:k], M11 = M[k:n,k:n]
     # i.e. M = [M00 0 ; M10 M11] (where M = I-Ax)
     # then M^{-1} = [M00^{-1} 0 ; -M11^{-1} M_10^{-1} M_00^{-1}]
-
     S0, d0 = resolvent_bilinear(A[:k,:k], v[:k], u[:k], k)
     S1, d1 = resolvent_bilinear(A[k:,k:], v[k:], u[k:], n-k)
 
     # print(S1)
     # print(d1)
 
+    # print('fat')
+    # print((S1[0,1], S0[1,0]))
+    # print(poly_mult(S1[0,1], S0[1,0]))
+
     # the part corresponding to bottom left corner is
     # -A[k, k-1]x * u_1^T M_11^{-1} e_1 * e_k^T M_00^{-1} v_0
     # or S1[:,1] * S0[1,:]
-    L = [[poly_mult(S1[0,1], S0[1,0]), poly_mult(S1[0,1], S0[1,1])], [poly_mult( S1[1,1], S0[1,0] ), poly_mult( S1[1,1], S0[1,1] )]]
+    L = np.array([[poly_mult(S1[0,1], S0[1,0]), poly_mult(S1[0,1], S0[1,1])], [poly_mult( S1[1,1], S0[1,0] ), poly_mult( S1[1,1], S0[1,1] )]])
     # print(L)
     L = A[k,k-1] * np.pad(L, ((0,0),(0,0),(1,0)), 'constant')
+    # TODO: above padding should be able to be optimized away; when we allocate memory properly can store the coefficients directly in the right place
     # print(L)
 
     # clear denominators
@@ -127,10 +162,13 @@ def resolvent_bilinear(A, v, u, n):
     # really need to define poly matrix operations
     # S = np.array([[poly_add(S0[i,j],S1[i,j]) for j in range(2)] for i in range(2)])
     # S = np.array([[poly_add(S[i,j],L[i,j]) for j in range(2)] for i in range(2)])
-    L[0,0] = poly_add(L[0,0], poly_mult(S0[0,0], d1))
-    L[0,1] = poly_add(L[0,1], poly_mult(S0[0,1], d1))
-    L[0,0] = poly_add(L[0,0], poly_mult(S1[0,0], d0))
-    L[1,0] = poly_add(L[1,0], poly_mult(S1[1,0], d0))
+    # L[0,0] = poly_add(L[0,0], poly_mult(S0[0,0], d1), n)
+    # L[0,1] = poly_add(L[0,1], poly_mult(S0[0,1], d1), n)
+    # L[0,0] = poly_add(L[0,0], poly_mult(S1[0,0], d0), n)
+    # L[1,0] = poly_add(L[1,0], poly_mult(S1[1,0], d0), n)
+    L[0,0] += poly_mult(S0[0,0], d1) + poly_mult(S1[0,0], d0)
+    L[0,1] += poly_mult(S0[0,1], d1)
+    L[1,0] += poly_mult(S1[1,0], d0)
     return (L, poly_mult(d0,d1))
 
 def krylov_mult(A, v, u, m):
@@ -143,48 +181,51 @@ def krylov_mult(A, v, u, m):
     """
 
     n = v.shape[0]
-    # m = u.shape[0]
     assert A.shape == (n,n)
     # Compute M = (I-Ax)
-    M = np.stack(( np.eye(n), -A), axis=-1)
+    # M = np.stack(( np.eye(n), -A), axis=-1)
     # print(M)
-
 
     R, d = resolvent_bilinear(A,v,u,n)
     ans = poly_mult(R[0,0], poly_inv(d, m))
-    return np.pad(ans, (0, m-min(ans.shape[0],m)), 'constant')[:m]
+    # return np.pad(ans, (0, m-min(ans.shape[0],m)), 'constant')[:m]
+    return ans[:m]
+
+def Amult(d, subd, v):
+    # return np.array([A[0,0]*v[0]]+[A[i,i-1]*v[i-1] + A[i,i]*v[i] for i in range(1,n)])
+    ans = d*v
+    ans[1:] += subd*v[:-1]
+    return ans
 
 def krylov_mult_slow(A, v, u, m):
     n = v.shape[0]
     assert A.shape == (n,n)
-    def Amult(A, v):
-        return np.array([A[0,0]*v[0]]+[A[i,i-1]*v[i-1] + A[i,i]*v[i] for i in range(1,n)])
+    K = np.empty(shape=(m,n))
     cols = [v]
+    d = np.diagonal(A, 0)
+    subd = np.diagonal(A, -1)
     for i in range(1,m):
-        cols.append(Amult(A, cols[-1]))
+        cols.append(Amult(d, subd, cols[-1]))
     K = np.stack(cols, axis=1)
     return K.T @ u
 
 
+np.random.seed(0)
 
+# A = np.array([[0,0],[1,0]])
+# u = np.array([1,1])
+# v = np.array([1,1])
+# resolvent_bilinear(A,u,v,2)
 
-A = np.array([[0,0],[1,0]])
-u = np.array([1,1])
-v = np.array([1,1])
+# A = np.array([[0,0,0,0],[1,0,0,0],[0,2,0,0],[0,0,3,0]])
+# u = np.array([1,1,1,1])
+# v = np.array([1,1,1,1])
+# resolvent_bilinear(A,u,v,4)
 
-A = np.array([[0,0,0,0],[1,0,0,0],[0,2,0,0],[0,0,3,0]])
-u = np.array([1,1,1,1])
-v = np.array([1,1,1,1])
-resolvent_bilinear(A,u,v,4)
-
-n = 700
+n = 1024
 A = np.diag(np.random.random(n-1), -1)
 u = np.random.random(n)
 v = np.random.random(n)
 k1 = krylov_mult_slow(A,v,u,n)
 k2 = krylov_mult(A,v,u,n)
-print(k1-k2)
-
-
-# poly_mult_slow(p1, p2)
-poly_mult_fft(p1, p2)
+print(np.max(np.abs(k1-k2)))
