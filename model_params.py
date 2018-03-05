@@ -47,9 +47,8 @@ class ModelParams:
 		self.flip_K_B = flip_K_B
 
 
-	def save(self, results_dir, name):
+	def save(self, results_dir, name, commit_id):
 		# Append git commit ID
-		commit_id = get_commit_id()
 		param_str = commit_id + '\n' + str(self)
 
 		# Make new dir with timestamp

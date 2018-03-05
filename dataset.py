@@ -11,7 +11,7 @@ from utils import *
 class Dataset:
 	# here n is the input size.
 	# true_test: if True, we test on test set. Otherwise, split training set into train/validation.
-	def __init__(self, name, layer_size, num_iters, transform, stochastic_train, test_size=1000, train_size=50000, true_test=False):
+	def __init__(self, name, layer_size, num_iters, transform, stochastic_train, test_size=1000, train_size=10000, true_test=False):
 		self.name = name
 		self.mnist = None
 		self.transform = transform

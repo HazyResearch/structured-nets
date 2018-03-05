@@ -44,9 +44,9 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 		subdiag_B = sess.run(model['subdiag_B'], feed_dict={x: batch_xs, y_: batch_ys})
 		f_B = sess.run(model['f_B'], feed_dict={x: batch_xs, y_: batch_ys})
 
-		print 'subdiag_A: ', subdiag_A
-		print 'supdiag_A: ', supdiag_A
-		print 'diag_A: ', diag_A
+		#print 'subdiag_A: ', subdiag_A
+		#print 'supdiag_A: ', supdiag_A
+		#print 'diag_A: ', diag_A
 
 		A = gen_tridiag_corner(subdiag_A, supdiag_A, diag_A, f_A)
 		B = gen_tridiag_corner(subdiag_B, supdiag_B, diag_B, f_B)
@@ -107,14 +107,15 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 		assert 0 
 	print E.shape
 	print('(Displacement) Rank: ', np.linalg.matrix_rank(E))
-	print 'eigvals: ', np.linalg.eigvals(E)
+	#print 'eigvals: ', np.linalg.eigvals(E)
 	return dr, ratio
 
 def get_structured_W(params):
 	model = {}
 	if params.class_type == 'unconstrained':
 		W = tf.Variable(tf.truncated_normal([params.layer_size, params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
-		model['W'] = W
+		if params.check_disp:
+			model['W'] = W
 		return W, model
 	elif params.class_type in ['low_rank', 'symm_tridiag_corner_pan', 'symm_tridiag_corner_krylov','symmetric', 'toeplitz_like', 
 		'vandermonde_like', 'hankel_like', 'circulant_sparsity', 'tridiagonal_corner']:
@@ -131,8 +132,9 @@ def get_structured_W(params):
 			B = tf.multiply(B, mask)
 
 			W = general_recon(G, H, A, B)
-			model['A'] = A
-			model['B'] = B
+			if params.check_disp:
+				model['A'] = A
+				model['B'] = B
 		elif params.class_type == 'symm_tridiag_corner_krylov':
 			diag_A = tf.Variable(tf.truncated_normal([params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
 			off_diag_A = tf.Variable(tf.truncated_normal([params.layer_size-1], stddev=params.init_stddev, dtype=tf.float64))
@@ -140,12 +142,13 @@ def get_structured_W(params):
 			off_diag_B = tf.Variable(tf.truncated_normal([params.layer_size-1], stddev=params.init_stddev, dtype=tf.float64))
 			f_A = tf.Variable(tf.truncated_normal([1], stddev=params.init_stddev, dtype=tf.float64))
 			f_B = tf.Variable(tf.truncated_normal([1], stddev=params.init_stddev, dtype=tf.float64))
-			model['diag_A'] = diag_A
-			model['off_diag_A'] = off_diag_A
-			model['f_A'] = f_A
-			model['diag_B'] = diag_B
-			model['off_diag_B'] = off_diag_B
-			model['f_B'] = f_B
+			if params.check_disp:
+				model['diag_A'] = diag_A
+				model['off_diag_A'] = off_diag_A
+				model['f_A'] = f_A
+				model['diag_B'] = diag_B
+				model['off_diag_B'] = off_diag_B
+				model['f_B'] = f_B
 
 			fn_A = functools.partial(tridiag_corners_transpose_mult_fn, off_diag_A, diag_A, off_diag_A, f_A, f_A)
 			fn_B = functools.partial(tridiag_corners_transpose_mult_fn, off_diag_B, diag_B, off_diag_B, f_B, f_B)
@@ -181,8 +184,9 @@ def get_structured_W(params):
 			B_symm = 0.5 * (B_upper + tf.transpose(B_upper))
 
 			W = general_recon(G, H, A_symm, B_symm)
-			model['A'] = A_symm
-			model['B'] = B_symm
+			if params.check_disp:
+				model['A'] = A_symm
+				model['B'] = B_symm
 		elif params.class_type == 'toeplitz_like':
 			W = toeplitz_like_recon(G, H, params.layer_size, params.r)
 		elif params.class_type == 'hankel_like':
@@ -223,20 +227,21 @@ def get_structured_W(params):
 			coeff = 1.0/(1 - a*b)
 
 			W = tf.scalar_mul(coeff, W)
-			model['f_x_A'] = f_x_A
-			model['f_x_B'] = f_x_B
+			if params.check_disp:
+				model['f_x_A'] = f_x_A
+				model['f_x_B'] = f_x_B
 
 		elif params.class_type == 'tridiagonal_corner':
 			subdiag_A, supdiag_A, diag_A, f_A, subdiag_B, supdiag_B, diag_B, f_B = get_tridiag_corner_vars(params.layer_size, params.init_type, params.init_stddev, params.learn_corner)
-
-			model['subdiag_A'] = subdiag_A
-			model['supdiag_A'] = supdiag_A
-			model['diag_A'] = diag_A
-			model['f_A'] = f_A
-			model['subdiag_B'] = subdiag_B
-			model['supdiag_B'] = supdiag_B
-			model['diag_B'] = diag_B
-			model['f_B'] = f_B
+			if params.check_disp:
+				model['subdiag_A'] = subdiag_A
+				model['supdiag_A'] = supdiag_A
+				model['diag_A'] = diag_A
+				model['f_A'] = f_A
+				model['subdiag_B'] = subdiag_B
+				model['supdiag_B'] = supdiag_B
+				model['diag_B'] = diag_B
+				model['f_B'] = f_B
 
 			fn_A = functools.partial(tridiag_corner_transpose_mult_fn, subdiag_A, diag_A, supdiag_A, f_A)
 			fn_B = functools.partial(tridiag_corner_transpose_mult_fn, subdiag_B, diag_B, supdiag_B, f_B)
@@ -248,7 +253,8 @@ def get_structured_W(params):
 			coeff = 1.0/(1 - a*b)
 
 			W = tf.multiply(coeff, W)
-		model['W'] = W
+		if params.check_disp:
+			model['W'] = W
 		return W, model
 
 

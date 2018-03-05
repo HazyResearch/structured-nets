@@ -396,7 +396,12 @@ def sylvester(A, B, n, r):
 	return M
 
 def gen_matrix(n, prefix, r=2):
-	if prefix == 'toeplitz':
+	if prefix.startswith('rank'):
+		r = int(prefix[-1])
+		G = np.random.random((n,r))
+		H = np.random.random((n,r))
+		return np.dot(G,H.T)
+	elif prefix == 'toeplitz':
 		c = np.random.random(n)
 		r = np.random.random(n)
 		return toeplitz(c,r)
