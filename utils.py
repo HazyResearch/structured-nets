@@ -5,6 +5,28 @@ import tensorflow as tf
 import time, subprocess
 import functools
 
+def kth_diag_indices(A, k):
+    rows, cols = np.diag_indices_from(A)
+    if k < 0:
+        return rows[-k:], cols[:k]
+    elif k > 0:
+        return rows[:-k], cols[k:]
+    else:
+        return rows, cols
+
+def symm_tridiag_corner_mask(n):
+	mask = np.zeros((n,n))
+	mask[0, -1] = 1
+	mask[-1, 0] = 1
+	subdiag = kth_diag_indices(mask, -1)
+	supdiag = kth_diag_indices(mask, -1)
+	diag = kth_diag_indices(mask, 0)
+	mask[subdiag] = 1
+	mask[supdiag] = 1
+	mask[diag] = 1
+
+	return mask
+
 def sylvester_disp(M, A, B):
 	return np.dot(A,M) - np.dot(M,B)
 

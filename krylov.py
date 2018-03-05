@@ -49,6 +49,23 @@ def symm_tridiag_mult_fn(diag, off_diag, x, n):
 
 	return sup_result + sub_result + tf.multiply(x, diag)
 
+# f1: top right. f2: bottom left.
+def tridiag_corners_transpose_mult_fn(subdiag, diag, supdiag, f1, f2, x, n):
+	sub_result = tf.multiply(x[1:], subdiag)
+	sup_result = tf.multiply(x[:n-1], supdiag)
+
+	sup_result = tf.concat([[0], sup_result], axis=0)
+	sub_result = tf.concat([sub_result, [0]], axis=0)
+
+	z = tf.zeros(n-1, dtype=tf.float64)
+	scaled_f1 = tf.multiply(f1, x[0])
+	scaled_f2 = tf.multiply(f2, x[n-1])
+
+	f1_result = tf.concat([z, scaled_f1], axis=0)
+	f2_result = tf.concat([scaled_f2, z], axis=0)
+
+	return sup_result + sub_result + tf.multiply(x, diag) + f1_result + f2_result
+
 def tridiag_corner_transpose_mult_fn(subdiag, diag, supdiag, f, x, n):
 	sub_result = tf.multiply(x[1:], subdiag)
 	sup_result = tf.multiply(x[:n-1], supdiag)

@@ -11,16 +11,18 @@ from utils import *
 class Dataset:
 	# here n is the input size.
 	# true_test: if True, we test on test set. Otherwise, split training set into train/validation.
-	def __init__(self, name, layer_size, num_iters, transform, test_size=1000, true_test=False):
+	def __init__(self, name, layer_size, num_iters, transform, stochastic_train, test_size=1000, train_size=50000, true_test=False):
 		self.name = name
 		self.mnist = None
 		self.transform = transform
+		self.stochastic_train = stochastic_train
 		self.num_iters = num_iters
 		self.layer_size = layer_size
 		self.pert = None
 		self.current_batch = 0
 		self.true_transform = None
 		self.test_size = test_size
+		self.train_size = train_size
 		self.true_test = true_test
 		self.input_size = self.get_input_size()
 		self.train_loc = ''
@@ -87,9 +89,9 @@ class Dataset:
 		elif self.name.startswith('mnist_noise'):
 			idx = self.name[-1]
 			data_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
-			train_size = 12000
+			train_size = 11000
+			val_size = 1000
 			test_size = 2000 # As specified in http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/DeepVsShallowComparisonICML2007#Downloadable_datasets
-			#val_size = 1000
 
 			data = np.genfromtxt(data_loc)
 			X = data[:, :-1]
@@ -104,23 +106,19 @@ class Dataset:
 			np.random.shuffle(idx)
 
 			train_idx = idx[0:train_size]
-			#val_idx = idx[train_size:train_size+val_size]
+			val_idx = idx[train_size:train_size+val_size]
 			test_idx = idx[-test_size:]
 
 			assert train_idx.size == train_size
-			#assert val_idx.size == val_size
+			assert val_idx.size == val_size
 			assert test_idx.size == test_size
 
-			#self.val_X = X[val_idx, :]
-			#self.val_Y = Y[val_idx, :]
+			self.val_X = X[val_idx, :]
+			self.val_Y = Y[val_idx, :]
 			self.test_X = X[test_idx, :]
 			self.test_Y = Y[test_idx, :]
 			self.train_X = X[train_idx, :]
 			self.train_Y = Y[train_idx, :]
-
-
-			self.val_X = self.test_X
-			self.val_Y = self.test_Y
 
 			print self.val_X.shape, self.val_Y.shape, self.test_X.shape, self.test_Y.shape, self.train_X.shape, self.train_Y.shape 
 
@@ -224,6 +222,11 @@ class Dataset:
 			self.test_Y = test_Y
 			self.val_X = val_X
 			self.val_Y = val_Y
+
+			if not self.stochastic_train:
+				train_X, train_Y = gen_batch(self.true_transform, self.train_size)				
+				self.train_X = train_X	
+				self.train_Y = train_Y
 		else:
 			print 'Not supported: ', self.name
 			assert 0
@@ -371,7 +374,11 @@ class Dataset:
 			idx = np.random.randint(self.train_X.shape[0], size=batch_size)
 			return self.train_X[idx, :], self.train_Y[idx, :]			
 		elif self.name.startswith('true'):
-			return gen_batch(self.true_transform, batch_size, self.pert)
+			if self.stochastic_train:
+				return gen_batch(self.true_transform, batch_size, self.pert)
+			else:
+				idx = np.random.randint(self.train_X.shape[0], size=batch_size)
+				return self.train_X[idx, :], self.train_Y[idx, :]
 		else:
 			print 'Not supported: ', name
 			assert 0

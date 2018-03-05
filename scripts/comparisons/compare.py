@@ -13,7 +13,7 @@ import argparse
 
 # Available datasets: mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
 # Example command: 
-# python compare.py test toeplitz_like true_toeplitz 2_25_18 1 1e-3 1.0 0.9 0 50 downsample
+# python compare.py test tridiagonal_corner true_toeplitz 2_25_18 1 1e-3 1.0 0.9 0 50 none
 
 # Command line params
 parser = argparse.ArgumentParser()
@@ -38,8 +38,9 @@ steps = 50000
 decay_freq = 0.1
 batch_size = 50
 test_size = 1000
+train_size = 50000
 verbose = False
-check_disp = False
+check_disp = True
 fix_G = False
 fix_A_identity = True
 init_type = 'toeplitz'
@@ -47,20 +48,22 @@ init_stddev = 0.01 # Random initializations
 test_freq = 100
 learn_corner = True
 learn_diagonal = False
+stochastic_train = False
 checkpoint_freq = 100000
 n_trials = 3
 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
 results_dir = os.path.join(out_dir, 'results', args.result_dir) 
 checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
 
-dataset = Dataset(args.dataset, args.layer_size, steps, args.transform, test_size, args.test)
+dataset = Dataset(args.dataset, args.layer_size, steps, args.transform, stochastic_train, test_size, train_size, args.test)
 n_diag_learned = dataset.input_size - 1
 
 params = ModelParams(args.dataset, args.transform, args.test, log_path, dataset.input_size, args.layer_size, 
 		dataset.out_size(), num_layers, loss, args.r, steps, batch_size, 
 		args.lr, args.mom, init_type, args.method, learn_corner, 
 		n_diag_learned, init_stddev, fix_G, check_disp, checkpoint_freq, 
-		checkpoint_path, test_freq, verbose, args.decay_rate, decay_freq, learn_diagonal, fix_A_identity)
+		checkpoint_path, test_freq, verbose, args.decay_rate, decay_freq, learn_diagonal, 
+		fix_A_identity, stochastic_train)
 
 print 'Params:\n', params
 
