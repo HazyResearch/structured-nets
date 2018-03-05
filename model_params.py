@@ -7,7 +7,7 @@ class ModelParams:
 			lr, mom, init_type, class_type, learn_corner, n_diag_learned, 
 			init_stddev, fix_G, check_disp, checkpoint_freq, checkpoint_path, 
 			test_freq, verbose, decay_rate, decay_freq, learn_diagonal, 
-			fix_A_identity, stochastic_train):
+			fix_A_identity, stochastic_train, flip_K_B):
 		if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner']:
 			print 'Class type ' + class_type + ' not supported'
 			assert 0
@@ -44,6 +44,7 @@ class ModelParams:
 		self.learn_diagonal = learn_diagonal
 		self.fix_A_identity = fix_A_identity
 		self.stochastic_train = stochastic_train
+		self.flip_K_B = flip_K_B
 
 
 	def save(self, results_dir, name):

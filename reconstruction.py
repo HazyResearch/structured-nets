@@ -45,8 +45,10 @@ def krylov_recon(params, G, H, fn_A, fn_B):
   W1 = tf.zeros([params.layer_size, params.layer_size], dtype=tf.float64)
   for i in range(params.r):
     K_A = krylov(fn_A, G[:, i], params.layer_size)
-    K_B = krylov(fn_B, H[:, i], params.layer_size)
-    prod = tf.matmul(K_A, tf.transpose(K_B))
+    K_B = tf.transpose(krylov(fn_B, H[:, i], params.layer_size))
+    if params.flip_K_B:
+      K_B = tf.reverse(K_B, [0])
+    prod = tf.matmul(K_A, K_B)
     W1 = tf.add(W1, prod)
 
   return W1

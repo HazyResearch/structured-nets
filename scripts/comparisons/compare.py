@@ -42,7 +42,8 @@ train_size = 50000
 verbose = False
 check_disp = True
 fix_G = False
-fix_A_identity = True
+fix_A_identity = False
+flip_K_B = False
 init_type = 'toeplitz'
 init_stddev = 0.01 # Random initializations
 test_freq = 100
@@ -63,7 +64,7 @@ params = ModelParams(args.dataset, args.transform, args.test, log_path, dataset.
 		args.lr, args.mom, init_type, args.method, learn_corner, 
 		n_diag_learned, init_stddev, fix_G, check_disp, checkpoint_freq, 
 		checkpoint_path, test_freq, verbose, args.decay_rate, decay_freq, learn_diagonal, 
-		fix_A_identity, stochastic_train)
+		fix_A_identity, stochastic_train, flip_K_B)
 
 print 'Params:\n', params
 

@@ -110,9 +110,9 @@ def get_structured_W(params):
 			A = tf.multiply(A, mask)
 			B = tf.multiply(B, mask)
 
-			W = general_recon(G, H, A, A)
+			W = general_recon(G, H, A, B)
 			model['A'] = A
-			model['B'] = A
+			model['B'] = B
 		elif params.class_type == 'symm_tridiag_corner_krylov':
 			diag_A = tf.Variable(tf.truncated_normal([params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
 			off_diag_A = tf.Variable(tf.truncated_normal([params.layer_size-1], stddev=params.init_stddev, dtype=tf.float64))
