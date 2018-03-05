@@ -24,6 +24,10 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 		W = sess.run(model['W'], feed_dict={x: batch_xs, y_: batch_ys})
 		print 'W: ', W.shape
 		E = compute_disp(params.disp_type, W, A, B)
+
+		dr = np.linalg.matrix_rank(E)
+		ratio = np.linalg.norm(E)/np.linalg.norm(W)
+
 	elif params.class_type == 'symm_tridiag_pan':
 		return
 	elif params.class_type == 'symm_tridiag_krylov':
@@ -50,6 +54,9 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 		W = sess.run(model['W'], feed_dict={x: batch_xs, y_: batch_ys})
 		E = compute_disp(params.disp_type, W, A, B)
 
+		dr = np.linalg.matrix_rank(E)
+		ratio = np.linalg.norm(E)/np.linalg.norm(W)
+
 	elif params.class_type == 'circulant_sparsity':
 		# Construct A
 		f_x_A = sess.run(model['f_x_A'], feed_dict={x: batch_xs, y_: batch_ys})
@@ -65,6 +72,9 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 
 		W = sess.run(model['W'], feed_dict={x: batch_xs, y_: batch_ys})
 		E = compute_disp(params.disp_type, W, A, B)
+		dr = np.linalg.matrix_rank(E)
+		ratio = np.linalg.norm(E)/np.linalg.norm(W)
+
 	elif params.class_type == 'tridiagonal_corner':
 		# Construct A
 		subdiag_A, supdiag_A, diag_A, f_A = sess.run([model['subdiag_A'], model['supdiag_A'], model['diag_A'], model['f_A']], 
@@ -76,19 +86,29 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 		B = gen_tridiag_corner(subdiag_B, supdiag_B, diag_B, f_B)
 		W = sess.run(model['W'], feed_dict={x: batch_xs, y_: batch_ys})
 		E = compute_disp(params.disp_type, W, A, B)
+		dr = np.linalg.matrix_rank(E)
+		ratio = np.linalg.norm(E)/np.linalg.norm(W)
+
 	elif params.class_type == 'low_rank':
 		E = sess.run(model['W'], feed_dict={x: batch_xs, y_: batch_ys})
+
+		dr = np.linalg.matrix_rank(E)
+		ratio = 0
 	elif params.class_type == 'vandermonde_like':
 		v, W = sess.run([model['v'], model['W']], feed_dict={x: batch_xs, y_: batch_ys})
 		A = np.diag(v)
 		B = gen_Z_f(params.layer_size, 0).T
 		E = compute_disp(params.disp_type, W, A, B)
+		dr = np.linalg.matrix_rank(E)
+		ratio = np.linalg.norm(E)/np.linalg.norm(W)
+
 	else:
 		print 'class_type not supported: ', params.class_type
 		assert 0 
 	print E.shape
 	print('(Displacement) Rank: ', np.linalg.matrix_rank(E))
 	print 'eigvals: ', np.linalg.eigvals(E)
+	return dr, ratio
 
 def get_structured_W(params):
 	model = {}

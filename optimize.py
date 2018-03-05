@@ -32,7 +32,7 @@ def optimize(dataset, params):
 
 	saver = tf.train.Saver()
 
-	losses = {'train': [], 'val': []}
+	losses = {'train': [], 'val': [], 'DR': [], 'ratio': []}
 	accuracies = {'train': [], 'val': []}
 
 	for _ in range(params.steps):
@@ -43,7 +43,10 @@ def optimize(dataset, params):
 		if this_step % params.test_freq == 0:
 			print('Training step: ', this_step)
 			# Verify displacement rank
-			check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
+			if params.check_disp:
+				dr, ratio = check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
+				losses['DR'].append(dr)
+				losses['ratio'].append(ratio)
 
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
