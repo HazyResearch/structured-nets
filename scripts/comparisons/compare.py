@@ -78,8 +78,8 @@ for method in methods:
 
 	for test_iter in range(n_trials):
 		this_iter_name = method + str(test_iter)
-		params.log_path = os.path.join(log_path, args.name + '_' + str(test_iter))
-		params.checkpoint_path = os.path.join(checkpoint_path, args.name + '_' + str(test_iter))
+		params.log_path = os.path.join(log_path, args.name + '_' + method + '_' + str(test_iter))
+		params.checkpoint_path = os.path.join(checkpoint_path, args.name + '_' + method + '_' + str(test_iter))
 
 		print 'Tensorboard log path: ', params.log_path
 		print 'Tensorboard checkpoint path: ', params.checkpoint_path
