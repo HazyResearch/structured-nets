@@ -10,7 +10,7 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 	if not params.check_disp:
 		return 
 
-	if params.class_type in ['unconstrained', 'tridiagonal_corner', 'symmetric']:
+	if params.class_type in ['unconstrained', 'symmetric']:
 		if params.class_type == 'symmetric':
 			A = sess.run(model['A'], feed_dict={x: batch_xs, y_: batch_ys})
 			B = sess.run(model['B'], feed_dict={x: batch_xs, y_: batch_ys})
@@ -24,6 +24,32 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 		W = sess.run(model['W'], feed_dict={x: batch_xs, y_: batch_ys})
 		print 'W: ', W.shape
 		E = compute_disp(params.disp_type, W, A, B)
+	elif params.class_type == 'symm_tridiag_pan':
+		return
+	elif params.class_type == 'symm_tridiag_krylov':
+		return
+	elif params.class_type == 'tridiagonal_corner':
+		# Construct A
+		supdiag_A = sess.run(model['supdiag_A'], feed_dict={x: batch_xs, y_: batch_ys})
+		diag_A = sess.run(model['diag_A'], feed_dict={x: batch_xs, y_: batch_ys})
+		subdiag_A = sess.run(model['subdiag_A'], feed_dict={x: batch_xs, y_: batch_ys})
+		f_A = sess.run(model['f_A'], feed_dict={x: batch_xs, y_: batch_ys})
+		# Construct B
+		supdiag_B = sess.run(model['supdiag_B'], feed_dict={x: batch_xs, y_: batch_ys})
+		diag_B = sess.run(model['diag_B'], feed_dict={x: batch_xs, y_: batch_ys})
+		subdiag_B = sess.run(model['subdiag_B'], feed_dict={x: batch_xs, y_: batch_ys})
+		f_B = sess.run(model['f_B'], feed_dict={x: batch_xs, y_: batch_ys})
+
+		print 'subdiag_A: ', subdiag_A
+		print 'supdiag_A: ', supdiag_A
+		print 'diag_A: ', diag_A
+
+		A = gen_tridiag_corner(subdiag_A, supdiag_A, diag_A, f_A)
+		B = gen_tridiag_corner(subdiag_B, supdiag_B, diag_B, f_B)
+
+		W = sess.run(model['W'], feed_dict={x: batch_xs, y_: batch_ys})
+		E = compute_disp(params.disp_type, W, A, B)
+
 	elif params.class_type == 'circulant_sparsity':
 		# Construct A
 		f_x_A = sess.run(model['f_x_A'], feed_dict={x: batch_xs, y_: batch_ys})
@@ -62,6 +88,7 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 		assert 0 
 	print E.shape
 	print('(Displacement) Rank: ', np.linalg.matrix_rank(E))
+	print 'eigvals: ', np.linalg.eigvals(E)
 
 def get_structured_W(params):
 	model = {}
@@ -69,12 +96,48 @@ def get_structured_W(params):
 		W = tf.Variable(tf.truncated_normal([params.layer_size, params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
 		model['W'] = W
 		return W, model
-	elif params.class_type in ['low_rank', 'symmetric', 'toeplitz_like', 
+	elif params.class_type in ['low_rank', 'symm_tridiag_corner_pan', 'symm_tridiag_corner_krylov','symmetric', 'toeplitz_like', 
 		'vandermonde_like', 'hankel_like', 'circulant_sparsity', 'tridiagonal_corner']:
 		G = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=params.init_stddev, dtype=tf.float64))
 		H = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=params.init_stddev, dtype=tf.float64))
 		if params.class_type == 'low_rank':
 			W = tf.matmul(G, tf.transpose(H))
+		elif params.class_type == 'symm_tridiag_corner_pan':
+			mask = symm_tridiag_corner_mask(n)
+			A = tf.Variable(tf.truncated_normal([params.layer_size, params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
+			B = tf.Variable(tf.truncated_normal([params.layer_size, params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
+
+			A = tf.multiply(A, mask)
+			B = tf.multiply(B, mask)
+
+			W = general_recon(G, H, A, A)
+			model['A'] = A
+			model['B'] = A
+		elif params.class_type == 'symm_tridiag_corner_krylov':
+			diag_A = tf.Variable(tf.truncated_normal([params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
+			off_diag_A = tf.Variable(tf.truncated_normal([params.layer_size-1], stddev=params.init_stddev, dtype=tf.float64))
+			diag_B = tf.Variable(tf.truncated_normal([params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
+			off_diag_B = tf.Variable(tf.truncated_normal([params.layer_size-1], stddev=params.init_stddev, dtype=tf.float64))
+			f_A = tf.Variable(tf.truncated_normal([1], stddev=params.init_stddev, dtype=tf.float64))
+			f_B = tf.Variable(tf.truncated_normal([1], stddev=params.init_stddev, dtype=tf.float64))
+			model['diag_A'] = diag_A
+			model['off_diag_A'] = off_diag_A
+			model['f_A'] = f_A
+			model['diag_B'] = diag_B
+			model['off_diag_B'] = off_diag_B
+			model['f_B'] = f_B
+
+			fn_A = functools.partial(tridiag_corners_transpose_mult_fn, off_diag_A, diag_A, off_diag_A, f_A, f_A)
+			fn_B = functools.partial(tridiag_corners_transpose_mult_fn, off_diag_B, diag_B, off_diag_B, f_B, f_B)
+			W = krylov_recon(params, G, H, fn_A, fn_B)
+			# Compute a and b
+			a = tf.multiply(f_A, tf.reduce_prod(subdiag_A))
+			b = tf.multiply(f_B, tf.reduce_prod(subdiag_B))
+
+			coeff = 1.0/(1 - a*b)
+
+			W = tf.multiply(coeff, W)
+
 		elif params.class_type == 'symmetric':
 			# Initialization with T+H operators
 			Z1 = gen_Z_f(params.layer_size, 1)
@@ -112,8 +175,6 @@ def get_structured_W(params):
 			v = tf.Variable(tf.truncated_normal([params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
 			model['v'] = v
 			W = vand_recon(G, H, v, params.layer_size, params.layer_size, f_V, params.r)
-		elif params.class_type == 'symmetric_tridiagonal':
-			return 0
 		elif params.class_type == 'circulant_sparsity':
 			f_x_A, f_x_B = get_f_x(params.layer_size, params.init_type, params.learn_corner, params.n_diag_learned, params.init_stddev)
 
