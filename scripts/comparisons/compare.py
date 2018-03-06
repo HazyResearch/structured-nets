@@ -74,7 +74,8 @@ for method in methods:
 	print 'Params:\n', params
 
 	# Save params + git commit ID
-	this_results_dir = params.save(results_dir, args.name, commit_id)
+	this_results_dir = params.save(results_dir, args.name + '_' + method, commit_id)
+	print 'this_results_dir: ', this_results_dir
 
 	for test_iter in range(n_trials):
 		this_iter_name = method + str(test_iter)
