@@ -25,6 +25,7 @@ class Dataset:
 		self.train_size = train_size
 		self.true_test = true_test
 		self.input_size = self.get_input_size()
+		print('input size: ', self.input_size)
 		self.train_loc = ''
 		self.test_loc = ''
 		
@@ -40,6 +41,37 @@ class Dataset:
 			self.load_test_data()
 			self.val_X = self.test_X
 			self.val_Y = self.test_Y
+		elif self.name == 'smallnorb':
+			data_loc = '/dfs/scratch1/thomasat/datasets/smallnorb/processed_py2.pkl'
+			# Load
+			data = pkl.load(open(data_loc, 'rb'))
+			train_X = data['train_X']
+			train_Y = data['train_Y']
+			self.test_X = data['test_X']
+			self.test_Y = data['test_Y']
+			val_size = 2000
+			train_size = train_X.shape[0] - val_size
+
+			print('train size, val size: ', train_size, val_size)
+
+			# Shuffle X
+			idx = np.arange(0, train_X.shape[0])
+			np.random.shuffle(idx)
+
+			train_idx = idx[0:train_size]
+			val_idx = idx[-val_size:]
+
+			assert train_idx.size == train_size
+			assert val_idx.size == val_size
+
+			self.val_X = train_X[val_idx, :]
+			self.val_Y = train_Y[val_idx, :]
+			self.train_X = train_X[train_idx, :]
+			self.train_Y = train_X[train_idx, :]
+
+
+			print self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape 
+
 
 		elif self.name == 'mnist':
 			data_dir = '/tmp/tensorflow/mnist/input_data'
@@ -234,6 +266,8 @@ class Dataset:
 	def get_input_size(self):
 		if 'mnist' in self.name:
 			return 784
+		elif self.name == 'smallnorb':
+			return 576
 		elif self.name == 'cifar10':
 			return 3072
 			if self.transform == 'grayscale':
@@ -296,13 +330,15 @@ class Dataset:
 	def out_size(self):
 		if self.name in ['convex', 'rect', 'rect_images']:
 			return 2
+		elif self.name == 'smallnorb':
+			return 5
 		elif 'mnist' in self.name or 'cifar10' in self.name:
 			return 10
 		else:
 			return self.input_size
 
 	def load_test_data(self):
-		if self.name.startswith('mnist_noise'):
+		if self.name.startswith('mnist_noise') or self.name == 'smallnorb':
 			return 
 
 		if self.name == 'cifar10':
@@ -361,7 +397,7 @@ class Dataset:
 		if self.name == 'mnist':
 			batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
 			return batch_xs, batch_ys
-		elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images']:
+		elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb']:
 			# Randomly sample batch_size from train_X and train_Y
 			idx = np.random.randint(self.train_X.shape[0], size=batch_size)
 			return self.train_X[idx, :], self.train_Y[idx, :]
