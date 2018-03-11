@@ -243,7 +243,7 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 	# Create the model
 	x = tf.placeholder(tf.float64, [None, params.input_size])
 	if params.fix_G:
-		G = tf.truncated_normal([params.layer_size, params.r], stddev=1.01, dtype=tf.float64)
+		G = tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64)
 	else:
 		G = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
 	H = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=0.01, dtype=tf.float64))
