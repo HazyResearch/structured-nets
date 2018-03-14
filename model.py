@@ -107,7 +107,7 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 		assert 0 
 	print E.shape
 	print('(Displacement) Rank: ', np.linalg.matrix_rank(E))
-	print('||E||/||W||: ', ratio
+	print('||E||/||W||: ', ratio)
 	#print 'eigvals: ', np.linalg.eigvals(E)
 	return dr, ratio
 

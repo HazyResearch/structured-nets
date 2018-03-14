@@ -9,6 +9,7 @@ from scipy.misc import imresize
 MAX_VAL = 255.0
 DS_SIZE = (24, 24)
 N_CATEGORIES = 5
+OUT_LOC = '/dfs/scratch1/thomasat/datasets/smallnorb/processed_py2.pkl'
 
 """
 Downsamples and normalizes.
@@ -52,8 +53,8 @@ test_X, test_Y = process_data(dataset.data['test'])
 print('train_X, train_Y, test_X, test_Y: ', train_X.shape, train_Y.shape, test_X.shape, test_Y.shape)
 
 # Save
-dict = {'train_X': train_X, 'train_Y': train_Y, 'test_X': test_X, 'test_Y': test_Y}
-
+data_dict = {'train_X': train_X, 'train_Y': train_Y, 'test_X': test_X, 'test_Y': test_Y}
+pkl.dump(data_dict, open(OUT_LOC, 'wb'), protocol=2)
 
 
 

@@ -41,6 +41,33 @@ class Dataset:
 			self.load_test_data()
 			self.val_X = self.test_X
 			self.val_Y = self.test_Y
+		elif self.name == 'norb':
+			data_loc = '/dfs/scratch1/thomasat/datasets/norb/processed_py2_train.pkl'
+			data = pkl.load(open(data_loc, 'rb'))
+			train_X = data['train_X']
+			train_Y = data['train_Y']
+			val_size = 2000
+			train_size = train_X.shape[0] - val_size
+
+			print('train size, val size: ', train_size, val_size)
+
+			# Shuffle X
+			idx = np.arange(0, train_X.shape[0])
+			np.random.shuffle(idx)
+
+			train_idx = idx[0:train_size]
+			val_idx = idx[-val_size:]
+
+			assert train_idx.size == train_size
+			assert val_idx.size == val_size
+
+			self.val_X = train_X[val_idx, :]
+			self.val_Y = train_Y[val_idx, :]
+			self.train_X = train_X[train_idx, :]
+			self.train_Y = train_Y[train_idx, :]
+
+
+			print self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape 
 		elif self.name == 'smallnorb':
 			data_loc = '/dfs/scratch1/thomasat/datasets/smallnorb/processed_py2.pkl'
 			# Load
@@ -67,7 +94,7 @@ class Dataset:
 			self.val_X = train_X[val_idx, :]
 			self.val_Y = train_Y[val_idx, :]
 			self.train_X = train_X[train_idx, :]
-			self.train_Y = train_X[train_idx, :]
+			self.train_Y = train_Y[train_idx, :]
 
 
 			print self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape 
@@ -268,6 +295,8 @@ class Dataset:
 			return 784
 		elif self.name == 'smallnorb':
 			return 576
+		elif self.name == 'norb':
+			return 729
 		elif self.name == 'cifar10':
 			return 3072
 			if self.transform == 'grayscale':
@@ -332,13 +361,15 @@ class Dataset:
 			return 2
 		elif self.name == 'smallnorb':
 			return 5
+		elif self.name == 'norb':
+			return 6
 		elif 'mnist' in self.name or 'cifar10' in self.name:
 			return 10
 		else:
 			return self.input_size
 
 	def load_test_data(self):
-		if self.name.startswith('mnist_noise') or self.name == 'smallnorb':
+		if self.name.startswith('mnist_noise') or self.name == 'smallnorb' or self.name == 'norb':
 			return 
 
 		if self.name == 'cifar10':
@@ -397,7 +428,7 @@ class Dataset:
 		if self.name == 'mnist':
 			batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
 			return batch_xs, batch_ys
-		elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb']:
+		elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb']:
 			# Randomly sample batch_size from train_X and train_Y
 			idx = np.random.randint(self.train_X.shape[0], size=batch_size)
 			return self.train_X[idx, :], self.train_Y[idx, :]

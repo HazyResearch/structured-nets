@@ -76,8 +76,8 @@ def optimize(dataset, params):
 		dataset.load_test_data()
 		test_loss, test_accuracy, test_loss_summ, test_acc_summ = sess.run([loss, accuracy, test_loss_summary, test_acc_summary], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
 
-		summary_writer.add_summary(test_loss_summ, step)
-		summary_writer.add_summary(test_acc_summ, step)
+		summary_writer.add_summary(test_loss_summ, this_step)
+		summary_writer.add_summary(test_acc_summ, this_step)
 
 		print('Test loss, %s: %f' % (params.class_type, test_loss))
 		print('Test accuracy, %s: %f ' % (params.class_type, test_accuracy))

@@ -11,7 +11,7 @@ from model_params import ModelParams
 from dataset import Dataset
 import argparse
 
-# Available datasets: mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
+# Available datasets: norb, cifar10, smallnorb, mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
 # Example command: 
 # python compare.py --name=test --methods=tridiagonal_corner,toeplitz-like --dataset=true_toeplitz --result_dir=2_25_18 --r=1 --lr=1e-3 --decay_rate=1.0 --mom=0.9 --test=0 --layer_size=50 --transform=none
 
@@ -33,7 +33,7 @@ args = parser.parse_args()
 # Fixed params
 num_layers = 1
 out_dir = '/dfs/scratch1/thomasat/'
-loss = 'mse'
+loss = 'cross_entropy'
 steps = 50000
 decay_freq = 0.1
 batch_size = 50
@@ -61,7 +61,7 @@ n_diag_learned = dataset.input_size - 1
 commit_id = get_commit_id()
 methods = args.methods.split(',')
 
-print 'Testing methods: ', methods
+print('Testing methods: ', methods)
 
 for method in methods:
 	params = ModelParams(args.dataset, args.transform, args.test, log_path, dataset.input_size, args.layer_size, 
@@ -71,19 +71,20 @@ for method in methods:
 			checkpoint_path, test_freq, verbose, args.decay_rate, decay_freq, learn_diagonal, 
 			fix_A_identity, stochastic_train, flip_K_B)
 
-	print 'Params:\n', params
+	print('Params:\n', params)
 
 	# Save params + git commit ID
 	this_results_dir = params.save(results_dir, args.name + '_' + method, commit_id)
-	print 'this_results_dir: ', this_results_dir
+	print('this_results_dir: ', this_results_dir)
 
 	for test_iter in range(n_trials):
 		this_iter_name = method + str(test_iter)
 		params.log_path = os.path.join(log_path, args.name + '_' + method + '_' + str(test_iter))
 		params.checkpoint_path = os.path.join(checkpoint_path, args.name + '_' + method + '_' + str(test_iter))
 
-		print 'Tensorboard log path: ', params.log_path
-		print 'Tensorboard checkpoint path: ', params.checkpoint_path
+		print('Tensorboard log path: ', params.log_path)
+		print('Tensorboard checkpoint path: ', params.checkpoint_path)
+		os.makedirs(params.checkpoint_path)
 
 		losses, accuracies = optimize(dataset, params)
 		tf.reset_default_graph()
@@ -92,5 +93,5 @@ for method in methods:
 		pkl.dump(losses, open(out_loc + '_losses.p', 'wb'))
 		pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'))
 
-		print 'Saved losses and accuracies for ' + method + ' to: ' + out_loc
+		print('Saved losses and accuracies for ' + method + ' to: ' + out_loc)
 
