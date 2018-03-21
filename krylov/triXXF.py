@@ -1,3 +1,4 @@
+
 import numpy as np
 import scipy.fftpack as fft
 from scipy import signal
@@ -116,8 +117,14 @@ def resolvent_bilinear(A, v, u, n):
     invariants:
         numerator has degree n-1
         denominator degree n
+
+    # let x_{m-1}, x_{m-2}, ... x_{m-d} denote the branch
+    #     i.e. this computes the answer for indices i = with bit pattern matching the above
+    #     (since this fixes the higher-order bits, this is a contiguous range of u,v)
+    # returns arrays indexed by bits y_0, ..., y_{m-d-1}, z_0, z_1
+    # where n = 2^m
     """
-    if n == 1:
+    if n == 1: # leaf: branch x_0, \dots, x_{m-1}
         # don't know how write outer product in numpy
         return (np.array([[[ u[0]*v[0] ], [ u[0]*1 ]], [[ 1*v[0] ], [ 1*1 ]]]), np.array([1,-A[0,0]]))
 
@@ -125,34 +132,107 @@ def resolvent_bilinear(A, v, u, n):
     # Let M00 = M[0:k, 0:k], M10 = M[k:n, 0:k], M11 = M[k:n,k:n]
     # i.e. M = [M00 0 ; M10 M11] (where M = I-Ax)
     # then M^{-1} = [M00^{-1} 0 ; -M11^{-1} M_10^{-1} M_00^{-1}]
-    S0, d0 = resolvent_bilinear(A[:k,:k], v[:k], u[:k], k)
-    S1, d1 = resolvent_bilinear(A[k:,k:], v[k:], u[k:], n-k)
+    S0, d0 = resolvent_bilinear(A[:k,:k], v[:k], u[:k], k)   # subproblem [x_0, ..., x_d, 0]
+    S1, d1 = resolvent_bilinear(A[k:,k:], v[k:], u[k:], n-k) # subproblem [x_0, ..., x_d, 1]
 
     # the part corresponding to bottom left corner is
     # -A[k, k-1]x * u_1^T M_11^{-1} e_1 * e_k^T M_00^{-1} v_0
     # or S1[:,1] * S0[1,:]
     L = np.array([[poly_mult(S1[0,1], S0[1,0]), poly_mult(S1[0,1], S0[1,1])], [poly_mult( S1[1,1], S0[1,0] ), poly_mult( S1[1,1], S0[1,1] )]])
-    # print(L)
+    # this is x = [x_0, ..., x_d, 1], z = [0, 1]
     L = A[k,k-1] * np.pad(L, ((0,0),(0,0),(1,0)), 'constant') # multiply by X
     # TODO: above padding should be able to be optimized away; when we allocate memory properly can store the coefficients directly in the right place
-    # print(L)
 
     # clear denominators
-    # S0 = np.array([[ poly_mult(s, d1) for s in r ] for r in S0])
-    # S1 = np.array([[ poly_mult(s, d0) for s in r ] for r in S1])
-    # print(S0)
-
-    # really need to define poly matrix operations
-    # S = np.array([[poly_add(S0[i,j],S1[i,j]) for j in range(2)] for i in range(2)])
-    # S = np.array([[poly_add(S[i,j],L[i,j]) for j in range(2)] for i in range(2)])
-    # L[0,0] = poly_add(L[0,0], poly_mult(S0[0,0], d1), n)
-    # L[0,1] = poly_add(L[0,1], poly_mult(S0[0,1], d1), n)
-    # L[0,0] = poly_add(L[0,0], poly_mult(S1[0,0], d0), n)
-    # L[1,0] = poly_add(L[1,0], poly_mult(S1[1,0], d0), n)
     L[0,0] += poly_mult(S0[0,0], d1) + poly_mult(S1[0,0], d0)
     L[0,1] += poly_mult(S0[0,1], d1)
     L[1,0] += poly_mult(S1[1,0], d0)
     return (L, poly_mult(d0,d1))
+
+# TODO: put this as subfunction of other
+
+# this is specialized to subdiagonal for now
+def resolvent_bilinear_flattened_(subd, v, u, m, d, S):
+    # pass at depth d computes 4 arrays:
+    # each array is length n, indexed by x_{m-1}, ..., x_{m-d}, y_{m-d-1}, ..., y_0
+    # for convenience, store as x_{m-d}, ..., x_{m-1}, y_{m-d-1}, ..., y_0
+
+    assert d < m # assume leaf pass done in main function
+
+    S_00, S_01, S_10, S_11 = S # answers to previous layer: indexed by x_{m-d-1}, x_{m-d}, ..., x_{m-1}, y_{m-d-2}, ..., y_0
+    # these are the same as the S0[0,0],S1[0,0] above
+    assert S_00.shape == (1<<(d+1), 1<<(m-d-1))
+    n1, n2 = 1<<d, 1<<(m-d)
+
+    # TODO: time the following: hcat a big dense matrix with a 0 matrix, vs. np.zeros followed by assignment
+    # %timeit np.hstack((x, np.zeros((32,32))))   : 9.16 µs ± 221 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+    # %timeit y = np.zeros((32,64)); y[:,:32] = x : 3.63 µs ± 573 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+    # S0_00, S0_01, S0_00, S0_01, S1_00, S1_01, S1_00, S1_01 = np.zeros((8,n))
+    # S0_00[:n/2], S1_00[:n/2] = S_00[:n/2], S_00[n/2:] # alternative: numpy.split(S, 2)
+    # S0_01[:n/2], S1_01[:n/2] = S_01[:n/2], S_01[n/2:]
+    # S0_10[:n/2], S1_10[:n/2] = S_10[:n/2], S_10[n/2:]
+    # S0_11[:n/2], S1_11[:n/2] = S_11[:n/2], S_11[n/2:]
+    S0_10, S0_11, S1_01, S1_11 = np.zeros((4,n1,n2))
+    S0_10[:,:n2//2] = S_10[:n1,:]
+    S1_01[:,:n2//2] = S_01[n1:,:]
+    S0_11[:,:n2//2] = S_11[:n1,:]
+    S1_11[:,:n2//2] = S_11[n1:,:]
+
+    # polynomial multiplications
+    S0_10_ = np.fft.rfft(S0_10)
+    S0_11_ = np.fft.rfft(S0_11)
+    S1_01_ = np.fft.rfft(S1_01)
+    S1_11_ = np.fft.rfft(S1_11)
+
+    # subproblem for branch x_{m-d}, ..., x_{m-1} is A[\overline{x_{m-1}...x_{m-d}} + 2^{m-d-1}]
+    A_subd = subd[n1:n1*2, np.newaxis]
+    T_00 = A_subd * np.fft.irfft(S1_01_ * S0_10_)
+    T_01 = A_subd * np.fft.irfft(S1_01_ * S0_11_)
+    T_10 = A_subd * np.fft.irfft(S1_11_ * S0_10_)
+    T_11 = A_subd * np.fft.irfft(S1_11_ * S0_11_)
+
+    # polynomial additions
+    T_00[:,n2//2:] += S_00[:n1,:]
+    T_00[:,n2//2:] += S_00[n1:,:]
+    T_01[:,n2//2:] += S_01[:n1,:]
+    T_10[:,n2//2:] += S_10[n1:,:]
+
+    return (T_00, T_01, T_10, T_11)
+
+
+def idx_bitflip(x, n, m):
+    assert n == 1<<m # power of 2 for now
+    x_ = x.reshape([2]*m)
+    x_bf_ = np.empty(shape=[2]*m)
+    for i in itertools.product(*([[0,1]]*m)):
+        x_bf_[i[::-1]] = x_[i]
+    x_bf = x_bf_.reshape(n)
+    return x_bf
+
+def resolvent_bilinear_flattened(A, v, u, n, m):
+    assert n == 1<<m # power of 2 for now
+
+    # assume A is subdiagonal for now
+    subd = np.concatenate(([0],np.diagonal(A, -1)))
+    subd = idx_bitflip(subd, n, m)
+
+    # reshape u,v to be indexed consistently with the above
+    # i.e. bit flip their indices
+    u_bf = idx_bitflip(u, n, m).reshape((n,1)) # tri says use [:,np.newaxis]
+    v_bf = idx_bitflip(v, n, m).reshape((n,1))
+
+    S = (u_bf*v_bf, u_bf, v_bf, np.ones((n,1)))
+
+    for d in range(m-1,-1,-1):
+        S = resolvent_bilinear_flattened_(subd, v, u, m, d, S)
+
+    # print(S[0], S[1], S[2], S[3])
+    # return np.flip(S[0], axis=-1)
+    return S[0].squeeze()[::-1]
+
+
+
+
 
 def krylov_mult(A, v, u, m):
     """
@@ -192,7 +272,7 @@ def krylov_mult_slow_faster(A, v, u, m):
     d = np.diagonal(A, 0)
     subd = np.diagonal(A, -1)
 
-    K = np.empty(shape=(m,n))
+    K = np.zeros(shape=(m,n))
     K[0,:] = v
     for i in range(1,m):
         K[i,1:] = subd*K[i-1,:-1]
@@ -200,21 +280,41 @@ def krylov_mult_slow_faster(A, v, u, m):
 
 np.random.seed(0)
 
-# A = np.array([[0,0],[1,0]])
-# u = np.array([1,1])
-# v = np.array([1,1])
-# resolvent_bilinear(A,u,v,2)
+A = np.array([[0,0],[1,0]])
+u = np.array([1,1])
+v = np.array([1,1])
+print(resolvent_bilinear(A,v,u,2))
+# ans: [2 1], [1, 1], [1 1], [0 1]
 
 # A = np.array([[0,0,0,0],[1,0,0,0],[0,2,0,0],[0,0,3,0]])
 # u = np.array([1,1,1,1])
 # v = np.array([1,1,1,1])
 # resolvent_bilinear(A,u,v,4)
 
-n = 4096
+n = 4
+A = np.diag(np.arange(1,4),-1)
+u = np.ones(4)
+v = np.ones(4)
+print(resolvent_bilinear(A,v,u,4))
+print(krylov_mult(A,v,u,4))
+print(krylov_mult_slow(A,v,u,4))
+print(krylov_mult_slow_faster(A,v,u,4))
+print(resolvent_bilinear_flattened(A,v,u,4,2))
+# ans: [4 6 8 6], [1 1 2 6], [1 3 6 6], [0 0 0 6]
+
+# A = np.array([[0,0,0,0],[1,0,0,0],[0,2,0,0],[0,0,3,0]])
+# u = np.array([1,1,1,1])
+# v = np.array([1,1,1,1])
+# resolvent_bilinear(A,u,v,4)
+m = 12
+n = 1<<m
 A = np.diag(np.random.random(n-1), -1)
 u = np.random.random(n)
 v = np.random.random(n)
 k1 = krylov_mult_slow(A,v,u,n)
 k11 = krylov_mult_slow_faster(A,v,u,n)
 k2 = krylov_mult(A,v,u,n)
+k3 = resolvent_bilinear_flattened(A, v, u, n, m)
+print(np.max(np.abs(k1-k11)))
 print(np.max(np.abs(k1-k2)))
+print(np.max(np.abs(k1-k3)))
