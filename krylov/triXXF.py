@@ -1,6 +1,6 @@
-
 import numpy as np
 import scipy.fftpack as fft
+import itertools
 from scipy import signal
 
 # should create a poly class later
@@ -200,7 +200,8 @@ def resolvent_bilinear_flattened_(subd, v, u, m, d, S):
     return (T_00, T_01, T_10, T_11)
 
 
-def idx_bitflip(x, n, m):
+def bitreversal_fat(x, n, m):
+    """ Compute the bit reversal permutation """
     assert n == 1<<m # power of 2 for now
     x_ = x.reshape([2]*m)
     x_bf_ = np.empty(shape=[2]*m)
@@ -209,17 +210,28 @@ def idx_bitflip(x, n, m):
     x_bf = x_bf_.reshape(n)
     return x_bf
 
+def bitreversal(x, n, m):
+    assert n == 1<<m
+    n1, n2 = n, 1
+    x_ = x.reshape((n1,n2))
+    for i in range(m):
+        n1 //= 2
+        n2 *= 2
+        x_ = np.hstack((x_[:n1,:], x_[n1:,:]))
+    return x_.squeeze()
+
+
 def resolvent_bilinear_flattened(A, v, u, n, m):
     assert n == 1<<m # power of 2 for now
 
     # assume A is subdiagonal for now
     subd = np.concatenate(([0],np.diagonal(A, -1)))
-    subd = idx_bitflip(subd, n, m)
+    subd = bitreversal(subd, n, m)
 
     # reshape u,v to be indexed consistently with the above
     # i.e. bit flip their indices
-    u_bf = idx_bitflip(u, n, m).reshape((n,1)) # tri says use [:,np.newaxis]
-    v_bf = idx_bitflip(v, n, m).reshape((n,1))
+    u_bf = bitreversal(u, n, m).reshape((n,1)) # tri says use [:,np.newaxis]
+    v_bf = bitreversal(v, n, m).reshape((n,1))
 
     S = (u_bf*v_bf, u_bf, v_bf, np.ones((n,1)))
 
@@ -229,8 +241,6 @@ def resolvent_bilinear_flattened(A, v, u, n, m):
     # print(S[0], S[1], S[2], S[3])
     # return np.flip(S[0], axis=-1)
     return S[0].squeeze()[::-1]
-
-
 
 
 
@@ -266,7 +276,7 @@ def krylov_mult_slow(A, v, u, m):
     K = np.stack(cols, axis=1)
     return K.T @ u
 
-def krylov_mult_slow_faster(A, v, u, m):
+def krylov_construct(A, v, m):
     n = v.shape[0]
     assert A.shape == (n,n)
     d = np.diagonal(A, 0)
@@ -276,6 +286,10 @@ def krylov_mult_slow_faster(A, v, u, m):
     K[0,:] = v
     for i in range(1,m):
         K[i,1:] = subd*K[i-1,:-1]
+    return K
+
+def krylov_mult_slow_faster(A, v, u, m):
+    K = krylov_construct(A, v, m)
     return K @ u
 
 np.random.seed(0)
