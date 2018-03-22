@@ -152,7 +152,7 @@ def resolvent_bilinear(A, v, u, n):
 # TODO: put this as subfunction of other
 
 # this is specialized to subdiagonal for now
-def resolvent_bilinear_flattened_(subd, v, u, m, d, S):
+def resolvent_bilinear_flattened_(subd, v, u, m, d, S, stack_fft=False):
     # pass at depth d computes 4 arrays:
     # each array is length n, indexed by x_{m-1}, ..., x_{m-d}, y_{m-d-1}, ..., y_0
     # for convenience, store as x_{m-d}, ..., x_{m-1}, y_{m-d-1}, ..., y_0
@@ -172,24 +172,36 @@ def resolvent_bilinear_flattened_(subd, v, u, m, d, S):
     # S0_01[:n/2], S1_01[:n/2] = S_01[:n/2], S_01[n/2:]
     # S0_10[:n/2], S1_10[:n/2] = S_10[:n/2], S_10[n/2:]
     # S0_11[:n/2], S1_11[:n/2] = S_11[:n/2], S_11[n/2:]
-    S0_10, S0_11, S1_01, S1_11 = np.zeros((4,n1,n2))
+    S_ = np.zeros((4,n1,n2))
+    S0_10, S0_11, S1_01, S1_11 = S_
     S0_10[:,:n2//2] = S_10[:n1,:]
     S1_01[:,:n2//2] = S_01[n1:,:]
     S0_11[:,:n2//2] = S_11[:n1,:]
     S1_11[:,:n2//2] = S_11[n1:,:]
 
     # polynomial multiplications
-    S0_10_ = np.fft.rfft(S0_10)
-    S0_11_ = np.fft.rfft(S0_11)
-    S1_01_ = np.fft.rfft(S1_01)
-    S1_11_ = np.fft.rfft(S1_11)
+    if not stack_fft:
+        S0_10_f = np.fft.rfft(S0_10)
+        S0_11_f = np.fft.rfft(S0_11)
+        S1_01_f = np.fft.rfft(S1_01)
+        S1_11_f = np.fft.rfft(S1_11)
+    else:
+        S0_10_f, S0_11_f, S1_01_f, S1_11_f = np.fft.rfft(S_)
 
     # subproblem for branch x_{m-d}, ..., x_{m-1} is A[\overline{x_{m-1}...x_{m-d}} + 2^{m-d-1}]
     A_subd = subd[n1:n1*2, np.newaxis]
-    T_00 = A_subd * np.fft.irfft(S1_01_ * S0_10_)
-    T_01 = A_subd * np.fft.irfft(S1_01_ * S0_11_)
-    T_10 = A_subd * np.fft.irfft(S1_11_ * S0_10_)
-    T_11 = A_subd * np.fft.irfft(S1_11_ * S0_11_)
+    if not stack_fft:
+        T_00 = A_subd * np.fft.irfft(S1_01_f * S0_10_f)
+        T_01 = A_subd * np.fft.irfft(S1_01_f * S0_11_f)
+        T_10 = A_subd * np.fft.irfft(S1_11_f * S0_10_f)
+        T_11 = A_subd * np.fft.irfft(S1_11_f * S0_11_f)
+    else:
+        T_00, T_01, T_10, T_11 = A_subd * np.fft.irfft(np.stack(
+            (S1_01_f * S0_10_f,
+             S1_01_f * S0_11_f,
+             S1_11_f * S0_10_f,
+             S1_11_f * S0_11_f)
+        ))
 
     # polynomial additions
     T_00[:,n2//2:] += S_00[:n1,:]
@@ -275,7 +287,7 @@ def bitreversal(x, n, m):
     return x_.squeeze()
 
 
-def resolvent_bilinear_flattened(A, v, u, n, m):
+def resolvent_bilinear_flattened(A, v, u, n, m, stack_fft=False):
     assert n == 1<<m # power of 2 for now
 
     # assume A is subdiagonal for now
@@ -290,7 +302,7 @@ def resolvent_bilinear_flattened(A, v, u, n, m):
     S = (u_bf*v_bf, u_bf, v_bf, np.ones((n,1)))
 
     for d in range(m-1,-1,-1):
-        S = resolvent_bilinear_flattened_(subd, v, u, m, d, S)
+        S = resolvent_bilinear_flattened_(subd, v, u, m, d, S, stack_fft)
 
     # print(S[0], S[1], S[2], S[3])
     # return np.flip(S[0], axis=-1)
@@ -418,6 +430,6 @@ k11 = krylov_mult_slow_faster(A,v,u,n)
 k2 = krylov_mult(A,v,u,n)
 k3 = resolvent_bilinear_flattened(A, v, u, n, m)
 k3b = resolvent_bilinear_flattened_batched(A, v, u, n, m)
-print(np.max(np.abs(k1-k11)))
-print(np.max(np.abs(k1-k2)))
-print(np.max(np.abs(k1-k3)))
+print(np.linalg.norm(k1-k11)))
+print(np.linalg.norm(k1-k2)))
+print(np.linalg.norm(k1-k3)))
