@@ -10,7 +10,7 @@ import pyfftw
 def _plan_ffts(in_shape, lib='numpy'):
     out_shape = in_shape[:-1] + (in_shape[-1]//2 + 1,)
     if lib == 'numpy':
-        x_for = np.empty(shape=in_shape)
+        x_for = np.zeros(shape=in_shape)
         # y_for = np.empty(shape=out_shape)
         fft = lambda: np.fft.rfft(x_for)
 
@@ -23,7 +23,8 @@ def _plan_ffts(in_shape, lib='numpy'):
         out_shape = in_shape[:-1] + (in_shape[-1]//2 + 1,)
         x_for = pyfftw.empty_aligned(in_shape, dtype='float64')
         y_for = pyfftw.empty_aligned(out_shape, dtype='complex128')
-        fft_for = pyfftw.FFTW(x_for, y_for, direction='FFTW_FORWARD', flags=['FFTW_EXHAUSTIVE', 'FFTW_DESTROY_INPUT'])
+        fft_for = pyfftw.FFTW(x_for, y_for, direction='FFTW_FORWARD', flags=['FFTW_EXHAUSTIVE']) # don't destroy input so 0s are preserved
+        x_for[:] = 0
 
         x_bak = pyfftw.empty_aligned(in_shape, dtype='float64')
         y_bak = pyfftw.empty_aligned(out_shape, dtype='complex128')
@@ -50,16 +51,18 @@ def plan_ffts(m, lib='numpy'):
 # TODO: put this as subfunction of main function
 
 # this is specialized to subdiagonal for now
+# @profile
 def _resolvent_bilinear_flattened(fft_plans, subd, v, u, m, d, S):
     # pass at depth d computes 4 arrays:
     # each array is length n, indexed by x_{m-1}, ..., x_{m-d}, y_{m-d-1}, ..., y_0
     # for convenience, store as x_{m-d}, ..., x_{m-1}, y_{m-d-1}, ..., y_0
 
-    assert d < m # assume leaf pass done in main function
+    # assert d < m # assume leaf pass done in main function
 
     S_00, S_01, S_10, S_11 = S # answers to previous layer: indexed by x_{m-d-1}, x_{m-d}, ..., x_{m-1}, y_{m-d-2}, ..., y_0
-    # these are the same as the S0[0,0],S1[0,0] above
-    assert S_00.shape == (1<<(d+1), 1<<(m-d-1))
+    # these are the same as the S0[0,0],S1[0,0] in the recursive version
+
+    # assert S_00.shape == (1<<(d+1), 1<<(m-d-1))
     n1, n2 = 1<<d, 1<<(m-d)
 
     # TODO: time the following: hcat a big dense matrix with a 0 matrix, vs. np.zeros followed by assignment
@@ -71,7 +74,7 @@ def _resolvent_bilinear_flattened(fft_plans, subd, v, u, m, d, S):
     # S0_10[:n/2], S1_10[:n/2] = S_10[:n/2], S_10[n/2:]
     # S0_11[:n/2], S1_11[:n/2] = S_11[:n/2], S_11[n/2:]
     ((S_, fft), (T_, ifft)) = fft_plans[d]
-    S_[:] = 0
+    # S_[:] = 0
     # S_ = np.zeros((4,n1,n2))
     S0_10, S0_11, S1_01, S1_11 = S_
     S0_10[:,:n2//2] = S_10[:n1,:]
@@ -132,6 +135,7 @@ def create(n, m, lib='numpy'):
     bf_perm = bitreversal_stack(np.arange(n), n, m)
     bitreversal = lambda x, n, m: x[bf_perm]
 
+    # @profile
     def resolvent_bilinear_flattened(A, v, u, n, m):
         assert n == 1<<m # power of 2 for now
 
@@ -156,3 +160,4 @@ def create(n, m, lib='numpy'):
         return S[0].squeeze()[::-1]
 
     return resolvent_bilinear_flattened
+
