@@ -93,7 +93,10 @@ def _resolvent_bilinear_flattened(fft_plans, subd, v, u, m, d, S):
     T_[1] = S1_01_f * S0_11_f
     T_[2] = S1_11_f * S0_10_f
     T_[3] = S1_11_f * S0_11_f
-    T_00, T_01, T_10, T_11 = A_subd * ifft()
+    T_ = ifft()
+    T_ *= A_subd
+    T_00, T_01, T_10, T_11 = T_
+    # T_00, T_01, T_10, T_11 = A_subd * ifft()
 
     # polynomial additions
     T_00[:,n2//2:] += S_00[:n1,:]
