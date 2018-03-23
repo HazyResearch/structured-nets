@@ -186,35 +186,30 @@ def krylov_mult_slow(A, v, u, m):
     K = np.stack(cols, axis=1)
     return K.T @ u
 
-def krylov_mult_slow_faster(A, v, u, m):
+def krylov_mult_slow_allocated(A, v, u, m):
+    n = v.shape[0]
+    assert A.shape == (n,n)
+    d = np.diagonal(A, 0)
+    subd = np.diagonal(A, -1)
+    # Allocate memory at once to K
+    K_T = np.empty((m, n))
+    K_T[0] = v
+    for i in range(1,m):
+        K_T[i] = Amult(d, subd, K_T[i-1])
+    return K_T @ u
+
+def krylov_construct(A, v, m):
     n = v.shape[0]
     assert A.shape == (n,n)
     d = np.diagonal(A, 0)
     subd = np.diagonal(A, -1)
 
-    K = np.empty(shape=(m,n))
+    K = np.zeros(shape=(m,n))
     K[0,:] = v
     for i in range(1,m):
         K[i,1:] = subd*K[i-1,:-1]
+    return K
+
+def krylov_mult_slow_faster(A, v, u, m):
+    K = krylov_construct(A, v, m)
     return K @ u
-
-np.random.seed(0)
-
-# A = np.array([[0,0],[1,0]])
-# u = np.array([1,1])
-# v = np.array([1,1])
-# resolvent_bilinear(A,u,v,2)
-
-# A = np.array([[0,0,0,0],[1,0,0,0],[0,2,0,0],[0,0,3,0]])
-# u = np.array([1,1,1,1])
-# v = np.array([1,1,1,1])
-# resolvent_bilinear(A,u,v,4)
-
-n = 4096
-A = np.diag(np.random.random(n-1), -1)
-u = np.random.random(n)
-v = np.random.random(n)
-k1 = krylov_mult_slow(A,v,u,n)
-k11 = krylov_mult_slow_faster(A,v,u,n)
-k2 = krylov_mult(A,v,u,n)
-print(np.max(np.abs(k1-k2)))
