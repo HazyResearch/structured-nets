@@ -113,7 +113,7 @@ def bitreversal_fat(x, n, m):
     x_bf = x_bf_.reshape(n)
     return x_bf
 
-def bitreversal(x, n, m):
+def bitreversal_stack(x, n, m):
     """ faster version in numpy """
     assert n == 1<<m
     n1, n2 = n, 1
@@ -129,6 +129,8 @@ def bitreversal(x, n, m):
 # resolvent_bilinear_flattened = create(n, m, 'numpy')
 def create(n, m, lib='numpy'):
     fft_plans = plan_ffts(m, lib)
+    bf_perm = bitreversal_stack(np.arange(n), n, m)
+    bitreversal = lambda x, n, m: x[bf_perm]
 
     def resolvent_bilinear_flattened(A, v, u, n, m):
         assert n == 1<<m # power of 2 for now
