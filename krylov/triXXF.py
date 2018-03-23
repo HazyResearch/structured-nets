@@ -23,12 +23,12 @@ def _plan_ffts(in_shape, lib='numpy'):
         out_shape = in_shape[:-1] + (in_shape[-1]//2 + 1,)
         x_for = pyfftw.empty_aligned(in_shape, dtype='float64')
         y_for = pyfftw.empty_aligned(out_shape, dtype='complex128')
-        fft_for = pyfftw.FFTW(x_for, y_for, direction='FFTW_FORWARD', flags=['FFTW_EXHAUSTIVE']) # don't destroy input so 0s are preserved
+        fft_for = pyfftw.FFTW(x_for, y_for, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']) # don't destroy input so 0s are preserved
         x_for[:] = 0
 
         x_bak = pyfftw.empty_aligned(in_shape, dtype='float64')
         y_bak = pyfftw.empty_aligned(out_shape, dtype='complex128')
-        fft_bak = pyfftw.FFTW(y_bak, x_bak, direction='FFTW_BACKWARD', flags=['FFTW_EXHAUSTIVE', 'FFTW_DESTROY_INPUT'])
+        fft_bak = pyfftw.FFTW(y_bak, x_bak, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
         return ((x_for, fft_for), (y_bak, fft_bak))
 
 
