@@ -37,7 +37,7 @@ v = np.random.random(n)
 # k2 = krylov_mult(A,v,u,n)
 resolvent_bilinear_flattened = create(n, m, lib='fftw')
 # k3 = resolvent_bilinear_flattened(A, v, u, n, m)
-[resolvent_bilinear_flattened(A, v, u, n, m) for i in range(200)]
+[resolvent_bilinear_flattened(A, v, u, n, m) for i in range(100)]
 # print(np.linalg.norm(k1-k11))
 # print(np.linalg.norm(k1-k2))
 # print(np.linalg.norm(k1-k3))

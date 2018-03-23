@@ -11,7 +11,6 @@ def _plan_ffts(in_shape, lib='numpy'):
     out_shape = in_shape[:-1] + (in_shape[-1]//2 + 1,)
     if lib == 'numpy':
         x_for = np.zeros(shape=in_shape)
-        # y_for = np.empty(shape=out_shape)
         fft = lambda: np.fft.rfft(x_for)
 
         y_bak = np.empty(shape=out_shape, dtype='complex128')
@@ -34,16 +33,10 @@ def _plan_ffts(in_shape, lib='numpy'):
 
 def plan_ffts(m, lib='numpy'):
     fft_plans = [None] * m
-    fft_mem_for = [None] * m
-    fft_mem_bak = [None] * m
     for d in range(m-1,-1,-1):
         n1, n2 = 1<<d, 1<<(m-d)
         in_shape  = (4,n1,n2)
-        # out_shape = (4,n1,n2//2+1)
-        # fft_mem_for[d], fft_mem_bak[d], fft_plans[d] = _plan_ffts(in_shape, lib)
         fft_plans[d] = _plan_ffts(in_shape, lib)
-
-        # fft_plans[d] = fft_wrapper(shape, fft_plans[d+1], lib)
     return fft_plans
 
 
@@ -52,7 +45,7 @@ def plan_ffts(m, lib='numpy'):
 
 # this is specialized to subdiagonal for now
 # @profile
-def _resolvent_bilinear_flattened(fft_plans, subd, v, u, m, d, S):
+def _resolvent_bilinear_flattened(fft_plans, subd, m, d, S):
     # pass at depth d computes 4 arrays:
     # each array is length n, indexed by x_{m-1}, ..., x_{m-d}, y_{m-d-1}, ..., y_0
     # for convenience, store as x_{m-d}, ..., x_{m-1}, y_{m-d-1}, ..., y_0
@@ -63,46 +56,32 @@ def _resolvent_bilinear_flattened(fft_plans, subd, v, u, m, d, S):
     # these are the same as the S0[0,0],S1[0,0] in the recursive version
 
     # assert S_00.shape == (1<<(d+1), 1<<(m-d-1))
-    n1, n2 = 1<<d, 1<<(m-d)
+    n1, n2 = 1<<d, 1<<(m-d-1) # input shape 2n1 x n2, output shape n1 x 2n2
 
-    # TODO: time the following: hcat a big dense matrix with a 0 matrix, vs. np.zeros followed by assignment
-    # %timeit np.hstack((x, np.zeros((32,32))))   : 9.16 µs ± 221 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
-    # %timeit y = np.zeros((32,64)); y[:,:32] = x : 3.63 µs ± 573 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
-    # S0_00, S0_01, S0_00, S0_01, S1_00, S1_01, S1_00, S1_01 = np.zeros((8,n))
-    # S0_00[:n/2], S1_00[:n/2] = S_00[:n/2], S_00[n/2:] # alternative: numpy.split(S, 2)
-    # S0_01[:n/2], S1_01[:n/2] = S_01[:n/2], S_01[n/2:]
-    # S0_10[:n/2], S1_10[:n/2] = S_10[:n/2], S_10[n/2:]
-    # S0_11[:n/2], S1_11[:n/2] = S_11[:n/2], S_11[n/2:]
     ((S_, fft), (T_, ifft)) = fft_plans[d]
-    # S_[:] = 0
-    # S_ = np.zeros((4,n1,n2))
     S0_10, S0_11, S1_01, S1_11 = S_
-    S0_10[:,:n2//2] = S_10[:n1,:]
-    S1_01[:,:n2//2] = S_01[n1:,:]
-    S0_11[:,:n2//2] = S_11[:n1,:]
-    S1_11[:,:n2//2] = S_11[n1:,:]
+    S0_10[:,:n2] = S_10[:n1,:]
+    S1_01[:,:n2] = S_01[n1:,:]
+    S0_11[:,:n2] = S_11[:n1,:]
+    S1_11[:,:n2] = S_11[n1:,:]
 
     # polynomial multiplications
     S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft()
-    # S0_10_f, S0_11_f, S1_01_f, S1_11_f = np.fft.rfft(S_)
 
     # subproblem for branch x_{m-d}, ..., x_{m-1} is A[\overline{x_{m-1}...x_{m-d}} + 2^{m-d-1}]
-    A_subd = subd[n1:n1*2, np.newaxis]
-    # T_[:] = np.stack((S1_01_f * S0_10_f, S1_01_f * S0_11_f, S1_11_f * S0_10_f, S1_11_f * S0_11_f))
     T_[0] = S1_01_f * S0_10_f
     T_[1] = S1_01_f * S0_11_f
     T_[2] = S1_11_f * S0_10_f
     T_[3] = S1_11_f * S0_11_f
-    T_ = ifft()
-    T_ *= A_subd
-    T_00, T_01, T_10, T_11 = T_
-    # T_00, T_01, T_10, T_11 = A_subd * ifft()
+    T__ = ifft()
+    T__ *= subd[n1:n1*2, np.newaxis]
+    T_00, T_01, T_10, T_11 = T__
 
     # polynomial additions
-    T_00[:,n2//2:] += S_00[:n1,:]
-    T_00[:,n2//2:] += S_00[n1:,:]
-    T_01[:,n2//2:] += S_01[:n1,:]
-    T_10[:,n2//2:] += S_10[n1:,:]
+    T_00[:,n2:] += S_00[:n1,:] # dS_00[:n1,:] = T_00[:,n2:]
+    T_00[:,n2:] += S_00[n1:,:]
+    T_01[:,n2:] += S_01[:n1,:]
+    T_10[:,n2:] += S_10[n1:,:]
 
     return (T_00, T_01, T_10, T_11)
 
@@ -119,6 +98,9 @@ def bitreversal_fat(x, n, m):
     x_bf = x_bf_.reshape(n)
     return x_bf
 
+# note that this can be sped up by pre-allocating memory:
+# %timeit np.hstack((x, np.zeros((32,32))))   : 9.16 µs ± 221 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+# %timeit y = np.zeros((32,64)); y[:,:32] = x : 3.63 µs ± 573 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
 def bitreversal_stack(x, n, m):
     """ faster version in numpy """
     assert n == 1<<m
@@ -156,7 +138,7 @@ def create(n, m, lib='numpy'):
 
         # fft_plans = plan_ffts(m, lib)
         for d in range(m-1,-1,-1):
-            S = _resolvent_bilinear_flattened(fft_plans, subd, v, u, m, d, S)
+            S = _resolvent_bilinear_flattened(fft_plans, subd, m, d, S)
 
         # print(S[0], S[1], S[2], S[3])
         # return np.flip(S[0], axis=-1)
