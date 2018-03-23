@@ -3,12 +3,54 @@ import scipy.fftpack as fft
 import itertools
 from scipy import signal
 
+import pyfftw
+
+
+# define fft calls
+def _plan_ffts(in_shape, lib='numpy'):
+    out_shape = in_shape[:-1] + (in_shape[-1]//2 + 1,)
+    if lib == 'numpy':
+        x_for = np.empty(shape=in_shape)
+        # y_for = np.empty(shape=out_shape)
+        fft = lambda: np.fft.rfft(x_for)
+
+        y_bak = np.empty(shape=out_shape, dtype='complex128')
+        ifft = lambda: np.fft.irfft(y_bak)
+        return ((x_for, fft), (y_bak, ifft))
+    if lib == 'scipy':
+        pass
+    if lib == 'fftw':
+        out_shape = in_shape[:-1] + (in_shape[-1]//2 + 1,)
+        x_for = pyfftw.empty_aligned(in_shape, dtype='float64')
+        y_for = pyfftw.empty_aligned(out_shape, dtype='complex128')
+        fft_for = pyfftw.FFTW(x_for, y_for, direction='FFTW_FORWARD', flags=['FFTW_EXHAUSTIVE', 'FFTW_DESTROY_INPUT'])
+
+        x_bak = pyfftw.empty_aligned(in_shape, dtype='float64')
+        y_bak = pyfftw.empty_aligned(out_shape, dtype='complex128')
+        fft_bak = pyfftw.FFTW(y_bak, x_bak, direction='FFTW_BACKWARD', flags=['FFTW_EXHAUSTIVE', 'FFTW_DESTROY_INPUT'])
+        return ((x_for, fft_for), (y_bak, fft_bak))
+
+
+def plan_ffts(m, lib='numpy'):
+    fft_plans = [None] * m
+    fft_mem_for = [None] * m
+    fft_mem_bak = [None] * m
+    for d in range(m-1,-1,-1):
+        n1, n2 = 1<<d, 1<<(m-d)
+        in_shape  = (4,n1,n2)
+        # out_shape = (4,n1,n2//2+1)
+        # fft_mem_for[d], fft_mem_bak[d], fft_plans[d] = _plan_ffts(in_shape, lib)
+        fft_plans[d] = _plan_ffts(in_shape, lib)
+
+        # fft_plans[d] = fft_wrapper(shape, fft_plans[d+1], lib)
+    return fft_plans
+
 
 
 # TODO: put this as subfunction of main function
 
 # this is specialized to subdiagonal for now
-def resolvent_bilinear_flattened_(subd, v, u, m, d, S, stack_fft=False):
+def _resolvent_bilinear_flattened(fft_plans, subd, v, u, m, d, S):
     # pass at depth d computes 4 arrays:
     # each array is length n, indexed by x_{m-1}, ..., x_{m-d}, y_{m-d-1}, ..., y_0
     # for convenience, store as x_{m-d}, ..., x_{m-1}, y_{m-d-1}, ..., y_0
@@ -28,7 +70,9 @@ def resolvent_bilinear_flattened_(subd, v, u, m, d, S, stack_fft=False):
     # S0_01[:n/2], S1_01[:n/2] = S_01[:n/2], S_01[n/2:]
     # S0_10[:n/2], S1_10[:n/2] = S_10[:n/2], S_10[n/2:]
     # S0_11[:n/2], S1_11[:n/2] = S_11[:n/2], S_11[n/2:]
-    S_ = np.zeros((4,n1,n2))
+    ((S_, fft), (T_, ifft)) = fft_plans[d]
+    S_[:] = 0
+    # S_ = np.zeros((4,n1,n2))
     S0_10, S0_11, S1_01, S1_11 = S_
     S0_10[:,:n2//2] = S_10[:n1,:]
     S1_01[:,:n2//2] = S_01[n1:,:]
@@ -36,28 +80,24 @@ def resolvent_bilinear_flattened_(subd, v, u, m, d, S, stack_fft=False):
     S1_11[:,:n2//2] = S_11[n1:,:]
 
     # polynomial multiplications
-    if not stack_fft:
-        S0_10_f = np.fft.rfft(S0_10)
-        S0_11_f = np.fft.rfft(S0_11)
-        S1_01_f = np.fft.rfft(S1_01)
-        S1_11_f = np.fft.rfft(S1_11)
-    else:
-        S0_10_f, S0_11_f, S1_01_f, S1_11_f = np.fft.rfft(S_)
+    S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft()
+    # S0_10_f, S0_11_f, S1_01_f, S1_11_f = np.fft.rfft(S_)
 
     # subproblem for branch x_{m-d}, ..., x_{m-1} is A[\overline{x_{m-1}...x_{m-d}} + 2^{m-d-1}]
     A_subd = subd[n1:n1*2, np.newaxis]
-    if not stack_fft:
-        T_00 = A_subd * np.fft.irfft(S1_01_f * S0_10_f)
-        T_01 = A_subd * np.fft.irfft(S1_01_f * S0_11_f)
-        T_10 = A_subd * np.fft.irfft(S1_11_f * S0_10_f)
-        T_11 = A_subd * np.fft.irfft(S1_11_f * S0_11_f)
-    else:
-        T_00, T_01, T_10, T_11 = A_subd * np.fft.irfft(np.stack(
-            (S1_01_f * S0_10_f,
-             S1_01_f * S0_11_f,
-             S1_11_f * S0_10_f,
-             S1_11_f * S0_11_f)
-        ))
+    # T_[:] = np.stack((S1_01_f * S0_10_f, S1_01_f * S0_11_f, S1_11_f * S0_10_f, S1_11_f * S0_11_f))
+    T_[0] = S1_01_f * S0_10_f
+    T_[1] = S1_01_f * S0_11_f
+    T_[2] = S1_11_f * S0_10_f
+    T_[3] = S1_11_f * S0_11_f
+    T__ = ifft()
+    T_00, T_01, T_10, T_11 = A_subd * T__
+    # T_00, T_01, T_10, T_11 = A_subd * np.fft.irfft(np.stack(
+    #     (S1_01_f * S0_10_f,
+    #      S1_01_f * S0_11_f,
+    #      S1_11_f * S0_10_f,
+    #      S1_11_f * S0_11_f)
+    # ))
 
     # polynomial additions
     T_00[:,n2//2:] += S_00[:n1,:]
@@ -92,24 +132,32 @@ def bitreversal(x, n, m):
     return x_.squeeze()
 
 
-def resolvent_bilinear_flattened(A, v, u, n, m, stack_fft=False):
-    assert n == 1<<m # power of 2 for now
+# call with:
+# resolvent_bilinear_flattened = create(n, m, 'numpy')
+def create(n, m, lib='numpy'):
+    fft_plans = plan_ffts(m, lib)
 
-    # assume A is subdiagonal for now
-    subd = np.concatenate(([0],np.diagonal(A, -1)))
-    subd = bitreversal(subd, n, m)
+    def resolvent_bilinear_flattened(A, v, u, n, m):
+        assert n == 1<<m # power of 2 for now
 
-    # reshape u,v to be indexed consistently with the above
-    # i.e. bit flip their indices
-    u_bf = bitreversal(u, n, m).reshape((n,1)) # tri says use [:,np.newaxis]
-    v_bf = bitreversal(v, n, m).reshape((n,1))
+        # assume A is subdiagonal for now
+        subd = np.empty((n,))
+        subd[1:] = np.diagonal(A, -1)
+        subd = bitreversal(subd, n, m)
 
-    S = (u_bf*v_bf, u_bf, v_bf, np.ones((n,1)))
+        # reshape u,v to be indexed consistently with the above
+        # i.e. bit flip their indices
+        u_bf = bitreversal(u, n, m).reshape((n,1)) # tri says use [:,np.newaxis]
+        v_bf = bitreversal(v, n, m).reshape((n,1))
 
-    for d in range(m-1,-1,-1):
-        S = resolvent_bilinear_flattened_(subd, v, u, m, d, S, stack_fft)
+        S = (u_bf*v_bf, u_bf, v_bf, np.ones((n,1)))
 
-    # print(S[0], S[1], S[2], S[3])
-    # return np.flip(S[0], axis=-1)
-    return S[0].squeeze()[::-1]
+        # fft_plans = plan_ffts(m, lib)
+        for d in range(m-1,-1,-1):
+            S = _resolvent_bilinear_flattened(fft_plans, subd, v, u, m, d, S)
 
+        # print(S[0], S[1], S[2], S[3])
+        # return np.flip(S[0], axis=-1)
+        return S[0].squeeze()[::-1]
+
+    return resolvent_bilinear_flattened
