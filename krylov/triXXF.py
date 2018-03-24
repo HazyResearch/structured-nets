@@ -59,36 +59,44 @@ def _resolvent_bilinear_flattened(fft_plans, subd, m, d, S):
     n1, n2 = 1<<d, 1<<(m-d-1) # input shape 2n1 x n2, output shape n1 x 2n2
 
     ((S_, fft), (T_, ifft)) = fft_plans[d]
-    S0_10, S0_11, S1_01, S1_11 = S_
+    S0_10, S0_11, S1_01, S1_11 = S_ ## pass
     S0_10[:,:n2] = S_10[:n1,:]
     S1_01[:,:n2] = S_01[n1:,:]
     S0_11[:,:n2] = S_11[:n1,:]
-    S1_11[:,:n2] = S_11[n1:,:]
+    S1_11[:,:n2] = S_11[n1:,:] ## dS_11[...] = dS1_11[...]
 
     # polynomial multiplications
-    S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft()
+    S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft() ## dS_ = fft(dS*_**_f)
 
     # subproblem for branch x_{m-d}, ..., x_{m-1} is A[\overline{x_{m-1}...x_{m-d}} + 2^{m-d-1}]
     T_[0] = S1_01_f * S0_10_f
     T_[1] = S1_01_f * S0_11_f
     T_[2] = S1_11_f * S0_10_f
-    T_[3] = S1_11_f * S0_11_f
-    T__ = ifft()
-    T__ *= subd[n1:n1*2, np.newaxis]
+    T_[3] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
+    ## note that the S*_**_f are the only things that need to be stored in t he forward pass
+    ## also note that there is an optimization here; should only need half
+
+    T__ = ifft() ## dT_ = ifft(dT__) (because DFT matrix symmetric)
+    T__ *= subd[n1:n1*2, np.newaxis] ## dT__ *= subd[...]
+    ## for learning A, should get somethiign like dsubd[...] = T__
+
     T_00, T_01, T_10, T_11 = T__
 
     # polynomial additions
-    T_00[:,n2:] += S_00[:n1,:] # dS_00[:n1,:] = T_00[:,n2:]
+    T_00[:,n2:] += S_00[:n1,:] ## dS_00[:n1,:] = T_00[:,n2:]
     T_00[:,n2:] += S_00[n1:,:]
     T_01[:,n2:] += S_01[:n1,:]
     T_10[:,n2:] += S_10[n1:,:]
 
+    ## autodiff correspondences annotated in with '##'
+    ## this function takes in S and outputs T;
+    ## the backwards pass calls these lines in reverse,
+    ## taking dT and outputting dS where ## dx := \partial{L}/\partial{x},
+    ## (L is the final output of the entire algorithm)
+
     return (T_00, T_01, T_10, T_11)
 
-# another bit reversal algorithm that's asymptotically faster:
-# http://www.lite.etsii.urjc.es/manuel.rubiosanchez/papers/Bit-Reversal-Article.pdf
-
-def bitreversal_fat(x, n, m):
+def bitreversal_slow(x, n, m):
     """ Compute the bit reversal permutation """
     assert n == 1<<m # power of 2 for now
     x_ = x.reshape([2]*m)
@@ -111,6 +119,10 @@ def bitreversal_stack(x, n, m):
         n2 *= 2
         x_ = np.hstack((x_[:n1,:], x_[n1:,:]))
     return x_.squeeze()
+
+# another bit reversal algorithm that's asymptotically faster:
+# http://www.lite.etsii.urjc.es/manuel.rubiosanchez/papers/Bit-Reversal-Article.pdf
+# we don't need to implement any fast ones because we only need to calculae the permutation once and then index into it
 
 
 # call with:
@@ -136,11 +148,9 @@ def create(n, m, lib='numpy'):
 
         S = (u_bf*v_bf, u_bf, v_bf, np.ones((n,1)))
 
-        # fft_plans = plan_ffts(m, lib)
         for d in range(m-1,-1,-1):
             S = _resolvent_bilinear_flattened(fft_plans, subd, m, d, S)
 
-        # print(S[0], S[1], S[2], S[3])
         # return np.flip(S[0], axis=-1)
         return S[0].squeeze()[::-1]
 
