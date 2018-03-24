@@ -161,29 +161,34 @@ def create(n, m, lib='numpy'):
 
     return resolvent_bilinear_flattened
 
-def create_nobf(n, m, lib='numpy'):
-    """Same as @create, but we don't use bit reversal here.
-
+class KrylovTransposeMultiply():
+    """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
     """
-    fft_plans = plan_ffts(m, lib)
 
-    def resolvent_bilinear_flattened_nobf(A, v, u, n, m):
-        assert n == 1 << m
-        subd = np.empty(n)
-        subd[1:] = np.diag(A, -1)
+    def __init__(self, n, lib='numpy'):
+        m = int(np.log2(n))
+        assert n == 1 << m, 'n must be a power of 2'
+        self.n = n
+        self.m = m
+        self.fft_plans = plan_ffts(m, lib)
 
+    def __call__(self, subdiag, v, u):
+        """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
+        We don't use bit reversal here.
+        """
+        n, m = self.n, self.m
         u, v = u[:, np.newaxis], v[:, np.newaxis]
         S = (u * v, u, v, np.ones((n, 1)))
         for d in range(m - 1, -1, -1):
             n1, n2 = 1 << d, 1 << (m - d - 1)
             S_00, S_01, S_10, S_11 = S
-            ((S_, fft), (T_, ifft)) = fft_plans[d]
+            ((S_, fft), (T_, ifft)) = self.fft_plans[d]
 
             S0_10, S0_11, S1_01, S1_11 = S_ ## pass
-            S0_10[:,:n2] = S_10[::2, :]
-            S1_01[:,:n2] = S_01[1::2, :]
-            S0_11[:,:n2] = S_11[::2, :]
-            S1_11[:,:n2] = S_11[1::2,:] ## dS_11[...] = dS1_11[...]
+            S0_10[:,:n2] = S_10[::2]
+            S1_01[:,:n2] = S_01[1::2]
+            S0_11[:,:n2] = S_11[::2]
+            S1_11[:,:n2] = S_11[1::2] ## dS_11[...] = dS1_11[...]
 
             # polynomial multiplications
             S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft() ## dS_ = fft(dS*_**_f)
@@ -196,8 +201,8 @@ def create_nobf(n, m, lib='numpy'):
             ## also note that there is an optimization here; should only need half
 
             T = ifft() ## dT_ = ifft(dT) (because DFT matrix symmetric)
-            T *= subd[n2::2 * n2, np.newaxis] ## dT *= subd[...]
-            ## for learning A, should get somethiign like dsubd[...] = T
+            T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
+            ## for learning A, should get something like dsubd[...] = T
 
             T_00, T_01, T_10, T_11 = T
 
