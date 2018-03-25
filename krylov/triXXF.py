@@ -314,58 +314,38 @@ class KrylovMultiply():
         n, m = self.n, self.m
         self.forward(subdiag, v.reshape(n))
         v = v.reshape((n, 1))
-        # dT = (w[::-1].reshape((1, n)), np.zeros((1, n)), np.zeros((1, n)), np.zeros((1, n)))
         # We can ignore dT[2] and dT[3] because they start at zero and always stay zero.
-        # We can check this by static analysis of the code or by math. I've done the static analysis
-        # but I haven't checked the math (should be true).
+        # We can check this by static analysis of the code or by math.
         dT = (w[::-1].reshape((1, n)), np.zeros((1, n)))
 
         for d in range(m):
             n1, n2 = 1 << d, 1 << (m - d - 1)
             ((S_, fft), (T_, ifft)) = self.fft_plans[d]
-            # dT_00, dT_01, dT_10, dT_11 = dT
             dT_00, dT_01 = dT
-            # dS = np.zeros((4, 2 * n1, n2))
             dS = np.zeros((2, 2 * n1, n2))
-            # dS_00, dS_01, dS_10, dS_11 = dS
             dS_00, dS_01 = dS
 
             dS_00[::2] = dT_00[:, n2:]
             dS_00[1::2] = dT_00[:, n2:]
             dS_01[::2] = dT_01[:, n2:]
-            # dS_10[1::2] = dT_10[:, n2:]
             dT *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
 
             # Discard the negative frequencies since it's the complex conj of the positive frequencies
             dT_ = np.fft.ifft(dT)[:, :, :n2 + 1]
-            # dS_f = np.zeros((4, n1, n2 + 1), dtype=dT_.dtype)
-            dS_f = np.zeros((n1, n2 + 1), dtype=dT_.dtype)
-            # By static analysis, dS0_10_f, dS0_11_f, dS1_11_f are always zero
-            # dS0_10_f, dS0_11_f, dS1_01_f, dS1_11_f = dS_f
-            dS1_01_f = dS_f
+            dS1_01_f = np.zeros((n1, n2 + 1), dtype=dT_.dtype)
             S0_10_f, S0_11_f, S1_11_f = fft.output_array
-            # dS0_10_f += S1_01_f * dT_[0]
-            # dS0_10_f += S1_11_f * dT_[2]
-            # dS0_11_f += S1_01_f * dT_[1]
-            # dS0_11_f += S1_11_f * dT_[3]
             dS1_01_f += S0_10_f * dT_[0]
             dS1_01_f += S0_11_f * dT_[1]
-            # dS1_11_f += S0_10_f * dT_[2]
-            # dS1_11_f += S0_11_f * dT_[3]
             # This is inefficient. There's a way to do this with irfft but I'm to tired to think of it right now.
-            dS_f_temp = np.zeros((n1, 2 * n2), dtype=dT_.dtype)
-            dS_f_temp[:, :n2 + 1] = dS_f
-            dS_f_temp[:, (2*n2 - 1):n2:-1] = np.conj(dS_f_temp[:, 1:n2])
+            dS1_01_f_temp = np.zeros((n1, 2 * n2), dtype=dT_.dtype)
+            dS1_01_f_temp[:, :n2 + 1] = dS1_01_f
+            dS1_01_f_temp[:, (2*n2 - 1):n2:-1] = np.conj(dS1_01_f_temp[:, 1:n2])
 
-            dS_ = np.fft.fft(dS_f_temp)
+            dS_ = np.fft.fft(dS1_01_f_temp)
             assert np.allclose(dS_.imag, 0)
             dS_ = dS_.real
-            # dS0_10, dS0_11, dS1_01, dS1_11 = dS_
             dS1_01 = dS_
-            # dS_10[::2] += dS0_10[:, :n2]
             dS_01[1::2] += dS1_01[:, :n2]
-            # dS_11[::2] += dS0_11[:, :n2]
-            # dS_11[1::2] += dS1_11[:, :n2]
 
             dT = dS
 
