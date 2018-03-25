@@ -38,7 +38,7 @@ v = np.random.random(n)
 # k11 = krylov_mult_slow_faster(A,v,u,n)
 # k2 = krylov_mult(A,v,u,n)
 resolvent_bilinear_flattened = create(n, m, lib='fftw')
-resolvent_bilinear_flattened_nobf = KrylovTransposeMultiply(n, lib='fftw')
+resolvent_bilinear_flattened_nobf = KrylovTransposeMultiply(n)
 k3 = resolvent_bilinear_flattened(A, v, u, n, m)
 k3_nobf = resolvent_bilinear_flattened_nobf(subdiag, v, u)
 [resolvent_bilinear_flattened(A, v, u, n, m) for i in range(100)]

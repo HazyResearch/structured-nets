@@ -165,30 +165,42 @@ class KrylovTransposeMultiply():
     """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
     """
 
-    def __init__(self, n, lib='numpy'):
+    def __init__(self, n):
         m = int(np.log2(n))
         assert n == 1 << m, 'n must be a power of 2'
         self.n = n
         self.m = m
-        self.fft_plans = plan_ffts(m, lib)
+        self.plan_ffts_forward_pass()
+
+    def plan_ffts_forward_pass(self):
+        n, m = self.n, self.m
+        self.S_storage = np.empty((m, 4, n))
+        self.T_storage = np.empty((m, 4, n))
+        self.S_f_storage = [np.empty((4, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.T_f_storage = [np.empty((4, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.ffts_forward_pass = []
+        for d, (S, S_f, T_f, T) in enumerate(zip(self.S_storage, self.S_f_storage, self.T_f_storage, self.T_storage)):
+            S = S.reshape((4, 1 << d, 1 << (m - d)))
+            T = T.reshape((4, 1 << d, 1 << (m - d)))
+            fft_time2freq = pyfftw.FFTW(S, S_f, direction='FFTW_FORWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
+            fft_freq2time = pyfftw.FFTW(T_f, T, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
+            self.ffts_forward_pass.append((fft_time2freq, fft_freq2time))
 
     def __call__(self, subdiag, v, u):
         """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
         We don't use bit reversal here.
         """
         n, m = self.n, self.m
-        # Allocate memory up front
-        S_f_storage = [np.empty((4, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
-        T_f_storage = [np.empty((4, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
-        S_storage = np.zeros((m, 4, n))
-        T_storage = np.empty((m, 4, n))
         u, v = u.reshape(n, 1), v.reshape(n, 1)
+        self.S_storage.fill(0.0)
         T_prev = (u * v, u, v, np.ones((n, 1)))
         for d in range(m)[::-1]:
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            S = S_storage[d].reshape((4, n1, 2 * n2))
-            T = T_storage[d].reshape((4, n1, 2 * n2))
-            ((_, fft), (T_f, ifft)) = self.fft_plans[d]
+            S = self.S_storage[d].reshape((4, n1, 2 * n2))
+            T = self.T_storage[d].reshape((4, n1, 2 * n2))
+            S_f = self.S_f_storage[d]
+            T_f = self.T_f_storage[d]
+            fft_time2freq, fft_freq2time = self.ffts_forward_pass[d]
 
             S_00, S_01, S_10, S_11 = T_prev
             S0_10, S0_11, S1_01, S1_11 = S
@@ -198,9 +210,7 @@ class KrylovTransposeMultiply():
             S1_11[:, :n2] = S_11[1::2]
 
             # polynomial multiplications
-            S_f = S_f_storage[d]
-            S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft(S, output_array=S_f) ## dS_ = fft(dS*_**_f)
-            T_f = T_f_storage[d]
+            S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft_time2freq(S, output_array=S_f) ## dS_ = fft(dS*_**_f)
             T_f[0] = S1_01_f * S0_10_f
             T_f[1] = S1_01_f * S0_11_f
             T_f[2] = S1_11_f * S0_10_f
@@ -208,7 +218,7 @@ class KrylovTransposeMultiply():
             ## note that the S*_**_f are the only things that need to be stored in t he forward pass
             ## also note that there is an optimization here; should only need half
 
-            T = ifft(T_f, output_array=T) ## dT_ = ifft(dT) (because DFT matrix symmetric)
+            T = fft_freq2time(T_f, output_array=T) ## dT_ = ifft(dT) (because DFT matrix symmetric)
             T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
             ## for learning A, should get something like dsubd[...] = T
 
