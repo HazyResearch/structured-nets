@@ -361,22 +361,22 @@ class KrylovMultiply():
         v = v.reshape((n, 1))
         # We can ignore dT[2] and dT[3] because they start at zero and always stay zero.
         # We can check this by static analysis of the code or by math.
-        (dT_time, _), _ = self.fft_plans_backward[0]
-        dT_time[0], dT_time[1] = w[::-1].reshape((1, n)), np.zeros((1, n))
+        (dT, _), _ = self.fft_plans_backward[0]
+        dT[0], dT[1] = w[::-1].reshape((1, n)), np.zeros((1, n))
         # Temporarily allocate space for result, stored at self.fft_plans_backward[m]
         self.fft_plans_backward.append(((np.empty((2, n, 1)), None), (None, None)))
 
         for d in range(m):
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            (dT_time, fft_time2freq), (dS_f, fft_freq2time) = self.fft_plans_backward[d]
+            (dT, fft_time2freq), (dS_f, fft_freq2time) = self.fft_plans_backward[d]
             (dS, _), _ = self.fft_plans_backward[d + 1]
-            dT_00, dT_01 = dT_time
+            dT_00, dT_01 = dT
             dS_00, dS_01 = dS
 
             dS_00[::2] = dT_00[:, n2:]
             dS_00[1::2] = dT_00[:, n2:]
             dS_01[::2] = dT_01[:, n2:]
-            dT_time *= subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+            dT *= subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
             dT_f = fft_time2freq()
             dS1_01_f = dS_f
@@ -386,8 +386,6 @@ class KrylovMultiply():
 
             dS1_01 = fft_freq2time()
             dS_01[1::2] = dS1_01[:, :n2]
-
-            dT = dS
 
         self.fft_plans_backward = self.fft_plans_backward[:-1]
         du = (dS[0] * v + dS[1]).squeeze()
