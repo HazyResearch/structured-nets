@@ -232,33 +232,64 @@ class KrylovMultiply():
         assert n == 1 << m, 'n must be a power of 2'
         self.n = n
         self.m = m
-        self.fft_plans = plan_ffts(m, lib)
+        self.fft_plans = self.plan_ffts_forward_u_zero(m, lib)
 
-    def forward(self, subdiag, v, u):
+    def _plan_ffts_forward_u_zero(self, in_shape, out_shape, lib='numpy'):
+        if lib == 'numpy':
+            x_for = np.zeros(shape=in_shape)
+            fft = lambda: np.fft.rfft(x_for)
+
+            y_bak = np.empty(shape=out_shape, dtype='complex128')
+            ifft = lambda: np.fft.irfft(y_bak)
+            return ((x_for, fft), (y_bak, ifft))
+        if lib == 'scipy':
+            pass
+        if lib == 'fftw':
+            out_shape_forward = in_shape[:-1] + (in_shape[-1]//2 + 1,)
+            x_for = pyfftw.empty_aligned(in_shape, dtype='float64')
+            y_for = pyfftw.empty_aligned(out_shape_forward, dtype='complex128')
+            fft_for = pyfftw.FFTW(x_for, y_for, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']) # don't destroy input so 0s are preserved
+            x_for[:] = 0
+
+            in_shape_backward = out_shape[:-1] + ((out_shape[-1] - 1) * 2,)
+            x_bak = pyfftw.empty_aligned(in_shape_backward, dtype='float64')
+            y_bak = pyfftw.empty_aligned(out_shape, dtype='complex128')
+            fft_bak = pyfftw.FFTW(y_bak, x_bak, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
+            return ((x_for, fft_for), (y_bak, fft_bak))
+
+    def plan_ffts_forward_u_zero(self, m, lib='numpy'):
+        fft_plans = [None] * m
+        for d in range(m-1,-1,-1):
+            n1, n2 = 1<<d, 1<<(m-d)
+            in_shape  = (3, n1, n2)
+            out_shape = (2, n1, n2 // 2 + 1)
+            fft_plans[d] = self._plan_ffts_forward_u_zero(in_shape, out_shape, lib)
+        return fft_plans
+
+
+    def forward(self, subdiag, v):
         """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
-        We don't use bit reversal here.
+        Special case when u = 0 to save intermediate results relating to v for
+        the backward pass.
         """
         n, m = self.n, self.m
-        u, v = u[:, np.newaxis], v[:, np.newaxis]
-        S = (u * v, u, v, np.ones((n, 1)))
+        v = v[:, np.newaxis]
+        S = (v, np.ones((n, 1)))
         for d in range(m)[::-1]:
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            S_00, S_01, S_10, S_11 = S
+            S_10, S_11 = S
             ((S_, fft), (T_, ifft)) = self.fft_plans[d]
 
-            S0_10, S0_11, S1_01, S1_11 = S_ ## pass
+            S0_10, S0_11, S1_11 = S_ ## pass
             S0_10[:,:n2] = S_10[::2]
-            S1_01[:,:n2] = S_01[1::2]
             S0_11[:,:n2] = S_11[::2]
             S1_11[:,:n2] = S_11[1::2] ## dS_11[...] = dS1_11[...]
 
             # polynomial multiplications
-            S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft() ## dS_ = fft(dS*_**_f)
+            S0_10_f, S0_11_f, S1_11_f = fft() ## dS_ = fft(dS*_**_f)
 
-            T_[0] = S1_01_f * S0_10_f
-            T_[1] = S1_01_f * S0_11_f
-            T_[2] = S1_11_f * S0_10_f
-            T_[3] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
+            T_[0] = S1_11_f * S0_10_f
+            T_[1] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
             ## note that the S*_**_f are the only things that need to be stored in t he forward pass
             ## also note that there is an optimization here; should only need half
 
@@ -266,12 +297,9 @@ class KrylovMultiply():
             T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
             ## for learning A, should get something like dsubd[...] = T
 
-            T_00, T_01, T_10, T_11 = T
+            T_10, T_11 = T
 
             # polynomial additions
-            T_00[:,n2:] += S_00[::2] ## dS_00[:n1,:] = T_00[:,n2:]
-            T_00[:,n2:] += S_00[1::2]
-            T_01[:,n2:] += S_01[::2]
             T_10[:,n2:] += S_10[1::2]
 
             ## autodiff correspondences annotated in with '##'
@@ -280,14 +308,11 @@ class KrylovMultiply():
             ## taking dT and outputting dS where ## dx := \partial{L}/\partial{x},
             ## (L is the final output of the entire algorithm)
 
-            S = T
-
-        return S[0].squeeze()[::-1]
+            S = (T_10, T_11)
 
     def __call__(self, subdiag, v, w):
         n, m = self.n, self.m
-        u = np.zeros(n)
-        self.forward(subdiag, v.reshape(n), u.reshape(n))
+        self.forward(subdiag, v.reshape(n))
         v = v.reshape((n, 1))
         dT = (w[::-1].reshape((1, n)), np.zeros((1, n)), np.zeros((1, n)), np.zeros((1, n)))
 
@@ -308,10 +333,10 @@ class KrylovMultiply():
             dT_ = np.fft.ifft(dT)[:, :, :n2 + 1]
             dS_f = np.zeros((4, n1, n2 + 1), dtype=dT_.dtype)
             dS0_10_f, dS0_11_f, dS1_01_f, dS1_11_f = dS_f
-            S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft.output_array
-            dS0_10_f += S1_01_f * dT_[0]
+            S0_10_f, S0_11_f, S1_11_f = fft.output_array
+            # dS0_10_f += S1_01_f * dT_[0]
             dS0_10_f += S1_11_f * dT_[2]
-            dS0_11_f += S1_01_f * dT_[1]
+            # dS0_11_f += S1_01_f * dT_[1]
             dS0_11_f += S1_11_f * dT_[3]
             dS1_01_f += S0_10_f * dT_[0]
             dS1_01_f += S0_11_f * dT_[1]

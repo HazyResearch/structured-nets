@@ -48,7 +48,7 @@ k3_nobf = resolvent_bilinear_flattened_nobf(subdiag, v, u)
 # print(np.linalg.norm(k1-k3b))
 
 # Test non-transpose multiply
-m = 6
+m = 14
 n = 1 << m
 subdiag = np.random.random(n-1)
 A = np.diag(subdiag, -1)
