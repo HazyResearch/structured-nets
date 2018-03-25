@@ -302,13 +302,12 @@ class KrylovMultiply():
             dS_time = pyfftw.empty_aligned(out_shape_freq, dtype='float64')
             dS_freq = pyfftw.empty_aligned(out_shape, dtype='complex128')
             # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
-            fft_freq2time_func = pyfftw.FFTW(dS_freq, dS_time, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE'])  # don't destroy input so 0s are preserved
+            fft_freq2time_func = pyfftw.FFTW(dS_freq, dS_time, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
 
             def fft_freq2time():
                 np.conjugate(dS_freq, out=dS_freq)
                 return fft_freq2time_func(normalise_idft=False)
 
-            dS_freq[:] = 0
             return ((dT_time, fft_time2freq), (dS_freq, fft_freq2time))
 
     def forward(self, subdiag, v):
@@ -362,14 +361,16 @@ class KrylovMultiply():
         v = v.reshape((n, 1))
         # We can ignore dT[2] and dT[3] because they start at zero and always stay zero.
         # We can check this by static analysis of the code or by math.
-        dT = (w[::-1].reshape((1, n)), np.zeros((1, n)))
+        (dT_time, _), _ = self.fft_plans_backward[0]
+        dT_time[0], dT_time[1] = w[::-1].reshape((1, n)), np.zeros((1, n))
+        # Temporarily allocate space for result, stored at self.fft_plans_backward[m]
+        self.fft_plans_backward.append(((np.empty((2, n, 1)), None), (None, None)))
 
         for d in range(m):
             n1, n2 = 1 << d, 1 << (m - d - 1)
             (dT_time, fft_time2freq), (dS_f, fft_freq2time) = self.fft_plans_backward[d]
-            dT_time[0], dT_time[1] = dT[0], dT[1]
+            (dS, _), _ = self.fft_plans_backward[d + 1]
             dT_00, dT_01 = dT_time
-            dS = np.zeros((2, 2 * n1, n2))
             dS_00, dS_01 = dS
 
             dS_00[::2] = dT_00[:, n2:]
@@ -380,13 +381,14 @@ class KrylovMultiply():
             dT_f = fft_time2freq()
             dS1_01_f = dS_f
             S0_10_f, S0_11_f = self.save_for_backward[d]
-            dS1_01_f += S0_10_f * dT_f[0]
+            dS1_01_f[:] = S0_10_f * dT_f[0]
             dS1_01_f += S0_11_f * dT_f[1]
 
-            dS1_01 = np.fft.hfft(dS_f)
-            dS_01[1::2] += dS1_01[:, :n2]
+            dS1_01 = fft_freq2time()
+            dS_01[1::2] = dS1_01[:, :n2]
 
             dT = dS
 
+        self.fft_plans_backward = self.fft_plans_backward[:-1]
         du = (dS[0] * v + dS[1]).squeeze()
         return du
