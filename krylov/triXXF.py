@@ -177,50 +177,56 @@ class KrylovTransposeMultiply():
         We don't use bit reversal here.
         """
         n, m = self.n, self.m
-        u, v = u[:, np.newaxis], v[:, np.newaxis]
-        S = (u * v, u, v, np.ones((n, 1)))
+        # Allocate memory up front
+        S_f_storage = [np.empty((4, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        T_f_storage = [np.empty((4, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        S_storage = np.zeros((m, 4, n))
+        T_storage = np.empty((m, 4, n))
+        u, v = u.reshape(n, 1), v.reshape(n, 1)
+        T_prev = (u * v, u, v, np.ones((n, 1)))
         for d in range(m)[::-1]:
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            S_00, S_01, S_10, S_11 = S
-            ((S_, fft), (T_, ifft)) = self.fft_plans[d]
+            S = S_storage[d].reshape((4, n1, 2 * n2))
+            T = T_storage[d].reshape((4, n1, 2 * n2))
+            ((_, fft), (T_f, ifft)) = self.fft_plans[d]
 
-            S0_10, S0_11, S1_01, S1_11 = S_ ## pass
-            S0_10[:,:n2] = S_10[::2]
-            S1_01[:,:n2] = S_01[1::2]
-            S0_11[:,:n2] = S_11[::2]
-            S1_11[:,:n2] = S_11[1::2] ## dS_11[...] = dS1_11[...]
+            S_00, S_01, S_10, S_11 = T_prev
+            S0_10, S0_11, S1_01, S1_11 = S
+            S0_10[:, :n2] = S_10[::2]
+            S1_01[:, :n2] = S_01[1::2]
+            S0_11[:, :n2] = S_11[::2]
+            S1_11[:, :n2] = S_11[1::2]
 
             # polynomial multiplications
-            S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft() ## dS_ = fft(dS*_**_f)
-
-            T_[0] = S1_01_f * S0_10_f
-            T_[1] = S1_01_f * S0_11_f
-            T_[2] = S1_11_f * S0_10_f
-            T_[3] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
+            S_f = S_f_storage[d]
+            S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft(S, output_array=S_f) ## dS_ = fft(dS*_**_f)
+            T_f = T_f_storage[d]
+            T_f[0] = S1_01_f * S0_10_f
+            T_f[1] = S1_01_f * S0_11_f
+            T_f[2] = S1_11_f * S0_10_f
+            T_f[3] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
             ## note that the S*_**_f are the only things that need to be stored in t he forward pass
             ## also note that there is an optimization here; should only need half
 
-            T = ifft() ## dT_ = ifft(dT) (because DFT matrix symmetric)
+            T = ifft(T_f, output_array=T) ## dT_ = ifft(dT) (because DFT matrix symmetric)
             T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
             ## for learning A, should get something like dsubd[...] = T
 
             T_00, T_01, T_10, T_11 = T
-
             # polynomial additions
-            T_00[:,n2:] += S_00[::2] ## dS_00[:n1,:] = T_00[:,n2:]
-            T_00[:,n2:] += S_00[1::2]
-            T_01[:,n2:] += S_01[::2]
-            T_10[:,n2:] += S_10[1::2]
+            T_00[:, n2:] += S_00[::2] ## dS_00[:n1,:] = T_00[:,n2:]
+            T_00[:, n2:] += S_00[1::2]
+            T_01[:, n2:] += S_01[::2]
+            T_10[:, n2:] += S_10[1::2]
 
             ## autodiff correspondences annotated in with '##'
             ## this function takes in S and outputs T;
             ## the backwards pass calls these lines in reverse,
             ## taking dT and outputting dS where ## dx := \partial{L}/\partial{x},
             ## (L is the final output of the entire algorithm)
+            T_prev = T
 
-            S = T
-
-        return S[0].squeeze()[::-1]
+        return T[0].squeeze()[::-1]
 
 
 class KrylovMultiply():
