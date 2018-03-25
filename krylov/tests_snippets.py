@@ -1,17 +1,18 @@
 import os
 import numpy as np
 from triXXF import *
+from triextrafat import *
 os.environ['MKL_NUM_THREADS'] = '1'
 
 np.random.seed(0)
 
 
-# n, m = 2, 1
-# A = np.array([[0,0],[1,0]])
-# u = np.array([1,1])
-# v = np.array([1,1])
-# print(resolvent_bilinear(A,v,u,n))
-# ans: [2 1], [1, 1], [1 1], [0 1]
+n, m = 2, 1
+A = np.array([[0,0],[1,0]])
+u = np.array([1,1])
+v = np.array([1,1])
+print(resolvent_bilinear(A,v,u,n))
+ans: [2 1], [1, 1], [1 1], [0 1]
 
 
 # n, m = 4, 2
@@ -26,7 +27,7 @@ np.random.seed(0)
 # ans: [4 6 8 6], [1 1 2 6], [1 3 6 6], [0 0 0 6]
 
 
-m = 12
+m = 14
 n = 1<<m
 subdiag = np.random.random(n-1)
 A = np.diag(subdiag, -1)
@@ -45,3 +46,15 @@ k3_nobf = resolvent_bilinear_flattened_nobf(subdiag, v, u)
 # print(np.linalg.norm(k1-k2))
 # print(np.linalg.norm(k1-k3))
 # print(np.linalg.norm(k1-k3b))
+
+# Test non-transpose multiply
+m = 6
+n = 1 << m
+subdiag = np.random.random(n-1)
+A = np.diag(subdiag, -1)
+u = np.random.random(n)
+v = np.random.random(n)
+krylov_multiply = KrylovMultiply(n, lib='fftw')
+result = krylov_construct(A, v, n).T @ u
+result1 = krylov_multiply(subdiag, v, u)
+np.allclose(result, result1)

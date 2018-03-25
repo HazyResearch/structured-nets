@@ -153,7 +153,7 @@ def create(n, m, lib='numpy'):
 
         S = (u_bf*v_bf, u_bf, v_bf, np.ones((n,1)))
 
-        for d in range(m-1,-1,-1):
+        for d in range(m)[::-1]:
             S = _resolvent_bilinear_flattened(fft_plans, subd, m, d, S)
 
         # return np.flip(S[0], axis=-1)
@@ -179,7 +179,7 @@ class KrylovTransposeMultiply():
         n, m = self.n, self.m
         u, v = u[:, np.newaxis], v[:, np.newaxis]
         S = (u * v, u, v, np.ones((n, 1)))
-        for d in range(m - 1, -1, -1):
+        for d in range(m)[::-1]:
             n1, n2 = 1 << d, 1 << (m - d - 1)
             S_00, S_01, S_10, S_11 = S
             ((S_, fft), (T_, ifft)) = self.fft_plans[d]
@@ -207,10 +207,10 @@ class KrylovTransposeMultiply():
             T_00, T_01, T_10, T_11 = T
 
             # polynomial additions
-            T_00[:,n2:] += S_00[::2, :] ## dS_00[:n1,:] = T_00[:,n2:]
-            T_00[:,n2:] += S_00[1::2 ,:]
-            T_01[:,n2:] += S_01[::2 ,:]
-            T_10[:,n2:] += S_10[1::2 ,:]
+            T_00[:,n2:] += S_00[::2] ## dS_00[:n1,:] = T_00[:,n2:]
+            T_00[:,n2:] += S_00[1::2]
+            T_01[:,n2:] += S_01[::2]
+            T_10[:,n2:] += S_10[1::2]
 
             ## autodiff correspondences annotated in with '##'
             ## this function takes in S and outputs T;
@@ -222,4 +222,116 @@ class KrylovTransposeMultiply():
 
         return S[0].squeeze()[::-1]
 
-    return resolvent_bilinear_flattened_nobf
+
+class KrylovMultiply():
+    """Multiply Krylov(A, v) @ w when A is zero except on the subdiagonal.
+    """
+
+    def __init__(self, n, lib='numpy'):
+        m = int(np.log2(n))
+        assert n == 1 << m, 'n must be a power of 2'
+        self.n = n
+        self.m = m
+        self.fft_plans = plan_ffts(m, lib)
+
+    def forward(self, subdiag, v, u):
+        """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
+        We don't use bit reversal here.
+        """
+        n, m = self.n, self.m
+        u, v = u[:, np.newaxis], v[:, np.newaxis]
+        S = (u * v, u, v, np.ones((n, 1)))
+        for d in range(m)[::-1]:
+            n1, n2 = 1 << d, 1 << (m - d - 1)
+            S_00, S_01, S_10, S_11 = S
+            ((S_, fft), (T_, ifft)) = self.fft_plans[d]
+
+            S0_10, S0_11, S1_01, S1_11 = S_ ## pass
+            S0_10[:,:n2] = S_10[::2]
+            S1_01[:,:n2] = S_01[1::2]
+            S0_11[:,:n2] = S_11[::2]
+            S1_11[:,:n2] = S_11[1::2] ## dS_11[...] = dS1_11[...]
+
+            # polynomial multiplications
+            S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft() ## dS_ = fft(dS*_**_f)
+
+            T_[0] = S1_01_f * S0_10_f
+            T_[1] = S1_01_f * S0_11_f
+            T_[2] = S1_11_f * S0_10_f
+            T_[3] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
+            ## note that the S*_**_f are the only things that need to be stored in t he forward pass
+            ## also note that there is an optimization here; should only need half
+
+            T = ifft() ## dT_ = ifft(dT) (because DFT matrix symmetric)
+            T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
+            ## for learning A, should get something like dsubd[...] = T
+
+            T_00, T_01, T_10, T_11 = T
+
+            # polynomial additions
+            T_00[:,n2:] += S_00[::2] ## dS_00[:n1,:] = T_00[:,n2:]
+            T_00[:,n2:] += S_00[1::2]
+            T_01[:,n2:] += S_01[::2]
+            T_10[:,n2:] += S_10[1::2]
+
+            ## autodiff correspondences annotated in with '##'
+            ## this function takes in S and outputs T;
+            ## the backwards pass calls these lines in reverse,
+            ## taking dT and outputting dS where ## dx := \partial{L}/\partial{x},
+            ## (L is the final output of the entire algorithm)
+
+            S = T
+
+        return S[0].squeeze()[::-1]
+
+    def __call__(self, subdiag, v, w):
+        n, m = self.n, self.m
+        u = np.zeros(n)
+        self.forward(subdiag, v.reshape(n), u.reshape(n))
+        v = v.reshape((n, 1))
+        dT = (w[::-1].reshape((1, n)), np.zeros((1, n)), np.zeros((1, n)), np.zeros((1, n)))
+
+        for d in range(m):
+            n1, n2 = 1 << d, 1 << (m - d - 1)
+            ((S_, fft), (T_, ifft)) = self.fft_plans[d]
+            dT_00, dT_01, dT_10, dT_11 = dT
+            dS = np.zeros((4, 2 * n1, n2))
+            dS_00, dS_01, dS_10, dS_11 = dS
+
+            dS_00[::2] = dT_00[:, n2:]
+            dS_00[1::2] = dT_00[:, n2:]
+            dS_01[::2] = dT_01[:, n2:]
+            dS_10[1::2] = dT_10[:, n2:]
+            dT *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
+
+            # Discard the negative frequencies since it's the complex conj of the positive frequencies
+            dT_ = np.fft.ifft(dT)[:, :, :n2 + 1]
+            dS_f = np.zeros((4, n1, n2 + 1), dtype=dT_.dtype)
+            dS0_10_f, dS0_11_f, dS1_01_f, dS1_11_f = dS_f
+            S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft.output_array
+            dS0_10_f += S1_01_f * dT_[0]
+            dS0_10_f += S1_11_f * dT_[2]
+            dS0_11_f += S1_01_f * dT_[1]
+            dS0_11_f += S1_11_f * dT_[3]
+            dS1_01_f += S0_10_f * dT_[0]
+            dS1_01_f += S0_11_f * dT_[1]
+            dS1_11_f += S0_10_f * dT_[2]
+            dS1_11_f += S0_11_f * dT_[3]
+            # This is inefficient. There's a way to do this with irfft but I'm to tired to think of it right now.
+            dS_f_temp = np.zeros((4, n1, 2 * n2), dtype=dT_.dtype)
+            dS_f_temp[:, :, :n2 + 1] = dS_f
+            dS_f_temp[:, :, (2*n2 - 1):n2:-1] = np.conj(dS_f_temp[:, :, 1:n2])
+
+            dS_ = np.fft.fft(dS_f_temp)
+            assert np.allclose(dS_.imag, 0)
+            dS_ = dS_.real
+            dS0_10, dS0_11, dS1_01, dS1_11 = dS_
+            dS_10[::2] += dS0_10[:, :n2]
+            dS_01[1::2] += dS1_01[:, :n2]
+            dS_11[::2] += dS0_11[:, :n2]
+            dS_11[1::2] += dS1_11[:, :n2]
+
+            dT = dS
+
+        du = (dS[0] * v + dS[1]).squeeze()
+        return du
