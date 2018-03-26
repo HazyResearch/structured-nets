@@ -7,12 +7,12 @@ os.environ['MKL_NUM_THREADS'] = '1'
 np.random.seed(0)
 
 
-n, m = 2, 1
-A = np.array([[0,0],[1,0]])
-u = np.array([1,1])
-v = np.array([1,1])
-print(resolvent_bilinear(A,v,u,n))
-ans: [2 1], [1, 1], [1 1], [0 1]
+# n, m = 2, 1
+# A = np.array([[0,0],[1,0]])
+# u = np.array([1,1])
+# v = np.array([1,1])
+# print(resolvent_bilinear(A,v,u,n))
+# ans: [2 1], [1, 1], [1 1], [0 1]
 
 
 # n, m = 4, 2
@@ -54,7 +54,7 @@ subdiag = np.random.random(n-1)
 A = np.diag(subdiag, -1)
 u = np.random.random(n)
 v = np.random.random(n)
-krylov_multiply = KrylovMultiply(n, lib='fftw')
+krylov_multiply = KrylovMultiply(n)
 result = krylov_construct(A, v, n).T @ u
 result1 = krylov_multiply(subdiag, v, u)
 np.allclose(result, result1)
