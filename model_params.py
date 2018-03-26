@@ -45,6 +45,31 @@ class ModelParams:
 		self.fix_A_identity = fix_A_identity
 		self.stochastic_train = stochastic_train
 		self.flip_K_B = flip_K_B
+		# c1_filters, c1_ksize, p1_size, p1_strides, c2_filters, c2_ksize, p2_size, p2_strides 
+		self.set_cnn_params()
+
+
+	def set_cnn_params(self):
+		cnn_params = {}
+		if self.dataset_name.startswith('mnist_noise'):
+			cnn_params['c1_filters'] = 32
+			cnn_params['c1_ksize'] = 5
+			cnn_params['p1_size'] = 2
+			cnn_params['p1_strides'] = 2 
+			cnn_params['c2_filters'] = 64
+			cnn_params['c2_ksize'] = 5
+			cnn_params['p2_size'] = 2
+			cnn_params['p2_strides'] = 2
+			cnn_params['p2_flat_size'] = 4 * 4 * 64
+		#elif self.dataset_name.startswith('cifar10'):
+		#	return 0
+		#elif self.dataset_name.startswith('norb'):
+		#	return 0
+		else:
+			print 'dataset_name not supported: ', self.dataset_name
+			assert 0
+
+		self.cnn_params = cnn_params
 
 
 	def save(self, results_dir, name, commit_id):

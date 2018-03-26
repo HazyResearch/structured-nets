@@ -158,34 +158,38 @@ def compute_loss_and_accuracy(y, y_, params):
 		assert 0
 
 def compute_y_cnn(x, W1, params):
-	input_layer = tf.reshape(x, [-1, 32, 32, 3])
-
+	#input_layer = tf.reshape(x, [-1, 32, 32, 3])
+	input_layer = tf.reshape(x, [-1, params.input_size, params.input_size, 1])  # Assuming single channel
 	input_layer = tf.cast(input_layer, tf.float32)
 	
 	# Reshape to x to 32x32x3
 	# Convolutional Layer #1
 	conv1 = tf.layers.conv2d(
 	inputs=input_layer,
-	filters=6,
-	kernel_size=[5, 5],
+	filters=params.cnn_params['c1_filters'],
+	kernel_size=[params.cnn_params['c1_ksize'], params.cnn_params['c1_ksize']],
 	padding="same",
 	activation=tf.nn.relu)
 
 	# Pooling Layer #1
-	pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
+	pool1 = tf.layers.max_pooling2d(inputs=conv1, 
+		pool_size=[params.cnn_params['p1_size'], params.cnn_params['p1_size']], 
+		strides=params.cnn_params['p1_strides'])
 
 	# Convolutional Layer #2 and Pooling Layer #2
 	conv2 = tf.layers.conv2d(
 	  inputs=pool1,
-	  filters=16,
-	  kernel_size=[5, 5],
+	  filters=params.cnn_params['c2_filters'],
+	  kernel_size=[params.cnn_params['c2_ksize'], params.cnn_params['c2_ksize']],
 	  padding="same",
 	  activation=tf.nn.relu)
-	pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
+	pool2 = tf.layers.max_pooling2d(inputs=conv2, 
+		pool_size=[params.cnn_params['p2_size'], params.cnn_params['p2_size']], 
+		strides=params.cnn_params['p2_strides'])
 
 		
 	# Dense Layer: replace with structured matrix
-	pool2_flat = tf.reshape(pool2, [-1, 4 * 4 * 64])
+	pool2_flat = tf.reshape(pool2, [-1, params.cnn_params['p2_flat_size']])
 	pool2_flat = tf.cast(pool2_flat, tf.float64)
 	dense = tf.nn.relu(tf.matmul(pool2_flat, W1))
 
