@@ -1,8 +1,11 @@
 import os
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
 import numpy as np
 from triXXF import *
 from triextrafat import *
-os.environ['MKL_NUM_THREADS'] = '1'
 
 np.random.seed(0)
 
@@ -58,3 +61,20 @@ krylov_multiply = KrylovMultiply(n)
 result = krylov_construct(A, v, n).T @ u
 result1 = krylov_multiply(subdiag, v, u)
 np.allclose(result, result1)
+
+# Test batch transpose multiply
+m = 12
+n = 1<<m
+batch_size = 100
+subdiag = np.random.random(n-1)
+A = np.diag(subdiag, -1)
+u = np.random.random((n, batch_size))
+v = np.random.random(n)
+krylov_transpose_multiply = KrylovTransposeMultiply(n, batch_size)
+result1 = krylov_transpose_multiply(subdiag, v, u)
+resolvent_bilinear_flattened = create(n, m, lib='fftw')
+result = resolvent_bilinear_flattened(A, v, u[:, 10], n, m)
+np.allclose(result1[:, 10], result)
+K = krylov_construct(A, v, n)
+result2 = K @ u
+np.allclose(result1, result2)
