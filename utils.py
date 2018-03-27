@@ -159,8 +159,11 @@ def compute_loss_and_accuracy(y, y_, params):
 
 def compute_y_cnn(x, W1, params):
 	#input_layer = tf.reshape(x, [-1, 32, 32, 3])
-	input_layer = tf.reshape(x, [-1, params.input_size, params.input_size, 1])  # Assuming single channel
+	dim = int(np.sqrt(params.input_size))
+	input_layer = tf.reshape(x, [-1, dim, dim, 1])  # Assuming single channel
 	input_layer = tf.cast(input_layer, tf.float32)
+
+	print 'input ', input_layer
 	
 	# Reshape to x to 32x32x3
 	# Convolutional Layer #1
@@ -171,41 +174,54 @@ def compute_y_cnn(x, W1, params):
 	padding="same",
 	activation=tf.nn.relu)
 
+
+	print 'conv1', conv1
 	# Pooling Layer #1
 	pool1 = tf.layers.max_pooling2d(inputs=conv1, 
 		pool_size=[params.cnn_params['p1_size'], params.cnn_params['p1_size']], 
 		strides=params.cnn_params['p1_strides'])
 
-	# Convolutional Layer #2 and Pooling Layer #2
-	conv2 = tf.layers.conv2d(
-	  inputs=pool1,
-	  filters=params.cnn_params['c2_filters'],
-	  kernel_size=[params.cnn_params['c2_ksize'], params.cnn_params['c2_ksize']],
-	  padding="same",
-	  activation=tf.nn.relu)
-	pool2 = tf.layers.max_pooling2d(inputs=conv2, 
-		pool_size=[params.cnn_params['p2_size'], params.cnn_params['p2_size']], 
-		strides=params.cnn_params['p2_strides'])
+	print 'pool1 ', pool1
 
+	if params.num_conv_layers == 1:
+		pool2_flat = tf.reshape(pool1, [-1, params.cnn_params['p2_flat_size']])
+		pool2_flat = tf.cast(pool2_flat, tf.float64)
+
+		print 'pool2_flat: ', pool2_flat
+
+		dense = tf.nn.relu(tf.matmul(pool2_flat, W1))
+	else:
+		# Convolutional Layer #2 and Pooling Layer #2
+		conv2 = tf.layers.conv2d(
+		  inputs=pool1,
+		  filters=params.cnn_params['c2_filters'],
+		  kernel_size=[params.cnn_params['c2_ksize'], params.cnn_params['c2_ksize']],
+		  padding="same",
+		  activation=tf.nn.relu)
 		
-	# Dense Layer: replace with structured matrix
-	pool2_flat = tf.reshape(pool2, [-1, params.cnn_params['p2_flat_size']])
-	pool2_flat = tf.cast(pool2_flat, tf.float64)
-	dense = tf.nn.relu(tf.matmul(pool2_flat, W1))
+		print 'conv2 ', conv2
 
+		pool2 = tf.layers.max_pooling2d(inputs=conv2, 
+			pool_size=[params.cnn_params['p2_size'], params.cnn_params['p2_size']], 
+			strides=params.cnn_params['p2_strides'])
+		
+		print 'pool2 ', pool2
+		# Dense Layer: replace with structured matrix
+		pool2_flat = tf.reshape(pool2, [-1, params.cnn_params['p2_flat_size']])
+		pool2_flat = tf.cast(pool2_flat, tf.float64)
+
+		print 'pool2_flat: ', pool2_flat
+
+		dense = tf.nn.relu(tf.matmul(pool2_flat, W1))
+
+	print 'dense ', dense
 	#dense = tf.layers.dense(inputs=pool3_flat, units=1024, activation=tf.nn.relu)
 
 	# Logits Layer
-	logits = tf.layers.dense(inputs=dense, units=10)
+	logits = tf.layers.dense(inputs=dense, units=params.out_size)
+	print 'dense ', dense
 
 	
-	print 'input ', input_layer
-	print 'conv1', conv1
-	print 'pool1 ', pool1
-	print 'conv2 ', conv2
-	print 'pool2 ', pool2
-	print 'pool2_flat: ', pool2_flat
-	print 'dense ', dense
 	print 'logits', logits
 
 	return logits

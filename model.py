@@ -269,7 +269,7 @@ def forward(x, params):
 	return y, model
 
 def compute_y(x, W1, params):
-	if params.transform == 'cnn':
+	if 'cnn' in params.transform:
 		return compute_y_cnn(x, W1, params)
 	elif params.num_layers==0:
 		y = tf.matmul(x, W1)

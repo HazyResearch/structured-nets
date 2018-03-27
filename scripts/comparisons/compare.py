@@ -51,6 +51,7 @@ learn_corner = True
 learn_diagonal = False
 stochastic_train = False
 checkpoint_freq = 100000
+num_conv_layers = 2
 n_trials = 3
 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
 results_dir = os.path.join(out_dir, 'results', args.result_dir) 
@@ -69,9 +70,7 @@ for method in methods:
 			args.lr, args.mom, init_type, method, learn_corner, 
 			n_diag_learned, init_stddev, fix_G, check_disp, checkpoint_freq, 
 			checkpoint_path, test_freq, verbose, args.decay_rate, decay_freq, learn_diagonal, 
-			fix_A_identity, stochastic_train, flip_K_B)
-
-	print('Params:\n', params)
+			fix_A_identity, stochastic_train, flip_K_B, num_conv_layers)
 
 	# Save params + git commit ID
 	this_results_dir = params.save(results_dir, args.name + '_' + method, commit_id)
