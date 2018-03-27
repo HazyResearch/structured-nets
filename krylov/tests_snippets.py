@@ -78,3 +78,17 @@ np.allclose(result1[:, 10], result)
 K = krylov_construct(A, v, n)
 result2 = K @ u
 np.allclose(result1, result2)
+
+# Test batch non-transpose multiply
+m = 14
+n = 1<<m
+batch_size = 100
+subdiag = np.random.random(n-1)
+A = np.diag(subdiag, -1)
+u = np.random.random((n, batch_size))
+v = np.random.random(n)
+krylov_multiply = KrylovMultiply(n, batch_size)
+result1 = krylov_multiply(subdiag, v, u)
+K = krylov_construct(A, v, n)
+result2 = K.T @ u
+np.allclose(result1, result2)

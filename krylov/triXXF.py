@@ -245,11 +245,12 @@ class KrylovMultiply():
     """Multiply Krylov(A, v) @ w when A is zero except on the subdiagonal.
     """
 
-    def __init__(self, n):
+    def __init__(self, n, batch_size=1):
         m = int(np.log2(n))
         assert n == 1 << m, 'n must be a power of 2'
         self.n = n
         self.m = m
+        self.batch_size = batch_size
         self.plan_ffts_forward_pass_u_zero()
         self.plan_ffts_backward()
 
@@ -268,15 +269,15 @@ class KrylovMultiply():
             self.ffts_forward_pass.append((fft_time2freq, fft_freq2time))
 
     def plan_ffts_backward(self):
-        n, m = self.n, self.m
-        self.dT_storage = np.empty((m + 1, 2, n))  # One extra array to store final result of backward pass
-        self.dT_f_storage = [np.empty((2, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
-        self.dS_f_storage = [np.empty((1, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
-        self.dS_storage = np.empty((m, 1, n))
+        n, m, batch_size = self.n, self.m, self.batch_size
+        self.dT_storage = np.empty((m + 1, 2 * batch_size, n))  # One extra array to store final result of backward pass
+        self.dT_f_storage = [np.empty((2 * batch_size, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.dS_f_storage = [np.empty((batch_size, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.dS_storage = np.empty((m, batch_size, n))
         self.ffts_backward_pass = []
         for d, (dT, dT_f, dS_f, dS) in enumerate(zip(self.dT_storage, self.dT_f_storage, self.dS_f_storage, self.dS_storage)):
-            dT = dT.reshape((2, 1 << d, 1 << (m - d)))
-            dS = dS.reshape((1, 1 << d, 1 << (m - d)))
+            dT = dT.reshape((2 * batch_size, 1 << d, 1 << (m - d)))
+            dS = dS.reshape((batch_size, 1 << d, 1 << (m - d)))
             self.ffts_backward_pass.append((self.pyfftw_ihfft(dT, dT_f), self.pyfftw_hfft(dS_f, dS)))
 
 
@@ -341,40 +342,40 @@ class KrylovMultiply():
             T_prev = T
 
     def __call__(self, subdiag, v, w):
-        n, m = self.n, self.m
+        n, m, batch_size = self.n, self.m, self.batch_size
         self.forward(subdiag, v.reshape(n))
-        v = v.reshape((n, 1))
+        w, v = w.T.reshape(batch_size, 1, n), v.reshape((n, 1))
         # We can ignore dT[2] and dT[3] because they start at zero and always stay zero.
         # We can check this by static analysis of the code or by math.
-        dT = self.dT_storage[0]
-        dT[0], dT[1] = w[::-1].reshape((1, n)), 0.0
+        dT = self.dT_storage[0].reshape((2 * batch_size, 1, n))
+        dT[:batch_size], dT[batch_size:] = w[:, :, ::-1], 0.0
 
         for d in range(m):
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            dT = self.dT_storage[d].reshape((2, n1, 2 * n2))
+            dT = self.dT_storage[d].reshape((2 * batch_size, n1, 2 * n2))
             dT_f = self.dT_f_storage[d]
             dS_f = self.dS_f_storage[d]
-            dS = self.dS_storage[d].reshape((1, n1, 2 * n2))
+            dS = self.dS_storage[d].reshape((batch_size, n1, 2 * n2))
             fft_time2freq, fft_freq2time = self.ffts_backward_pass[d]
-            dT_next = self.dT_storage[d + 1].reshape(2, 2 * n1, n2)
+            dT_next = self.dT_storage[d + 1].reshape(2 * batch_size, 2 * n1, n2)
 
-            dT_00, dT_01 = dT
-            dS_00, dS_01 = dT_next
+            dT_00, dT_01 = dT[:batch_size], dT[batch_size:]
+            dS_00, dS_01 = dT_next[:batch_size], dT_next[batch_size:]
 
-            dS_00[::2] = dT_00[:, n2:]
-            dS_00[1::2] = dT_00[:, n2:]
-            dS_01[::2] = dT_01[:, n2:]
+            dS_00[:, ::2] = dT_00[:, :, n2:]
+            dS_00[:, 1::2] = dT_00[:, :, n2:]
+            dS_01[:, ::2] = dT_01[:, :, n2:]
             dT *= subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
             dT_f = fft_time2freq(dT, output_array=dT_f)
 
-            dS1_01_f,  = dS_f
+            dS1_01_f  = dS_f
             S0_10_f, S0_11_f = self.save_for_backward[d]
-            dS1_01_f[:] = S0_10_f * dT_f[0]
-            dS1_01_f += S0_11_f * dT_f[1]
+            dS1_01_f[:] = S0_10_f * dT_f[:batch_size]
+            dS1_01_f += S0_11_f * dT_f[batch_size:]
 
-            dS1_01, = fft_freq2time(dS_f, output_array=dS)
-            dS_01[1::2] = dS1_01[:, :n2]
+            dS1_01 = fft_freq2time(dS_f, output_array=dS)
+            dS_01[:, 1::2] = dS1_01[:, :, :n2]
             # print(np.linalg.norm(dT_next[0] - dT_next[0, 0]))
             # dT[0] always contains the same polynomials. Maybe this is something we can exploit?
             # In the forward pass, this corresponds to the result only
@@ -383,6 +384,6 @@ class KrylovMultiply():
             # 7m+1, but the FFT calls are no longer on the same dimension. It's
             # probably annoying to do and not worth it.
 
-        du = (dT_next[0] * v + dT_next[1]).squeeze()
+        du = (dT_next[:batch_size] * v + dT_next[batch_size:]).squeeze()
         # du = (w[0] * v + dT_next[1]).squeeze()
-        return du
+        return du.T
