@@ -373,8 +373,13 @@ class KrylovMultiply():
 
             dS1_01, = fft_freq2time(dS_f, output_array=dS)
             dS_01[1::2] = dS1_01[:, :n2]
-            # dT[0] always contains the same polynomials. Maybe this is something we can exploit?
             # print(np.linalg.norm(dT_next[0] - dT_next[0, 0]))
+            # dT[0] always contains the same polynomials. Maybe this is something we can exploit?
+            # In the forward pass, this corresponds to the result only
+            # depending on S_00[even] + S_00[odd], not their individual values.
+            # Exploiting this will reduce the number of FFT calls from 8m to
+            # 7m+1, but the FFT calls are no longer on the same dimension. It's
+            # probably annoying to do and not worth it.
 
         du = (dT_next[0] * v + dT_next[1]).squeeze()
         # du = (w[0] * v + dT_next[1]).squeeze()
