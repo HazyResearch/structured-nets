@@ -165,150 +165,138 @@ class KrylovTransposeMultiply():
     """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
     """
 
-    def __init__(self, n, lib='numpy'):
+    def __init__(self, n):
         m = int(np.log2(n))
         assert n == 1 << m, 'n must be a power of 2'
         self.n = n
         self.m = m
-        self.fft_plans = plan_ffts(m, lib)
+        self.plan_ffts_forward_pass()
+
+    def plan_ffts_forward_pass(self):
+        n, m = self.n, self.m
+        self.S_storage = np.empty((m, 4, n))
+        self.S_f_storage = [np.empty((4, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.T_f_storage = [np.empty((4, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.T_storage = np.empty((m, 4, n))
+        self.ffts_forward_pass = []
+        for d, (S, S_f, T_f, T) in enumerate(zip(self.S_storage, self.S_f_storage, self.T_f_storage, self.T_storage)):
+            S = S.reshape((4, 1 << d, 1 << (m - d)))
+            T = T.reshape((4, 1 << d, 1 << (m - d)))
+            fft_time2freq = pyfftw.FFTW(S, S_f, direction='FFTW_FORWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
+            fft_freq2time = pyfftw.FFTW(T_f, T, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
+            self.ffts_forward_pass.append((fft_time2freq, fft_freq2time))
 
     def __call__(self, subdiag, v, u):
         """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
         We don't use bit reversal here.
         """
         n, m = self.n, self.m
-        u, v = u[:, np.newaxis], v[:, np.newaxis]
-        S = (u * v, u, v, np.ones((n, 1)))
+        u, v = u.reshape(n, 1), v.reshape(n, 1)
+        self.S_storage.fill(0.0)
+        T_prev = (u * v, u, v, np.ones((n, 1)))
         for d in range(m)[::-1]:
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            S_00, S_01, S_10, S_11 = S
-            ((S_, fft), (T_, ifft)) = self.fft_plans[d]
+            S = self.S_storage[d].reshape((4, n1, 2 * n2))
+            S_f = self.S_f_storage[d]
+            T_f = self.T_f_storage[d]
+            T = self.T_storage[d].reshape((4, n1, 2 * n2))
+            fft_time2freq, fft_freq2time = self.ffts_forward_pass[d]
 
-            S0_10, S0_11, S1_01, S1_11 = S_ ## pass
-            S0_10[:,:n2] = S_10[::2]
-            S1_01[:,:n2] = S_01[1::2]
-            S0_11[:,:n2] = S_11[::2]
-            S1_11[:,:n2] = S_11[1::2] ## dS_11[...] = dS1_11[...]
+            S_00, S_01, S_10, S_11 = T_prev
+            S0_10, S0_11, S1_01, S1_11 = S
+            S0_10[:, :n2] = S_10[::2]
+            S1_01[:, :n2] = S_01[1::2]
+            S0_11[:, :n2] = S_11[::2]
+            S1_11[:, :n2] = S_11[1::2]
 
             # polynomial multiplications
-            S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft() ## dS_ = fft(dS*_**_f)
-
-            T_[0] = S1_01_f * S0_10_f
-            T_[1] = S1_01_f * S0_11_f
-            T_[2] = S1_11_f * S0_10_f
-            T_[3] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
+            S0_10_f, S0_11_f, S1_01_f, S1_11_f = fft_time2freq(S, output_array=S_f) ## dS_ = fft(dS*_**_f)
+            T_f[0] = S1_01_f * S0_10_f
+            T_f[1] = S1_01_f * S0_11_f
+            T_f[2] = S1_11_f * S0_10_f
+            T_f[3] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
             ## note that the S*_**_f are the only things that need to be stored in t he forward pass
             ## also note that there is an optimization here; should only need half
 
-            T = ifft() ## dT_ = ifft(dT) (because DFT matrix symmetric)
+            T = fft_freq2time(T_f, output_array=T) ## dT_ = ifft(dT) (because DFT matrix symmetric)
             T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
             ## for learning A, should get something like dsubd[...] = T
 
             T_00, T_01, T_10, T_11 = T
-
             # polynomial additions
-            T_00[:,n2:] += S_00[::2] ## dS_00[:n1,:] = T_00[:,n2:]
-            T_00[:,n2:] += S_00[1::2]
-            T_01[:,n2:] += S_01[::2]
-            T_10[:,n2:] += S_10[1::2]
+            T_00[:, n2:] += S_00[::2] ## dS_00[:n1,:] = T_00[:,n2:]
+            T_00[:, n2:] += S_00[1::2]
+            T_01[:, n2:] += S_01[::2]
+            T_10[:, n2:] += S_10[1::2]
 
             ## autodiff correspondences annotated in with '##'
             ## this function takes in S and outputs T;
             ## the backwards pass calls these lines in reverse,
             ## taking dT and outputting dS where ## dx := \partial{L}/\partial{x},
             ## (L is the final output of the entire algorithm)
+            T_prev = T
 
-            S = T
-
-        return S[0].squeeze()[::-1]
+        return T[0].squeeze()[::-1]
 
 
 class KrylovMultiply():
     """Multiply Krylov(A, v) @ w when A is zero except on the subdiagonal.
     """
 
-    def __init__(self, n, lib='numpy'):
+    def __init__(self, n):
         m = int(np.log2(n))
         assert n == 1 << m, 'n must be a power of 2'
         self.n = n
         self.m = m
-        self.fft_plans_forward = self.plan_ffts_forward_u_zero(m, lib)
-        self.fft_plans_backward = self.plan_ffts_backward(m, lib)
+        self.plan_ffts_forward_pass_u_zero()
+        self.plan_ffts_backward()
 
-    def plan_ffts_forward_u_zero(self, m, lib='numpy'):
-        fft_plans = [None] * m
-        for d in range(m)[::-1]:
-            n1, n2 = 1<<d, 1<<(m-d)
-            in_shape  = (3, n1, n2)
-            out_shape = (2, n1, n2 // 2 + 1)
-            fft_plans[d] = self._plan_ffts_forward_u_zero(in_shape, out_shape, lib)
-        return fft_plans
+    def plan_ffts_forward_pass_u_zero(self):
+        n, m = self.n, self.m
+        self.S_storage = np.empty((m, 3, n))
+        self.S_f_storage = [np.empty((3, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.T_f_storage = [np.empty((2, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.T_storage = np.empty((m, 2, n))
+        self.ffts_forward_pass = []
+        for d, (S, S_f, T_f, T) in enumerate(zip(self.S_storage, self.S_f_storage, self.T_f_storage, self.T_storage)):
+            S = S.reshape((3, 1 << d, 1 << (m - d)))
+            T = T.reshape((2, 1 << d, 1 << (m - d)))
+            fft_time2freq = pyfftw.FFTW(S, S_f, direction='FFTW_FORWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
+            fft_freq2time = pyfftw.FFTW(T_f, T, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
+            self.ffts_forward_pass.append((fft_time2freq, fft_freq2time))
 
-    def _plan_ffts_forward_u_zero(self, in_shape, out_shape, lib='numpy'):
-        if lib == 'numpy':
-            S_time = np.zeros(shape=in_shape)
-            fft_time2freq = lambda: np.fft.rfft(S_time)
+    def plan_ffts_backward(self):
+        n, m = self.n, self.m
+        self.dT_storage = np.empty((m + 1, 2, n))  # One extra array to store final result of backward pass
+        self.dT_f_storage = [np.empty((2, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.dS_f_storage = [np.empty((1, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.dS_storage = np.empty((m, 1, n))
+        self.ffts_backward_pass = []
+        for d, (dT, dT_f, dS_f, dS) in enumerate(zip(self.dT_storage, self.dT_f_storage, self.dS_f_storage, self.dS_storage)):
+            dT = dT.reshape((2, 1 << d, 1 << (m - d)))
+            dS = dS.reshape((1, 1 << d, 1 << (m - d)))
+            self.ffts_backward_pass.append((self.pyfftw_ihfft(dT, dT_f), self.pyfftw_hfft(dS_f, dS)))
 
-            T_freq = np.empty(shape=out_shape, dtype='complex128')
-            fft_freq2time = lambda: np.fft.irfft(T_freq)
-            return ((S_time, fft_time2freq), (T_freq, fft_freq2time))
-        if lib == 'scipy':
-            pass
-        if lib == 'fftw':
-            in_shape_freq = in_shape[:-1] + (in_shape[-1]//2 + 1,)
-            S_time = pyfftw.empty_aligned(in_shape, dtype='float64')
-            S_freq = pyfftw.empty_aligned(in_shape_freq, dtype='complex128')
-            fft_time2freq = pyfftw.FFTW(S_time, S_freq, direction='FFTW_FORWARD', flags=['FFTW_MEASURE']) # don't destroy input so 0s are preserved
-            S_time[:] = 0
-            out_shape_freq = out_shape[:-1] + ((out_shape[-1] - 1) * 2,)
-            T_time = pyfftw.empty_aligned(out_shape_freq, dtype='float64')
-            T_freq = pyfftw.empty_aligned(out_shape, dtype='complex128')
-            fft_freq2time = pyfftw.FFTW(T_freq, T_time, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
-            return ((S_time, fft_time2freq), (T_freq, fft_freq2time))
 
-    def plan_ffts_backward(self, m, lib='numpy'):
-        fft_plans = [None] * m
-        for d in range(m):
-            n1, n2 = 1<<d, 1<<(m-d)
-            in_shape  = (2, n1, n2)
-            out_shape = (n1, n2 // 2 + 1)
-            fft_plans[d] = self._plan_ffts_backward(in_shape, out_shape, lib)
-        return fft_plans
+    @staticmethod
+    def pyfftw_ihfft(input_array, output_array):
+        # np.fft.ihfft is the same as np.fft.rfft().conj() / n
+        rfft = pyfftw.FFTW(input_array, output_array, direction='FFTW_FORWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
+        def fft_time2freq(input_array=None, output_array=None):
+            output_array = rfft(input_array, output_array)
+            np.conjugate(output_array, out=output_array)
+            output_array /= input_array.shape[-1]
+            return output_array
+        return fft_time2freq
 
-    def _plan_ffts_backward(self, in_shape, out_shape, lib='numpy'):
-        if lib == 'numpy':
-            dT_time = np.empty(shape=in_shape)
-            fft_time2freq = lambda: np.fft.ihfft(dT_time)
-
-            dS_freq = np.zeros(shape=out_shape, dtype='complex128')
-            fft_freq2time = lambda: np.fft.hfft(dS_freq)
-            return ((dT_time, fft_time2freq), (dS_freq, fft_freq2time))
-        if lib == 'scipy':
-            pass
-        if lib == 'fftw':
-            in_shape_freq = in_shape[:-1] + (in_shape[-1]//2 + 1,)
-            dT_time = pyfftw.empty_aligned(in_shape, dtype='float64')
-            dT_freq = pyfftw.empty_aligned(in_shape_freq, dtype='complex128')
-            # np.fft.ihfft is the same as np.fft.rfft().conj() / n
-            fft_time2freq_func = pyfftw.FFTW(dT_time, dT_freq, direction='FFTW_FORWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
-
-            def fft_time2freq():
-                dT_freq = fft_time2freq_func()
-                np.conjugate(dT_freq, out=dT_freq)
-                dT_freq /= in_shape[-1]
-                return dT_freq
-
-            out_shape_freq = out_shape[:-1] + ((out_shape[-1] - 1) * 2,)
-            dS_time = pyfftw.empty_aligned(out_shape_freq, dtype='float64')
-            dS_freq = pyfftw.empty_aligned(out_shape, dtype='complex128')
-            # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
-            fft_freq2time_func = pyfftw.FFTW(dS_freq, dS_time, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
-
-            def fft_freq2time():
-                np.conjugate(dS_freq, out=dS_freq)
-                return fft_freq2time_func(normalise_idft=False)
-
-            return ((dT_time, fft_time2freq), (dS_freq, fft_freq2time))
+    @staticmethod
+    def pyfftw_hfft(input_array, output_array):
+        # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
+        irfft = pyfftw.FFTW(input_array, output_array, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'])
+        def fft_freq2time(input_array=None, output_array=None):
+            np.conjugate(input_array, out=input_array)
+            return irfft(input_array, output_array, normalise_idft=False)
+        return fft_freq2time
 
     def forward(self, subdiag, v):
         """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
@@ -316,77 +304,83 @@ class KrylovMultiply():
         the backward pass.
         """
         n, m = self.n, self.m
-        v = v[:, np.newaxis]
-        S = (v, np.ones((n, 1)))
+        self.save_for_backward = [None] * m
+        v = v.reshape(n, 1)
+        self.S_storage.fill(0.0)
+        T_prev = (v, np.ones((n, 1)))
         for d in range(m)[::-1]:
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            S_10, S_11 = S
-            ((S_, fft_time2freq), (T_, fft_freq2time)) = self.fft_plans_forward[d]
+            S = self.S_storage[d].reshape((3, n1, 2 * n2))
+            S_f = self.S_f_storage[d]
+            T_f = self.T_f_storage[d]
+            T = self.T_storage[d].reshape((2, n1, 2 * n2))
+            fft_time2freq, fft_freq2time = self.ffts_forward_pass[d]
 
-            S0_10, S0_11, S1_11 = S_ ## pass
+            S_10, S_11 = T_prev
+
+            S0_10, S0_11, S1_11 = S
             S0_10[:,:n2] = S_10[::2]
             S0_11[:,:n2] = S_11[::2]
-            S1_11[:,:n2] = S_11[1::2] ## dS_11[...] = dS1_11[...]
+            S1_11[:,:n2] = S_11[1::2]
 
             # polynomial multiplications
-            S0_10_f, S0_11_f, S1_11_f = fft_time2freq() ## dS_ = fft_time2freq(dS*_**_f)
+            S0_10_f, S0_11_f, S1_11_f = fft_time2freq(S, output_array=S_f)
             self.save_for_backward[d] = (S0_10_f, S0_11_f)
+            T_f[0] = S1_11_f * S0_10_f
+            T_f[1] = S1_11_f * S0_11_f
 
-            T_[0] = S1_11_f * S0_10_f
-            T_[1] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
-            ## note that the S*_**_f are the only things that need to be stored in t he forward pass
-            ## also note that there is an optimization here; should only need half
-
-            T = fft_freq2time() ## dT_ = fft_freq2time(dT) (because DFT matrix symmetric)
-            T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
-            ## for learning A, should get something like dsubd[...] = T
+            T = fft_freq2time(T_f, output_array=T)
+            T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
             T_10, T_11 = T
-
             # polynomial additions
             T_10[:,n2:] += S_10[1::2]
 
-            ## autodiff correspondences annotated in with '##'
-            ## this function takes in S and outputs T;
-            ## the backwards pass calls these lines in reverse,
-            ## taking dT and outputting dS where ## dx := \partial{L}/\partial{x},
-            ## (L is the final output of the entire algorithm)
-
-            S = (T_10, T_11)
+            T_prev = T
 
     def __call__(self, subdiag, v, w):
         n, m = self.n, self.m
-        self.save_for_backward = [None] * m
         self.forward(subdiag, v.reshape(n))
         v = v.reshape((n, 1))
         # We can ignore dT[2] and dT[3] because they start at zero and always stay zero.
         # We can check this by static analysis of the code or by math.
-        (dT, _), _ = self.fft_plans_backward[0]
-        dT[0], dT[1] = w[::-1].reshape((1, n)), np.zeros((1, n))
-        # Temporarily allocate space for result, stored at self.fft_plans_backward[m]
-        self.fft_plans_backward.append(((np.empty((2, n, 1)), None), (None, None)))
+        dT = self.dT_storage[0]
+        dT[0], dT[1] = w[::-1].reshape((1, n)), 0.0
 
         for d in range(m):
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            (dT, fft_time2freq), (dS_f, fft_freq2time) = self.fft_plans_backward[d]
-            (dS, _), _ = self.fft_plans_backward[d + 1]
+            dT = self.dT_storage[d].reshape((2, n1, 2 * n2))
+            dT_f = self.dT_f_storage[d]
+            dS_f = self.dS_f_storage[d]
+            dS = self.dS_storage[d].reshape((1, n1, 2 * n2))
+            fft_time2freq, fft_freq2time = self.ffts_backward_pass[d]
+            dT_next = self.dT_storage[d + 1].reshape(2, 2 * n1, n2)
+
             dT_00, dT_01 = dT
-            dS_00, dS_01 = dS
+            dS_00, dS_01 = dT_next
 
             dS_00[::2] = dT_00[:, n2:]
             dS_00[1::2] = dT_00[:, n2:]
             dS_01[::2] = dT_01[:, n2:]
             dT *= subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
-            dT_f = fft_time2freq()
-            dS1_01_f = dS_f
+            dT_f = fft_time2freq(dT, output_array=dT_f)
+
+            dS1_01_f,  = dS_f
             S0_10_f, S0_11_f = self.save_for_backward[d]
             dS1_01_f[:] = S0_10_f * dT_f[0]
             dS1_01_f += S0_11_f * dT_f[1]
 
-            dS1_01 = fft_freq2time()
+            dS1_01, = fft_freq2time(dS_f, output_array=dS)
             dS_01[1::2] = dS1_01[:, :n2]
+            # print(np.linalg.norm(dT_next[0] - dT_next[0, 0]))
+            # dT[0] always contains the same polynomials. Maybe this is something we can exploit?
+            # In the forward pass, this corresponds to the result only
+            # depending on S_00[even] + S_00[odd], not their individual values.
+            # Exploiting this will reduce the number of FFT calls from 8m to
+            # 7m+1, but the FFT calls are no longer on the same dimension. It's
+            # probably annoying to do and not worth it.
 
-        self.fft_plans_backward = self.fft_plans_backward[:-1]
-        du = (dS[0] * v + dS[1]).squeeze()
+        du = (dT_next[0] * v + dT_next[1]).squeeze()
+        # du = (w[0] * v + dT_next[1]).squeeze()
         return du
