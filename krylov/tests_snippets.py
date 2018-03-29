@@ -41,9 +41,10 @@ v = np.random.random(n)
 # k11 = krylov_mult_slow_faster(A,v,u,n)
 # k2 = krylov_mult(A,v,u,n)
 resolvent_bilinear_flattened = create(n, m, lib='fftw')
-resolvent_bilinear_flattened_nobf = KrylovTransposeMultiply(n)
+krylov_transpose_multiply = KrylovTransposeMultiply(n)
 k3 = resolvent_bilinear_flattened(A, v, u, n, m)
-k3_nobf = resolvent_bilinear_flattened_nobf(subdiag, v, u)
+k3_nobf = krylov_transpose_multiply(subdiag, v, u)
+np.allclose(k3, k3_nobf)
 [resolvent_bilinear_flattened(A, v, u, n, m) for i in range(100)]
 # print(np.linalg.norm(k1-k11))
 # print(np.linalg.norm(k1-k2))
@@ -91,4 +92,22 @@ krylov_multiply = KrylovMultiply(n, batch_size)
 result1 = krylov_multiply(subdiag, v, u)
 K = krylov_construct(A, v, n)
 result2 = K.T @ u
+np.allclose(result1, result2)
+
+# Test batch transpose multiply with rank >= 2
+m = 12
+n = 1<<m
+batch_size = 100
+rank = 3
+subdiag = np.random.random(n-1)
+A = np.diag(subdiag, -1)
+u = np.random.random((batch_size, n))
+v = np.random.random((rank, n))
+krylov_transpose_multiply = KrylovTransposeMultiply(n, batch_size, rank)
+result1 = krylov_transpose_multiply(subdiag, v, u)
+resolvent_bilinear_flattened = create(n, m, lib='fftw')
+result = resolvent_bilinear_flattened(A, v[0], u[10], n, m)
+np.allclose(result1[10, 0], result)
+Ks = [krylov_construct(A, v[i], n) for i in range(rank)]
+result2 = np.stack([u @ K.T for K in Ks]).swapaxes(0, 1)
 np.allclose(result1, result2)

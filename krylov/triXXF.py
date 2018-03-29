@@ -165,24 +165,25 @@ class KrylovTransposeMultiply():
     """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
     """
 
-    def __init__(self, n, batch_size=1):
+    def __init__(self, n, batch_size=1, rank=1):
         m = int(np.log2(n))
         assert n == 1 << m, 'n must be a power of 2'
         self.n = n
         self.m = m
         self.batch_size = batch_size
+        self.rank = rank
         self.plan_ffts_forward_pass()
 
     def plan_ffts_forward_pass(self):
-        n, m, batch_size = self.n, self.m, self.batch_size
-        self.S_storage = np.empty((m, 3 + batch_size, n))
-        self.S_f_storage = [np.empty((3 + batch_size, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
-        self.T_f_storage = [np.empty((2 + 2 * batch_size, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
-        self.T_storage = np.empty((m, 2 + 2 * batch_size, n))
+        n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
+        self.S_storage = np.empty((m, batch_size + rank + 2, n))
+        self.S_f_storage = [np.empty((batch_size + rank + 2, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.T_f_storage = [np.empty((batch_size + 1, rank + 1, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.T_storage = np.empty((m, batch_size + 1, rank + 1, n))
         self.ffts_forward_pass = []
         for d, (S, S_f, T_f, T) in enumerate(zip(self.S_storage, self.S_f_storage, self.T_f_storage, self.T_storage)):
-            S = S.reshape((3 + batch_size, 1 << d, 1 << (m - d)))
-            T = T.reshape((2 + 2 * batch_size, 1 << d, 1 << (m - d)))
+            S = S.reshape((batch_size + rank + 2, 1 << d, 1 << (m - d)))
+            T = T.reshape((batch_size + 1, rank + 1, 1 << d, 1 << (m - d)))
             fft_time2freq = pyfftw.FFTW(S, S_f, direction='FFTW_FORWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'], threads=4)
             fft_freq2time = pyfftw.FFTW(T_f, T, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'], threads=4)
             self.ffts_forward_pass.append((fft_time2freq, fft_freq2time))
@@ -191,32 +192,37 @@ class KrylovTransposeMultiply():
         """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
         We don't use bit reversal here.
         """
-        n, m, batch_size = self.n, self.m, self.batch_size
-        u, v = u.T.reshape(batch_size, n, 1), v.reshape(n, 1)
+        n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
+        u, v = u.reshape(batch_size, 1, n, 1), v.reshape(1, rank, n, 1)
         self.S_storage.fill(0.0)
-        T_prev = np.vstack((u * v, u, v[np.newaxis], np.ones((1, n, 1))))
+        T_prev = np.empty((batch_size + 1, rank + 1, n, 1))
+        T_prev[:batch_size, :rank] = u * v
+        T_prev[:batch_size, -1:] = u
+        T_prev[-1:, :rank] = v
+        T_prev[-1:, -1:] = 1.0
         for d in range(m)[::-1]:
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            S = self.S_storage[d].reshape((3 + batch_size, n1, 2 * n2))
+            S = self.S_storage[d].reshape((batch_size + rank + 2, n1, 2 * n2))
             S_f = self.S_f_storage[d]
             T_f = self.T_f_storage[d]
-            T = self.T_storage[d].reshape((2 + 2 * batch_size, n1, 2 * n2))
+            T = self.T_storage[d].reshape((batch_size + 1, rank + 1, n1, 2 * n2))
             fft_time2freq, fft_freq2time = self.ffts_forward_pass[d]
 
-            S_00, S_01, S_10, S_11 = T_prev[:batch_size], T_prev[batch_size:2 * batch_size], T_prev[-2], T_prev[-1]
-            S0_10, S0_11, S1_01, S1_11 = S[0], S[1], S[2:2+ batch_size], S[-1]
-            S0_10[:, :n2] = S_10[::2]
+            S_00, S_01, S_10, S_11 = T_prev[:batch_size, :rank], T_prev[:batch_size, -1], T_prev[-1, :rank], T_prev[-1, -1]
+            S0_10, S0_11, S1_01, S1_11 = S[:rank], S[rank], S[rank+1:rank+1+batch_size], S[-1]
+            S0_10[:, :, :n2] = S_10[:, ::2]
             S1_01[:, :, :n2] = S_01[:, 1::2]
             S0_11[:, :n2] = S_11[::2]
             S1_11[:, :n2] = S_11[1::2]
 
             # polynomial multiplications
             S_f = fft_time2freq(S, output_array=S_f) ## dS_ = fft(dS*_**_f)
-            S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[0], S_f[1], S_f[2:2+batch_size], S_f[-1]
-            T_f[:batch_size] = S1_01_f * S0_10_f
-            T_f[batch_size:2*batch_size] = S1_01_f * S0_11_f
-            T_f[-2] = S1_11_f * S0_10_f
-            T_f[-1] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
+            S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
+            T_00_f, T_01_f, T_10_f, T_11_f = T_f[:batch_size, :rank], T_f[:batch_size, -1], T_f[-1, :rank], T_f[-1, -1]
+            T_00_f[:] = S1_01_f[:, np.newaxis] * S0_10_f[np.newaxis]
+            T_01_f[:] = S1_01_f * S0_11_f
+            T_10_f[:] = S1_11_f * S0_10_f
+            T_11_f[:] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
             ## note that the S*_**_f are the only things that need to be stored in t he forward pass
             ## also note that there is an optimization here; should only need half
 
@@ -224,12 +230,12 @@ class KrylovTransposeMultiply():
             T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
             ## for learning A, should get something like dsubd[...] = T
 
-            T_00, T_01, T_10, T_11 = T[:batch_size], T[batch_size:2 * batch_size], T[-2], T[-1]
+            T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
             # polynomial additions
-            T_00[:, :, n2:] += S_00[:, ::2] ## dS_00[:n1,:] = T_00[:,n2:]
-            T_00[:, :, n2:] += S_00[:, 1::2]
+            T_00[:, :, :, n2:] += S_00[:, :, ::2] ## dS_00[:n1,:] = T_00[:,n2:]
+            T_00[:, :, :, n2:] += S_00[:, :, 1::2]
             T_01[:, :, n2:] += S_01[:, ::2]
-            T_10[:, n2:] += S_10[1::2]
+            T_10[:, :, n2:] += S_10[:, 1::2]
 
             ## autodiff correspondences annotated in with '##'
             ## this function takes in S and outputs T;
@@ -238,7 +244,7 @@ class KrylovTransposeMultiply():
             ## (L is the final output of the entire algorithm)
             T_prev = T
 
-        return T[:batch_size, :, ::-1].T.squeeze()
+        return T[:batch_size, :rank, :, ::-1].squeeze()
 
 
 class KrylovMultiply():
