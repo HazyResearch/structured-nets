@@ -1,17 +1,12 @@
 from triextrafat import *
 import numpy as np
-from torch.autograd import Variable
 
 import torch
+from torch.autograd import Variable
 import pytorch_fft.fft as fft
 
-def Rfft(X_re):
-    X_im = torch.zeros_like(X_re)
-    return fft.autograd.Fft()(X_re, X_im)
-
-def Irfft(X):
-    X_re, X_im = X
-    return fft.autograd.Ifft()(X_re, X_im)[0]
+Rfft = fft.autograd.Rfft()
+Irfft = fft.autograd.Irfft()
 
 def complex_mult(X, Y):
     X_re, X_im = X
@@ -50,7 +45,7 @@ def krylov_transpose_multiply(subdiag, v, u):
         T_10_f = complex_mult(S1_11_f, S0_10_f)
         T_11_f = complex_mult(S1_11_f, S0_11_f)
 
-        T_00, T_01, T_10, T_11 = Irfft(T_00_f), Irfft(T_01_f), Irfft(T_10_f), Irfft(T_11_f)
+        T_00, T_01, T_10, T_11 = Irfft(*T_00_f), Irfft(*T_01_f), Irfft(*T_10_f), Irfft(*T_11_f)
         T_00 = T_00 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_01 = T_01 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_10 = T_10 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
@@ -67,23 +62,32 @@ def krylov_transpose_multiply(subdiag, v, u):
     # return T_00[:, :, :, ::-1]
     return T_00[:, :, :, index].squeeze(dim=2)
 
-m = 3
-n = 1<<m
-batch_size = 3
-rank = 2
-subdiag = Variable(torch.rand(n-1), requires_grad=True).cuda()
-A = np.diag(subdiag.data.cpu().numpy(), -1)
-u = Variable(torch.rand((batch_size, n)), requires_grad=True).cuda()
-v = Variable(torch.rand((rank, n)), requires_grad=True).cuda()
-result1 = krylov_transpose_multiply(subdiag, v, u)
-Ks = [krylov_construct(A, v.data.cpu().numpy()[i], n) for i in range(rank)]
-result2 = np.stack([u.data.cpu().numpy() @ K.T for K in Ks]).swapaxes(0, 1).squeeze()
-np.allclose(result1.data.cpu().numpy(), result2)
+def test():
+    m = 12
+    n = 1<<m
+    batch_size = 512
+    rank = 3
+    subdiag = Variable(torch.rand(n-1), requires_grad=True).cuda()
+    A = np.diag(subdiag.data.cpu().numpy(), -1)
+    u = Variable(torch.rand((batch_size, n)), requires_grad=True).cuda()
+    v = Variable(torch.rand((rank, n)), requires_grad=True).cuda()
+    result1 = krylov_transpose_multiply(subdiag, v, u)
+    Ks = [krylov_construct(A, v.data.cpu().numpy()[i], n) for i in range(rank)]
+    result2 = np.stack([u.data.cpu().numpy() @ K.T for K in Ks]).swapaxes(0, 1).squeeze()
+    # np.allclose(result1.data.cpu().numpy(), result2)
+    print(np.max(abs(result1.data.cpu().numpy() - result2)))
+    print(np.mean(abs(result1.data.cpu().numpy() - result2)))
 
-a = Variable(torch.rand(3, 4, 8).cuda(), requires_grad=True)
-# b_re, b_im = fft.autograd.Fft(a)
-b_re, b_im = fft.rfft(a.data)
+    a = Variable(torch.rand(3, 4, 8).cuda(), requires_grad=True)
+    # b_re, b_im = fft.autograd.Fft(a)
+    b_re, b_im = fft.rfft(a.data)
 
-b = b_re.cpu().numpy() + 1j * b_im.cpu().numpy()
-b_np = np.fft.rfft(a.cpu().numpy())
-np.allclose(b, b_np)
+    b = b_re.cpu().numpy() + 1j * b_im.cpu().numpy()
+    b_np = np.fft.rfft(a.cpu().numpy())
+    np.allclose(b, b_np)
+
+    temp = Variable(torch.zeros_like(a.data))
+    temp[0] = a[0]
+    s = temp.sum()
+    from torch import autograd
+    g = autograd.grad(s, a)
