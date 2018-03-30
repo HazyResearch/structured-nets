@@ -95,7 +95,7 @@ result2 = K.T @ u
 np.allclose(result1, result2)
 
 # Test batch transpose multiply with rank >= 2
-m = 12
+m = 14
 n = 1<<m
 batch_size = 100
 rank = 3
@@ -109,5 +109,22 @@ resolvent_bilinear_flattened = create(n, m, lib='fftw')
 result = resolvent_bilinear_flattened(A, v[0], u[10], n, m)
 np.allclose(result1[10, 0], result)
 Ks = [krylov_construct(A, v[i], n) for i in range(rank)]
-result2 = np.stack([u @ K.T for K in Ks]).swapaxes(0, 1)
+result2 = np.stack([u @ K.T for K in Ks]).swapaxes(0, 1).squeeze()
+np.allclose(result1, result2)
+
+# Test batch non-transpose multiply with rank >= 2
+m = 14
+n = 1<<m
+batch_size = 100
+# batch_size = 1
+rank = 3
+# rank = 2
+subdiag = np.random.random(n-1)
+A = np.diag(subdiag, -1)
+u = np.random.random((batch_size, n))
+v = np.random.random((rank, n))
+krylov_multiply = KrylovMultiply(n, batch_size, rank)
+result1 = krylov_multiply(subdiag, v, u)
+Ks = [krylov_construct(A, v[i], n) for i in range(rank)]
+result2 = np.stack([u @ K for K in Ks]).swapaxes(0, 1).squeeze()
 np.allclose(result1, result2)
