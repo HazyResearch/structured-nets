@@ -277,13 +277,13 @@ class KrylovMultiply():
 
     def plan_ffts_backward(self):
         n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
-        self.dT_storage = np.empty((m + 1, batch_size, rank * 2, n))  # One extra array to store final result of backward pass
-        self.dT_f_storage = [np.empty((batch_size, rank * 2, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.dT_storage = np.empty((m + 1, batch_size, 1 + rank, n))  # One extra array to store final result of backward pass
+        self.dT_f_storage = [np.empty((batch_size, 1 + rank, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
         self.dS_f_storage = [np.empty((batch_size, rank, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
         self.dS_storage = np.empty((m, batch_size, rank, n))
         self.ffts_backward_pass = []
         for d, (dT, dT_f, dS_f, dS) in enumerate(zip(self.dT_storage, self.dT_f_storage, self.dS_f_storage, self.dS_storage)):
-            dT = dT.reshape((batch_size, rank * 2, 1 << d, 1 << (m - d)))
+            dT = dT.reshape((batch_size, 1 + rank, 1 << d, 1 << (m - d)))
             dS = dS.reshape((batch_size, rank, 1 << d, 1 << (m - d)))
             self.ffts_backward_pass.append((self.pyfftw_ihfft(dT, dT_f), self.pyfftw_hfft(dS_f, dS)))
 
@@ -355,35 +355,35 @@ class KrylovMultiply():
     def __call__(self, subdiag, v, w):
         n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
         self.forward(subdiag, v)
-        w, v = w.reshape(batch_size, 1, 1, n), v.reshape((1, rank, n, 1))
+        w, v = w.reshape(batch_size, 1, n), v.reshape((1, rank, n, 1))
         # We can ignore dT[2] and dT[3] because they start at zero and always stay zero.
         # We can check this by static analysis of the code or by math.
-        dT = self.dT_storage[0].reshape((batch_size, rank * 2, 1, n))
-        dT[:, :rank], dT[:, rank:] = w[:, :, :, ::-1], 0.0
+        dT = self.dT_storage[0].reshape((batch_size, 1 + rank, 1, n))
+        dT[:, 0], dT[:, 1:] = w[:, :, ::-1], 0.0
 
         for d in range(m):
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            dT = self.dT_storage[d].reshape((batch_size, rank * 2, n1, 2 * n2))
+            dT = self.dT_storage[d].reshape((batch_size, 1 + rank, n1, 2 * n2))
             dT_f = self.dT_f_storage[d]
             dS_f = self.dS_f_storage[d]
             dS = self.dS_storage[d].reshape((batch_size, rank, n1, 2 * n2))
             fft_time2freq, fft_freq2time = self.ffts_backward_pass[d]
-            dT_next = self.dT_storage[d + 1].reshape(batch_size, rank * 2, 2 * n1, n2)
+            dT_next = self.dT_storage[d + 1].reshape(batch_size, 1 + rank, 2 * n1, n2)
 
-            dT_00, dT_01 = dT[:, :rank], dT[:, rank:]
-            dS_00, dS_01 = dT_next[:, :rank], dT_next[:, rank:]
+            dT_00, dT_01 = dT[:, 0], dT[:, 1:]
+            dS_00, dS_01 = dT_next[:, 0], dT_next[:, 1:]
 
-            dS_00[:, :, ::2] = dT_00[:, :, :, n2:]
-            dS_00[:, :, 1::2] = dT_00[:, :, :, n2:]
+            dS_00[:, ::2] = dT_00[:, :, n2:]
+            dS_00[:, 1::2] = dT_00[:, :, n2:]
             dS_01[:, :, ::2] = dT_01[:, :, :, n2:]
             dT *= subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
             dT_f = fft_time2freq(dT, output_array=dT_f)
-            dT_00_f, dT_01_f = dT_f[:, :rank], dT_f[:, rank:]
+            dT_00_f, dT_01_f = dT_f[:, 0], dT_f[:, 1:]
 
             dS1_01_f  = dS_f
             S0_10_f, S0_11_f = self.save_for_backward[d]
-            dS1_01_f[:] = S0_10_f[np.newaxis] * dT_00_f
+            dS1_01_f[:] = S0_10_f[np.newaxis] * dT_00_f[:, np.newaxis]
             dS1_01_f += S0_11_f * dT_01_f
 
             dS1_01 = fft_freq2time(dS_f, output_array=dS)
@@ -396,6 +396,6 @@ class KrylovMultiply():
             # 7m+1, but the FFT calls are no longer on the same dimension. It's
             # probably annoying to do and not worth it.
 
-        du = (dT_next[:, :rank] * v + dT_next[:, rank:]).squeeze()
+        du = (dT_next[:, [0]] * v + dT_next[:, 1:]).squeeze()
         # du = (w[0] * v + dT_next[1]).squeeze()
         return du
