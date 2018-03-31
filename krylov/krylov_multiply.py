@@ -1,4 +1,4 @@
-from triextrafat import *
+import functools
 import numpy as np
 
 import torch
@@ -7,6 +7,8 @@ import pytorch_fft.fft as fft
 
 Rfft = fft.autograd.Rfft()
 Irfft = fft.autograd.Irfft()
+
+from triextrafat import krylov_construct
 
 def complex_mult(X, Y):
     X_re, X_im = X
@@ -77,7 +79,7 @@ def krylov_transpose_multiply(subdiag, v, u):
 def test():
     m = 12
     n = 1<<m
-    batch_size = 100
+    batch_size = 512
     rank = 3
     subdiag = Variable(torch.rand(n-1), requires_grad=True).cuda()
     A = np.diag(subdiag.data.cpu().numpy(), -1)
@@ -94,11 +96,18 @@ def test():
     Ks_pytorch = [Variable(torch.Tensor(K)).cuda() for K in Ks]
     result3 = torch.stack([u @ K.t() for K in Ks_pytorch])
     result3 = result3.data.cpu().numpy().swapaxes(0, 1).squeeze()
+    # Explicit construction on GPU
+    linear_fn = functools.partial(shift_subdiag, subdiag)
+    Ks_gpu = [Krylov(linear_fn, v_) for v_ in v]
+    result4 = torch.stack([u @ K for K in Ks_gpu])
+    result4 = result4.data.cpu().numpy().swapaxes(0, 1).squeeze()
     # np.allclose(result1, result2)
     print(np.max(abs(result1 - result2)))
     print(np.mean(abs(result1 - result2)))
     print(np.max(abs(result3 - result2)))
     print(np.mean(abs(result3 - result2)))
+    print(np.max(abs(result4 - result2)))
+    print(np.mean(abs(result4 - result2)))
 
     a = Variable(torch.rand(3, 4, 8).cuda(), requires_grad=True)
     # b_re, b_im = fft.autograd.Fft(a)
@@ -113,3 +122,18 @@ def test():
     s = temp.sum()
     from torch import autograd
     g = autograd.grad(s, a)
+
+def shift(v, f=1):
+    return torch.cat((f * v[[v.size(0) - 1]], v[:-1]))
+
+def shift_subdiag(subdiag, v, f=0.0):
+    return torch.cat((f * v[[v.size(0) - 1]], subdiag * v[:-1]))
+
+def Krylov(linear_map, v, n=None):
+    if n is None:
+        n = v.size(0)
+    cols = [v]
+    for _ in range(n - 1):
+        v = linear_map(v)
+        cols.append(v)
+    return torch.stack(cols, dim=-1)
