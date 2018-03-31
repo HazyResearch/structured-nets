@@ -84,11 +84,21 @@ def test():
     u = Variable(torch.rand((batch_size, n)), requires_grad=True).cuda()
     v = Variable(torch.rand((rank, n)), requires_grad=True).cuda()
     result1 = krylov_transpose_multiply(subdiag, v, u)
+    result1 = result1.data.cpu().numpy()
+    # CPU dense multiply
     Ks = [krylov_construct(A, v.data.cpu().numpy()[i], n) for i in range(rank)]
-    result2 = np.stack([u.data.cpu().numpy() @ K.T for K in Ks]).swapaxes(0, 1).squeeze()
-    # np.allclose(result1.data.cpu().numpy(), result2)
-    print(np.max(abs(result1.data.cpu().numpy() - result2)))
-    print(np.mean(abs(result1.data.cpu().numpy() - result2)))
+    u_cpu = u.data.cpu().numpy()
+    result2 = np.stack([u_cpu @ K.T for K in Ks])
+    result2 = result2.swapaxes(0, 1).squeeze()
+    # GPU dense multiply
+    Ks_pytorch = [Variable(torch.Tensor(K)).cuda() for K in Ks]
+    result3 = torch.stack([u @ K.t() for K in Ks_pytorch])
+    result3 = result3.data.cpu().numpy().swapaxes(0, 1).squeeze()
+    # np.allclose(result1, result2)
+    print(np.max(abs(result1 - result2)))
+    print(np.mean(abs(result1 - result2)))
+    print(np.max(abs(result3 - result2)))
+    print(np.mean(abs(result3 - result2)))
 
     a = Variable(torch.rand(3, 4, 8).cuda(), requires_grad=True)
     # b_re, b_im = fft.autograd.Fft(a)
