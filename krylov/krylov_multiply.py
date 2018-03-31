@@ -13,7 +13,6 @@ def complex_mult(X, Y):
     Y_re, Y_im = Y
     return (X_re * Y_re - X_im * Y_im, X_re * Y_im + X_im * Y_re)
 
-
 def krylov_transpose_multiply(subdiag, v, u):
     """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
     """
@@ -31,25 +30,57 @@ def krylov_transpose_multiply(subdiag, v, u):
     for d in range(m)[::-1]:
         n1, n2 = 1 << d, 1 << (m - d - 1)
         S_00, S_01, S_10, S_11 = T_00_prev, T_01_prev, T_10_prev, T_11_prev
+        # S = Variable(torch.zeros((rank + 1 + batch_size + 1, n1, 2 * n2)).cuda())
+        # S[:rank, :, :n2] = S_10[:, ::2]
+        # S[rank+1:rank+1+batch_size, :, :n2] = S_01[:, 1::2]
+        # S[rank, :, :n2] = S_11[::2]
+        # S[-1, :, :n2] = S_11[1::2]
+        # S0_10, S0_11, S1_01, S1_11 = S[:rank], S[rank], S[rank+1:rank+1+batch_size], S[-1]
+        # S0_10 = Variable(torch.zeros((rank, n1, 2 * n2)).cuda())
+        # S0_10[:, :, :n2] = S_10[:, ::2]
+        # S1_01 = Variable(torch.zeros((batch_size, n1, 2 * n2)).cuda())
+        # S1_01[:, :, :n2] = S_01[:, 1::2]
+        # S0_11 = Variable(torch.zeros((n1, 2 * n2)).cuda())
+        # S0_11[:, :n2] = S_11[::2]
+        # S1_11 = Variable(torch.zeros((n1, 2 * n2)).cuda())
+        # S1_11[:, :n2] = S_11[1::2]
         S0_10 = torch.cat((S_10[:, ::2], torch.zeros_like(S_10[:, ::2])), dim=2)
         S1_01 = torch.cat((S_01[:, 1::2], torch.zeros_like(S_01[:, 1::2])), dim=2)
         S0_11 = torch.cat((S_11[::2], torch.zeros_like(S_11[::2])), dim=1)
         S1_11 = torch.cat((S_11[1::2], torch.zeros_like(S_11[1::2])), dim=1)
+        S = torch.cat((S0_10, S0_11[np.newaxis], S1_01, S1_11[np.newaxis]))
 
         # polynomial multiplications
-        S0_10_f, S0_11_f, S1_01_f, S1_11_f = Rfft(S0_10), Rfft(S0_11), Rfft(S1_01), Rfft(S1_11)
-        S1_01_f_re, S1_01_f_im = S1_01_f
-        S0_10_f_re, S0_10_f_im = S0_10_f
+        S_f_re, S_f_im = Rfft(S)
+        S0_10_f_re, S0_11_f_re, S1_01_f_re, S1_11_f_re = S_f_re[:rank], S_f_re[rank], S_f_re[rank+1:rank+1+batch_size], S_f_re[-1]
+        S0_10_f_im, S0_11_f_im, S1_01_f_im, S1_11_f_im = S_f_im[:rank], S_f_im[rank], S_f_im[rank+1:rank+1+batch_size], S_f_im[-1]
+        S1_01_f = (S1_01_f_re, S1_01_f_im)
+        S0_11_f = (S0_11_f_re, S0_11_f_im)
+        S1_11_f = (S1_11_f_re, S1_11_f_im)
+        S0_10_f = (S0_10_f_re, S0_10_f_im)
+        # S0_10_f, S0_11_f, S1_01_f, S1_11_f = Rfft(S0_10), Rfft(S0_11), Rfft(S1_01), Rfft(S1_11)
+        # S1_01_f_re, S1_01_f_im = S1_01_f
+        # S0_10_f_re, S0_10_f_im = S0_10_f
         T_00_f = complex_mult((S1_01_f_re[:, np.newaxis], S1_01_f_im[:, np.newaxis]), (S0_10_f_re[np.newaxis], S0_10_f_im[np.newaxis]))
         T_01_f = complex_mult(S1_01_f, S0_11_f)
         T_10_f = complex_mult(S1_11_f, S0_10_f)
         T_11_f = complex_mult(S1_11_f, S0_11_f)
 
-        T_00, T_01, T_10, T_11 = Irfft(*T_00_f), Irfft(*T_01_f), Irfft(*T_10_f), Irfft(*T_11_f)
-        T_00 = T_00 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
-        T_01 = T_01 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
-        T_10 = T_10 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
-        T_11 = T_11 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        temp1_re = torch.cat((T_00_f[0], T_01_f[0][:, np.newaxis]), dim=1)
+        temp2_re = torch.cat((T_10_f[0], T_11_f[0][np.newaxis]))
+        T_f_re = torch.cat((temp1_re, temp2_re[np.newaxis]))
+        temp1_im = torch.cat((T_00_f[1], T_01_f[1][:, np.newaxis]), dim=1)
+        temp2_im = torch.cat((T_10_f[1], T_11_f[1][np.newaxis]))
+        T_f_im = torch.cat((temp1_im, temp2_im[np.newaxis]))
+
+        T = Irfft(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
+
+        # T_00, T_01, T_10, T_11 = Irfft(*T_00_f), Irfft(*T_01_f), Irfft(*T_10_f), Irfft(*T_11_f)
+        # T_00 = T_00 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        # T_01 = T_01 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        # T_10 = T_10 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        # T_11 = T_11 * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
         # polynomial additions
         T_00 = torch.cat((T_00[:, :, :, :n2], T_00[:, :, :, n2:] + S_00[:, :, ::2] + S_00[:, :, 1::2]), dim=-1)
@@ -65,7 +96,7 @@ def krylov_transpose_multiply(subdiag, v, u):
 def test():
     m = 12
     n = 1<<m
-    batch_size = 512
+    batch_size = 100
     rank = 3
     subdiag = Variable(torch.rand(n-1), requires_grad=True).cuda()
     A = np.diag(subdiag.data.cpu().numpy(), -1)
