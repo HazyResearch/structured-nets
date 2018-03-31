@@ -119,10 +119,10 @@ batch_size = 100
 rank = 3
 subdiag = np.random.random(n-1)
 A = np.diag(subdiag, -1)
-u = np.random.random((batch_size, n))
+w = np.random.random((batch_size, rank, n))
 v = np.random.random((rank, n))
 krylov_multiply = KrylovMultiply(n, batch_size, rank)
-result1 = krylov_multiply(subdiag, v, u)
+result1 = krylov_multiply(subdiag, v, w)
 Ks = [krylov_construct(A, v[i], n) for i in range(rank)]
-result2 = np.stack([u @ K for K in Ks]).swapaxes(0, 1).squeeze()
+result2 = np.stack([w[:, i] @ Ks[i] for i in range(rank)]).swapaxes(0, 1).squeeze().sum(axis=1)
 np.allclose(result1, result2)
