@@ -28,6 +28,8 @@ parser.add_argument('--mom', type=float) # Momentum
 parser.add_argument('--test', type=int) # Test on test set
 parser.add_argument('--layer_size', type=int) # Size of hidden layer
 parser.add_argument('--transform') # Any transform of dataset, e.g. grayscale
+parser.add_argument('--torch') # Pytorch or TF
+parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 args = parser.parse_args()
 
 # Fixed params
@@ -57,7 +59,8 @@ log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
 results_dir = os.path.join(out_dir, 'results', args.result_dir) 
 checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
 
-dataset = Dataset(args.dataset, args.layer_size, steps, args.transform, stochastic_train, test_size, train_size, args.test)
+dataset = Dataset(args.dataset, args.layer_size, steps, args.transform, 
+	stochastic_train, test_size, train_size, args.test)
 n_diag_learned = dataset.input_size - 1
 commit_id = get_commit_id()
 methods = args.methods.split(',')
@@ -65,12 +68,13 @@ methods = args.methods.split(',')
 print('Testing methods: ', methods)
 
 for method in methods:
-	params = ModelParams(args.dataset, args.transform, args.test, log_path, dataset.input_size, args.layer_size, 
-			dataset.out_size(), num_layers, loss, args.r, steps, batch_size, 
-			args.lr, args.mom, init_type, method, learn_corner, 
-			n_diag_learned, init_stddev, fix_G, check_disp, checkpoint_freq, 
-			checkpoint_path, test_freq, verbose, args.decay_rate, decay_freq, learn_diagonal, 
-			fix_A_identity, stochastic_train, flip_K_B, num_conv_layers)
+	params = ModelParams(args.dataset, args.transform, args.test, log_path, 
+			dataset.input_size, args.layer_size, dataset.out_size(), num_layers, 
+			loss, args.r, steps, batch_size, args.lr, args.mom, init_type, 
+			method, learn_corner, n_diag_learned, init_stddev, fix_G, 
+			check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose, 
+			args.decay_rate, decay_freq, learn_diagonal, fix_A_identity, 
+			stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model)
 
 	# Save params + git commit ID
 	this_results_dir = params.save(results_dir, args.name + '_' + method, commit_id)
@@ -83,7 +87,8 @@ for method in methods:
 
 		print('Tensorboard log path: ', params.log_path)
 		print('Tensorboard checkpoint path: ', params.checkpoint_path)
-		os.makedirs(params.checkpoint_path)
+		if not os.path.exists(params.checkpoint_path):
+			os.makedirs(params.checkpoint_path)
 
 		losses, accuracies = optimize(dataset, params)
 		tf.reset_default_graph()

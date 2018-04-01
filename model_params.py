@@ -7,11 +7,13 @@ class ModelParams:
 			lr, mom, init_type, class_type, learn_corner, n_diag_learned, 
 			init_stddev, fix_G, check_disp, checkpoint_freq, checkpoint_path, 
 			test_freq, verbose, decay_rate, decay_freq, learn_diagonal, 
-			fix_A_identity, stochastic_train, flip_K_B, num_conv_layers):
+			fix_A_identity, stochastic_train, flip_K_B, num_conv_layers, 
+			torch, model):
 		if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner']:
 			print 'Class type ' + class_type + ' not supported'
 			assert 0
 		self.dataset_name = dataset_name
+		# grayscale
 		self.transform = transform
 		self.test = test
 		self.log_path = log_path
@@ -46,27 +48,40 @@ class ModelParams:
 		self.stochastic_train = stochastic_train
 		self.flip_K_B = flip_K_B
 		self.num_conv_layers = num_conv_layers
+		self.torch = torch
+		self.model = model
 		# c1_filters, c1_ksize, p1_size, p1_strides, c2_filters, c2_ksize, p2_size, p2_strides 
 		self.set_cnn_params()
 
 
 	def set_cnn_params(self):
 		cnn_params = {}
-		cnn_params['c1_ksize'] = 5
-		cnn_params['p1_size'] = 2
-		cnn_params['p1_strides'] = 2 
-		cnn_params['c2_ksize'] = 5
-		cnn_params['p2_size'] = 2
-		cnn_params['p2_strides'] = 2
 		if self.dataset_name.startswith('mnist_noise') or self.dataset_name == 'norb':
+			cnn_params['c1_ksize'] = 5
+			cnn_params['p1_size'] = 2
+			cnn_params['p1_strides'] = 2 
+			cnn_params['c2_ksize'] = 5
+			cnn_params['p2_size'] = 2
+			cnn_params['p2_strides'] = 2
 			cnn_params['c1_filters'] = 6
 			cnn_params['c2_filters'] = 16
 			cnn_params['p2_flat_size'] = 7 * 7 * cnn_params['c2_filters']
+			self.cnn_params = cnn_params
 			
 		elif self.dataset_name == 'cifar10':
+			cnn_params['c1_ksize'] = 5
+			cnn_params['p1_size'] = 2
+			cnn_params['p1_strides'] = 2 
+			cnn_params['c2_ksize'] = 5
+			cnn_params['p2_size'] = 2
+			cnn_params['p2_strides'] = 2
 			cnn_params['c1_filters'] = 6
 			cnn_params['c2_filters'] = 16
 			cnn_params['p2_flat_size'] = 8 * 8 * cnn_params['c2_filters']
+			self.cnn_params = cnn_params
+		
+		elif self.dataset_name.startswith('true'):
+			self.cnn_params = cnn_params
 		#elif self.dataset_name.startswith('norb'):
 		#	cnn_params['c1_filters'] = 9
 		#	cnn_params['c2_filters'] = 9
@@ -79,7 +94,6 @@ class ModelParams:
 			print 'dataset_name not supported: ', self.dataset_name
 			assert 0
 
-		self.cnn_params = cnn_params
 
 
 	def save(self, results_dir, name, commit_id):
