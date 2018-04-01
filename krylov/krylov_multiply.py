@@ -89,7 +89,8 @@ def krylov_transpose_multiply(subdiag, v, u):
     T_00 = u[:, np.newaxis, ..., np.newaxis] * v[np.newaxis, ..., np.newaxis]
     T_01 = u[..., np.newaxis]
     T_10 = v[..., np.newaxis]
-    T_11 = Variable(torch.ones((n, 1))).cuda()
+    # T_11 = Variable(torch.ones((n, 1))).cuda()
+    T_11 = Variable(torch.cuda.FloatTensor(n, 1).fill_(1.0))
     for d in range(m)[::-1]:
         n1, n2 = 1 << d, 1 << (m - d - 1)
         S_00, S_01, S_10, S_11 = T_00, T_01, T_10, T_11
@@ -149,19 +150,21 @@ def krylov_multiply_by_autodiff(subdiag, v, w):
     m = int(np.log2(n))
     assert n == 1 << m, 'n must be a power of 2'
 
-    u = Variable(torch.zeros((batch_size, n)).cuda(), requires_grad=True)
+    # u = Variable(torch.zeros((batch_size, n)).cuda(), requires_grad=True)
+    u = Variable(torch.cuda.FloatTensor(batch_size, n).fill_(0.0), requires_grad=True)
     prod = krylov_transpose_multiply(subdiag, v, u)
     result, = torch.autograd.grad(prod, u, grad_outputs=w, retain_graph=True)
     return result
 
 def krylov_multiply_forward(subdiag, v):
-    rank_, n = v.shape
+    rank, n = v.shape
     m = int(np.log2(n))
     assert n == 1 << m, 'n must be a power of 2'
 
     save_for_backward = [None] * m
     T_10 = v[..., np.newaxis]
-    T_11 = Variable(torch.ones((n, 1))).cuda()
+    # T_11 = Variable(torch.ones((n, 1))).cuda()
+    T_11 = Variable(torch.cuda.FloatTensor(n, 1).fill_(1.0))
     for d in range(m)[::-1]:
         n1, n2 = 1 << d, 1 << (m - d - 1)
         S_10, S_11 = T_10, T_11
@@ -212,15 +215,15 @@ def krylov_multiply(subdiag, v, w):
     save_for_backward = krylov_multiply_forward(subdiag, v)
     reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
     w = w.view(batch_size, rank, 1, n)
-    dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.zeros((batch_size, 1, n)).cuda())
+    # dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.zeros((batch_size, 1, n)).cuda())
+    dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.cuda.FloatTensor(batch_size, 1, n).fill_(0.0))
 
     for d in range(m):
         n1, n2 = 1 << d, 1 << (m - d - 1)
-        # Maybe use torch.repeat or torch.expand here
-        dS_00 = Variable(torch.Tensor(batch_size, rank, 2 * n1, n2).cuda())
+        dS_00 = Variable(torch.cuda.FloatTensor(batch_size, rank, 2 * n1, n2))
         dS_00[:, :, ::2] = dT_00[:, :, :, n2:]
         dS_00[:, :, 1::2] = dT_00[:, :, :, n2:]
-        dS_01 = Variable(torch.Tensor(batch_size, 2 * n1, n2).cuda())
+        dS_01 = Variable(torch.cuda.FloatTensor(batch_size, 2 * n1, n2))
         dS_01[:, ::2] = dT_01[:, :, n2:]
 
         dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
