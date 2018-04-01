@@ -5,9 +5,121 @@ import torch
 from torch.autograd import Variable
 import pytorch_fft.fft as fft
 
+import cupy as cp
+from cupy.cuda import cufft
+
+CUPY_MEM = cp.ndarray((1, ), dtype='float32').data.mem
 
 from triextrafat import krylov_construct
 # from triXXF import KrylovTransposeMultiply
+
+def torch_to_cupy(tensor):
+    '''Super hacky way to convert torch.cuda.FloatTensor to CuPy array.
+    Probably not safe, since we're manipulating GPU memory addresses directly.
+    '''
+    assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
+    # assert tensor.is_contiguous(), 'Input must be contiguous'
+    offset = tensor.data_ptr() - CUPY_MEM.ptr
+    array_mem = cp.cuda.memory.MemoryPointer(CUPY_MEM, offset)
+    array = cp.ndarray(tensor.shape, dtype='float32', memptr=array_mem)
+    array._strides = [4 * s for s in tensor.stride()]
+    return array
+
+def complex_multiply_cupy(X, Y):
+    '''X and Y are complex64 tensors but stored as torch.cuda.FloatTensor.
+    The even indices represent the real part and odd indices represent imaginary parts.
+    '''
+    assert isinstance(X, torch.cuda.FloatTensor) and isinstance(Y, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
+    assert X.shape[-1] % 2 == 0 and Y.shape[-1] % 2 == 0, 'Last dimension must be even'
+    X_cp, Y_cp = torch_to_cupy(X), torch_to_cupy(Y)
+    X_complex, Y_complex = X_cp.view('complex64'), Y_cp.view('complex64')
+    out = torch.cuda.FloatTensor(*cp.broadcast(X_cp, Y_cp).shape)
+    out_complex = torch_to_cupy(out).view('complex64')
+    cp.multiply(X_complex, Y_complex, out_complex)
+    return out
+
+def rfft(X):
+    assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
+    assert X.is_contiguous(), 'Input must be contiguous'
+    fft_type = cufft.CUFFT_R2C
+    direction = cufft.CUFFT_FORWARD
+    plan = cufft.Plan1d(X.shape[-1], fft_type, X.numel() // X.shape[-1])
+    out_shape = X.shape[:-1] + (2 * (X.shape[-1] // 2 + 1),)
+    out = torch.cuda.FloatTensor(*out_shape)
+    cufft.execR2C(plan.plan, X.data_ptr(), out.data_ptr())
+    return out
+
+def irfft(X, norm=True):
+    # TODO: Maybe support out_size because Rfft backward might need it for odd size input.
+    assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
+    assert X.is_contiguous(), 'Input must be contiguous'
+    assert X.shape[-1] % 2 == 0, 'Last dimension must be even'
+    fft_type = cufft.CUFFT_C2R
+    direction = cufft.CUFFT_INVERSE
+    out_size = (X.shape[-1] // 2 - 1) * 2
+    plan = cufft.Plan1d(out_size, fft_type, X.numel() // X.shape[-1])
+    out_shape = X.shape[:-1] + (out_size,)
+    out = torch.cuda.FloatTensor(*out_shape)
+    cufft.execC2R(plan.plan, X.data_ptr(), out.data_ptr())
+    if norm:
+        out /= out_size
+    return out
+
+def ihfft(X):
+    # np.fft.ihfft is the same as np.fft.rfft().conj() / n
+    n = X.shape[-1]
+    out = rfft(X)
+    out_cp = torch_to_cupy(out).view('complex64')
+    cp.conj(out_cp, out=out_cp)
+    out /= n
+    return out
+
+def hfft(X):
+    # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
+    n = (X.shape[-1] // 2 - 1) * 2
+    X_conj = torch.cuda.FloatTensor(*X.shape)
+    X_cp, X_conj_cp = torch_to_cupy(X).view('complex64'), torch_to_cupy(X_conj).view('complex64')
+    cp.conj(X_cp, out=X_conj_cp)
+    return irfft(X_conj, norm=False)
+
+class Rfft_fast(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X):
+        return rfft(X.contiguous())
+
+    @staticmethod
+    def backward(ctx, grad):
+        return hfft(grad.contiguous())
+
+class Irfft_fast(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X):
+        return irfft(X.contiguous())
+
+    @staticmethod
+    def backward(ctx, grad):
+        return hfft(grad.contiguous())
+
+class ComplexMult(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X, Y):
+        ctx.save_for_backward(X, Y)
+        return complex_multiply_cupy(X, Y)
+
+    @staticmethod
+    def backward(ctx, grad):
+        X, Y = ctx.saved_tensors
+        # There's probably a better way to do this, maybe define a Conjugate function
+        X_conj = torch.cuda.FloatTensor(*X.shape)
+        X_cp, X_conj_cp = torch_to_cupy(X).view('complex64'), torch_to_cupy(X_conj).view('complex64')
+        cp.conj(X_cp, out=X_conj_cp)
+        Y_conj = torch.cuda.FloatTensor(*Y.shape)
+        Y_cp, Y_conj_cp = torch_to_cupy(Y).view('complex64'), torch_to_cupy(Y_conj).view('complex64')
+        cp.conj(Y_cp, out=Y_conj_cp)
+        return Variable(complex_multiply_cupy(grad.data, Y_conj)), Variable(complex_multiply_cupy(grad.data, X_conj))
 
 class Rfft(torch.autograd.Function):
     def forward(self, X_re):
@@ -120,6 +232,62 @@ def krylov_transpose_multiply(subdiag, v, u):
                             torch.cat((T_10_f_im[np.newaxis], T_11_f_im[np.newaxis, np.newaxis]), dim=1)))
 
         T = Irfft()(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
+
+        # polynomial additions
+        T_00 = torch.cat((T_00[:, :, :, :n2], T_00[:, :, :, n2:] + S_00[:, :, ::2] + S_00[:, :, 1::2]), dim=-1)
+        T_01 = torch.cat((T_01[:, :, :n2], T_01[:, :, n2:] + S_01[:, ::2]), dim=-1)
+        T_10 = torch.cat((T_10[:, :, :n2], T_10[:, :, n2:] + S_10[:, 1::2]), dim=-1)
+
+    # Negative step isn't supported by Pytorch
+    # (https://github.com/pytorch/pytorch/issues/229) so we have to construct
+    # the index explicitly.
+    # reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
+    reverse_index = torch.arange(n - 1, -1, -1, out=torch.cuda.LongTensor())
+    return T_00[:, :, :, reverse_index].squeeze(dim=2)
+
+
+def krylov_transpose_multiply_fast(subdiag, v, u):
+    """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
+    Parameters:
+        subdiag: Tensor of shape (n - 1, )
+        v: Tensor of shape (rank, n)
+        u: Tensor of shape (batch_size, n)
+    Returns:
+        product: Tensor of shape (batch_size, rank, n)
+    """
+    batch_size, n = u.shape
+    rank, n_ = v.shape
+    assert n == n_, 'u and v must have the same last dimension'
+    m = int(np.log2(n))
+    assert n == 1 << m, 'n must be a power of 2'
+
+    T_00 = u[:, np.newaxis, ..., np.newaxis] * v[np.newaxis, ..., np.newaxis]
+    T_01 = u[..., np.newaxis]
+    T_10 = v[..., np.newaxis]
+    # T_11 = Variable(torch.ones((n, 1))).cuda()
+    T_11 = Variable(torch.cuda.FloatTensor(n, 1).fill_(1.0))
+    for d in range(m)[::-1]:
+        n1, n2 = 1 << d, 1 << (m - d - 1)
+        S_00, S_01, S_10, S_11 = T_00, T_01, T_10, T_11
+        S0_10 = torch.cat((S_10[:, ::2], torch.zeros_like(S_10[:, ::2])), dim=-1)
+        S1_01 = torch.cat((S_01[:, 1::2], torch.zeros_like(S_01[:, 1::2])), dim=-1)
+        S0_11 = torch.cat((S_11[::2], torch.zeros_like(S_11[::2])), dim=-1)
+        S1_11 = torch.cat((S_11[1::2], torch.zeros_like(S_11[1::2])), dim=-1)
+        S = torch.cat((S0_10, S0_11[np.newaxis], S1_01, S1_11[np.newaxis]))
+
+        # polynomial multiplications
+        S_f = Rfft_fast.apply(S)
+        S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
+        T_00_f = ComplexMult.apply(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        T_01_f = ComplexMult.apply(S1_01_f, S0_11_f)
+        T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
+        T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
+
+        T_f = torch.cat((torch.cat((T_00_f, T_01_f[:, np.newaxis]), dim=1),
+                         torch.cat((T_10_f[np.newaxis], T_11_f[np.newaxis, np.newaxis]), dim=1)))
+
+        T = Irfft_fast.apply(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
 
         # polynomial additions
@@ -263,6 +431,8 @@ def test_tranpose_multiply():
     A = np.diag(subdiag.data.cpu().numpy(), -1)
     u = Variable(torch.rand((batch_size, n)), requires_grad=True).cuda()
     v = Variable(torch.rand((rank, n)), requires_grad=True).cuda()
+    result = krylov_transpose_multiply_fast(subdiag, v, u)
+    result = result.data.cpu().numpy()
     result1 = krylov_transpose_multiply(subdiag, v, u)
     result1 = result1.data.cpu().numpy()
     # CPU dense multiply
@@ -280,6 +450,8 @@ def test_tranpose_multiply():
     result4 = torch.stack([u @ K for K in Ks_gpu])
     result4 = result4.data.cpu().numpy().swapaxes(0, 1).squeeze()
     # np.allclose(result1, result2)
+    print(np.max(abs(result - result1)))
+    print(np.mean(abs(result - result1)))
     print(np.max(abs(result1 - result2)))
     print(np.mean(abs(result1 - result2)))
     print(np.max(abs(result3 - result2)))
