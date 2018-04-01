@@ -5,10 +5,55 @@ import torch
 from torch.autograd import Variable
 import pytorch_fft.fft as fft
 
-Rfft = fft.autograd.Rfft()
-Irfft = fft.autograd.Irfft()
 
 from triextrafat import krylov_construct
+# from triXXF import KrylovTransposeMultiply
+
+class Rfft(torch.autograd.Function):
+    def forward(self, X_re):
+        X_re = X_re.contiguous()
+        self._to_save_input_size = X_re.size(-1)
+        return fft.rfft(X_re)
+
+    def backward(self, grad_output_re, grad_output_im):
+        # Clone the array and make contiguous if needed
+        grad_output_re = fft.autograd.contiguous_clone(grad_output_re)
+        grad_output_im = fft.autograd.contiguous_clone(grad_output_im)
+
+        if self._to_save_input_size & 1:
+            grad_output_re[...,1:] /= 2
+        elif self._to_save_input_size > 2:
+            grad_output_re[...,1:-1] /= 2
+
+        if self._to_save_input_size & 1:
+            grad_output_im[...,1:] /= 2
+        elif self._to_save_input_size > 2:
+            grad_output_im[...,1:-1] /= 2
+
+        gr = fft.irfft(grad_output_re,grad_output_im,self._to_save_input_size, normalize=False)
+        return gr
+
+class Irfft(torch.autograd.Function):
+
+    def forward(self, k_re, k_im):
+        k_re, k_im = fft.autograd.make_contiguous(k_re, k_im)
+        return fft.irfft(k_re, k_im)
+
+    def backward(self, grad_output_re):
+        grad_output_re = grad_output_re.contiguous()
+        gr, gi = fft.rfft(grad_output_re)
+
+        N = grad_output_re.size(-1)
+        gr[...,0] /= N
+        if gr.shape[-1] > 2:
+            gr[...,1:-1] /= N/2
+        gr[...,-1] /= N
+
+        gi[...,0] /= N
+        if gi.shape[-1] > 2:
+            gi[...,1:-1] /= N/2
+        gi[...,-1] /= N
+        return gr, gi
 
 def complex_mult(X, Y):
     X_re, X_im = X
@@ -16,7 +61,7 @@ def complex_mult(X, Y):
     return X_re * Y_re - X_im * Y_im, X_re * Y_im + X_im * Y_re
 
 def krylov_transpose_multiply(subdiag, v, u):
-    """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
+    """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
     Parameters:
         subdiag: Tensor of shape (n - 1, )
         v: Tensor of shape (rank, n)
@@ -44,7 +89,7 @@ def krylov_transpose_multiply(subdiag, v, u):
         S = torch.cat((S0_10, S0_11[np.newaxis], S1_01, S1_11[np.newaxis]))
 
         # polynomial multiplications
-        S_f_re, S_f_im = Rfft(S)
+        S_f_re, S_f_im = Rfft()(S)
         S0_10_f_re, S0_11_f_re, S1_01_f_re, S1_11_f_re = S_f_re[:rank], S_f_re[rank], S_f_re[rank+1:rank+1+batch_size], S_f_re[-1]
         S0_10_f_im, S0_11_f_im, S1_01_f_im, S1_11_f_im = S_f_im[:rank], S_f_im[rank], S_f_im[rank+1:rank+1+batch_size], S_f_im[-1]
         S1_01_f = (S1_01_f_re, S1_01_f_im)
@@ -62,7 +107,7 @@ def krylov_transpose_multiply(subdiag, v, u):
         T_f_im = torch.cat((torch.cat((T_00_f_im, T_01_f_im[:, np.newaxis]), dim=1),
                             torch.cat((T_10_f_im[np.newaxis], T_11_f_im[np.newaxis, np.newaxis]), dim=1)))
 
-        T = Irfft(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T = Irfft()(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
 
         # polynomial additions
@@ -75,6 +120,29 @@ def krylov_transpose_multiply(subdiag, v, u):
     # the index explicitly.
     reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
     return T_00[:, :, :, reverse_index].squeeze(dim=2)
+
+
+def krylov_multiply_by_autodiff(subdiag, v, w):
+    """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal, using Pytorch's autodiff.
+    Parameters:
+        subdiag: Tensor of shape (n - 1, )
+        v: Tensor of shape (rank, n)
+        w: Tensor of shape (batch_size, rank, n)
+    Returns:
+        product: Tensor of shape (batch_size, n)
+    """
+    batch_size, rank, n = w.shape
+    rank_, n_ = v.shape
+    assert n == n_, 'w and v must have the same last dimension'
+    assert rank == rank_, 'w and v must have the same rank'
+    m = int(np.log2(n))
+    assert n == 1 << m, 'n must be a power of 2'
+
+    u = Variable(torch.zeros((batch_size, n)).cuda(), requires_grad=True)
+    prod = krylov_transpose_multiply(subdiag, v, u)
+    result, = torch.autograd.grad(prod, u, grad_outputs=w, retain_graph=True)
+    return result
+
 
 def test():
     m = 12
@@ -109,6 +177,18 @@ def test():
     print(np.max(abs(result4 - result2)))
     print(np.mean(abs(result4 - result2)))
 
+    w = Variable(torch.rand((batch_size, rank, n)), requires_grad=True).cuda()
+    result1 = krylov_multiply_by_autodiff(subdiag, v, w)
+    result1 = result1.data.cpu().numpy()
+    # CPU dense multiply
+    Ks = [krylov_construct(A, v.data.cpu().numpy()[i], n) for i in range(rank)]
+    w_cpu = w.data.cpu().numpy()
+    result2 = np.stack([w_cpu[:, i] @ Ks[i] for i in range(rank)]).sum(axis=0)
+    result2 = result2.squeeze()
+    np.allclose(result1, result2)
+    print(np.max(abs(result1 - result2)))
+    print(np.mean(abs(result1 - result2)))
+
     a = Variable(torch.rand(3, 4, 8).cuda(), requires_grad=True)
     # b_re, b_im = fft.autograd.Fft(a)
     b_re, b_im = fft.rfft(a.data)
@@ -122,6 +202,26 @@ def test():
     s = temp.sum()
     from torch import autograd
     g = autograd.grad(s, a)
+
+    u = Variable(torch.rand((1, 8)), requires_grad=True).cuda()
+    re, im = Rfft(u)
+    t = Irfft(re, im)
+    t1_re, t1_im = Rfft(t)
+
+    grad, = torch.autograd.grad(torch.sum(re), u, retain_graph=True)
+    w = Variable(torch.rand((1, 5)), requires_grad=True).cuda()
+    ggrad = torch.autograd.grad(torch.sum(grad), u)
+    torch.autograd.gradcheck(Rfft, (u, ))
+
+    analytic_grad = fft.irfft(torch.ones_like(re).data, -torch.ones_like(im).data, normalize=False)
+
+    epsilon = 1e-5
+    for i in range(2):
+        one_hot = Variable(torch.zeros_like(u.data))
+        one_hot[0, i] = epsilon
+        u_new = u + one_hot
+        u_new_minus = u - one_hot
+        print((torch.sum(Rfft(u_new)[0]) - torch.sum(Rfft(u_new_minus)[0])) / (2 * epsilon))
 
 def shift(v, f=1):
     return torch.cat((f * v[[v.size(0) - 1]], v[:-1]))
@@ -137,3 +237,9 @@ def Krylov(linear_map, v, n=None):
         v = linear_map(v)
         cols.append(v)
     return torch.stack(cols, dim=-1)
+
+
+if __name__ == "__main__":
+    test()
+
+
