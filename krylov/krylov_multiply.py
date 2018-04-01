@@ -194,7 +194,7 @@ def krylov_multiply_forward(subdiag, v):
     return save_for_backward
 
 def krylov_multiply(subdiag, v, w):
-    """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal, using Pytorch's autodiff.
+    """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal.
     Parameters:
         subdiag: Tensor of shape (n - 1, )
         v: Tensor of shape (rank, n)
@@ -308,6 +308,9 @@ def test_multiply():
     print(np.mean(abs(result - result1)))
     print(np.max(abs(result1 - result2)))
     print(np.mean(abs(result1 - result2)))
+
+    # Combine transpose multiply follow by non-transpose multiply
+    result = krylov_multiply(subdiag, v, krylov_transpose_multiply(subdiag, v, u))
 
 def test_misc():
     a = Variable(torch.rand(3, 4, 8).cuda(), requires_grad=True)
