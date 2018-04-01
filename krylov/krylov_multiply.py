@@ -102,6 +102,26 @@ class Irfft_fast(torch.autograd.Function):
     def backward(ctx, grad):
         return hfft(grad.contiguous())
 
+class Ihfft_fast(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X):
+        return ihfft(X.contiguous())
+
+    @staticmethod
+    def backward(ctx, grad):
+        return irfft(grad.contiguous())
+
+class Hfft_fast(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X):
+        return hfft(X.contiguous())
+
+    @staticmethod
+    def backward(ctx, grad):
+        return rfft(grad.contiguous())
+
 class ComplexMult(torch.autograd.Function):
 
     @staticmethod
@@ -365,6 +385,41 @@ def krylov_multiply_forward(subdiag, v):
 
     return save_for_backward
 
+def krylov_multiply_forward_fast(subdiag, v):
+    rank, n = v.shape
+    m = int(np.log2(n))
+    assert n == 1 << m, 'n must be a power of 2'
+
+    save_for_backward = [None] * m
+    T_10 = v[..., np.newaxis]
+    # T_11 = Variable(torch.ones((n, 1))).cuda()
+    T_11 = Variable(torch.cuda.FloatTensor(n, 1).fill_(1.0))
+    for d in range(m)[::-1]:
+        n1, n2 = 1 << d, 1 << (m - d - 1)
+        S_10, S_11 = T_10, T_11
+        S0_10 = torch.cat((S_10[:, ::2], torch.zeros_like(S_10[:, ::2])), dim=-1)
+        S0_11 = torch.cat((S_11[::2], torch.zeros_like(S_11[::2])), dim=-1)
+        S1_11 = torch.cat((S_11[1::2], torch.zeros_like(S_11[1::2])), dim=-1)
+        S = torch.cat((S0_10, S0_11[np.newaxis], S1_11[np.newaxis]))
+
+        # polynomial multiplications
+        S_f = Rfft_fast.apply(S)
+        S0_10_f, S0_11_f, S1_11_f = S_f[:rank], S_f[-2], S_f[-1]
+        save_for_backward[d] = (S0_10_f, S0_11_f)
+
+        T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
+        T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
+
+        T_f = torch.cat((T_10_f, T_11_f[np.newaxis]))
+
+        T = Irfft_fast.apply(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T_10, T_11 = T[:rank], T[-1]
+
+        # polynomial additions
+        T_10 = torch.cat((T_10[:, :, :n2], T_10[:, :, n2:] + S_10[:, 1::2]), dim=-1)
+
+    return save_for_backward
+
 def krylov_multiply(subdiag, v, w):
     """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal.
     Parameters:
@@ -422,6 +477,55 @@ def krylov_multiply(subdiag, v, w):
     return du
 
 
+def krylov_multiply_fast(subdiag, v, w):
+    """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal.
+    Parameters:
+        subdiag: Tensor of shape (n - 1, )
+        v: Tensor of shape (rank, n)
+        w: Tensor of shape (batch_size, rank, n)
+    Returns:
+        product: Tensor of shape (batch_size, n)
+    """
+    batch_size, rank, n = w.shape
+    rank_, n_ = v.shape
+    assert n == n_, 'w and v must have the same last dimension'
+    assert rank == rank_, 'w and v must have the same rank'
+    m = int(np.log2(n))
+    assert n == 1 << m, 'n must be a power of 2'
+
+    save_for_backward = krylov_multiply_forward_fast(subdiag, v)
+    # reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
+    reverse_index = torch.arange(n - 1, -1, -1, out=torch.cuda.LongTensor())
+    w = w.view(batch_size, rank, 1, n)
+    # dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.zeros((batch_size, 1, n)).cuda())
+    dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.cuda.FloatTensor(batch_size, 1, n).fill_(0.0))
+
+    for d in range(m):
+        n1, n2 = 1 << d, 1 << (m - d - 1)
+        dS_00 = Variable(torch.cuda.FloatTensor(batch_size, rank, 2 * n1, n2))
+        dS_00[:, :, ::2] = dT_00[:, :, :, n2:]
+        dS_00[:, :, 1::2] = dT_00[:, :, :, n2:]
+        dS_01 = Variable(torch.cuda.FloatTensor(batch_size, 2 * n1, n2))
+        dS_01[:, ::2] = dT_01[:, :, n2:]
+
+        dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
+        dT = dT * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+
+        dT_f = Ihfft_fast.apply(dT)
+        dT_00_f, dT_01_f = dT_f[:, :rank], dT_f[:, -1]
+
+        S0_10_f, S0_11_f = save_for_backward[d]
+        dS1_01_f = ComplexMult.apply(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + ComplexMult.apply(S0_11_f, dT_01_f)
+
+        dS1_01 = Hfft_fast.apply(dS1_01_f)
+        dS_01[:, 1::2] = dS1_01[:, :, :n2]
+
+        dT_00, dT_01 = dS_00, dS_01
+
+    du = ((dT_00 * v[np.newaxis, :, :, np.newaxis]).sum(dim=1) + dT_01).squeeze(dim=-1)
+    return du
+
+
 def test_tranpose_multiply():
     m = 12
     n = 1<<m
@@ -469,6 +573,8 @@ def test_multiply():
     u = Variable(torch.rand((batch_size, n)), requires_grad=True).cuda()
     v = Variable(torch.rand((rank, n)), requires_grad=True).cuda()
     w = Variable(torch.rand((batch_size, rank, n)), requires_grad=True).cuda()
+    result_fast = krylov_multiply_fast(subdiag, v, w)
+    result_fast = result_fast.data.cpu().numpy()
     result = krylov_multiply(subdiag, v, w)
     result = result.data.cpu().numpy()
     # Using autodiff
@@ -479,8 +585,11 @@ def test_multiply():
     w_cpu = w.data.cpu().numpy()
     result2 = np.stack([w_cpu[:, i] @ Ks[i] for i in range(rank)]).sum(axis=0)
     result2 = result2.squeeze()
+    np.allclose(result_fast, result)
     np.allclose(result, result1)
     np.allclose(result1, result2)
+    print(np.max(abs(result_fast - result)))
+    print(np.mean(abs(result_fast - result)))
     print(np.max(abs(result - result1)))
     print(np.mean(abs(result - result1)))
     print(np.max(abs(result1 - result2)))
