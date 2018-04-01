@@ -130,7 +130,8 @@ def krylov_transpose_multiply(subdiag, v, u):
     # Negative step isn't supported by Pytorch
     # (https://github.com/pytorch/pytorch/issues/229) so we have to construct
     # the index explicitly.
-    reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
+    # reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
+    reverse_index = torch.arange(n - 1, -1, -1, out=torch.cuda.LongTensor())
     return T_00[:, :, :, reverse_index].squeeze(dim=2)
 
 
@@ -213,7 +214,8 @@ def krylov_multiply(subdiag, v, w):
     assert n == 1 << m, 'n must be a power of 2'
 
     save_for_backward = krylov_multiply_forward(subdiag, v)
-    reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
+    # reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
+    reverse_index = torch.arange(n - 1, -1, -1, out=torch.cuda.LongTensor())
     w = w.view(batch_size, rank, 1, n)
     # dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.zeros((batch_size, 1, n)).cuda())
     dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.cuda.FloatTensor(batch_size, 1, n).fill_(0.0))
