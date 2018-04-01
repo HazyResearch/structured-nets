@@ -142,8 +142,6 @@ class MLP(nn.Module):
         xW = structured_layer(self, x)
 
         if self.params.num_layers==0:
-            #thing = torch.matmul(x, self.H)
-            #y = torch.matmul(thing, self.G.t())
             return xW
         elif self.params.num_layers==1:
             h = F.relu(xW + self.b1)

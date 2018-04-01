@@ -15,6 +15,8 @@ def compute_loss_and_accuracy(pred, true, params, loss_fn):
 
 		return mse, accuracy
 	elif params.loss == 'cross_entropy':
+		print 'pred: ', pred
+		print 'true: ', true
 		cross_entropy = loss_fn(pred, true)
 
 		_, true_argmax = torch.max(true, 1)

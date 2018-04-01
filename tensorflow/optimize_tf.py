@@ -4,6 +4,7 @@ import tensorflow as tf
 from utils import *
 from reconstruction import *
 from model import *
+import time
 
 def optimize_tf(dataset, params):
 	# Create model
@@ -35,12 +36,16 @@ def optimize_tf(dataset, params):
 	losses = {'train': [], 'val': [], 'DR': [], 'ratio': []}
 	accuracies = {'train': [], 'val': []}
 
+	t1 = time.time()
+
 	for _ in range(params.steps):
 		this_step, lr = sess.run([global_step, learning_rate])
 		batch_xs, batch_ys = dataset.batch(params.batch_size, this_step)
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if this_step % params.test_freq == 0:
+			print time.time() - t1
+			t1 = time.time()
 			print('Training step: ', this_step)
 			# Verify displacement rank
 			if params.check_disp:

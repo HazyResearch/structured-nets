@@ -28,7 +28,7 @@ def circ_transpose_mult_fn(subdiag_f, x):
 def tridiag_transpose_mult_fn(subdiag_f, diag, supdiag, x):
 	y = torch.cat((x[1:], x[0]))
 	sub_result = y * subdiag_f	
-	z = Variable(torch.zeros(1))
+	z = Variable(torch.zeros(1).cuda())
 	sup_result = torch.cat((z, x[:-1] * supdiag))
 	diag_result = x*diag
 
