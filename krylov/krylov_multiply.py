@@ -89,9 +89,12 @@ def hfft(X):
     return irfft(X_conj, norm=False)
 
 def conjugate(X):
+    # This doesn't work if X isn't contiguous
+    assert X.shape[-1] % 2 == 0, 'Last dimension must be even'
     return (X.view(-1, 2) * torch.cuda.FloatTensor((1, -1))).view_as(X)
 
 def conjugate_cupy(X):
+    assert X.shape[-1] % 2 == 0, 'Last dimension must be even'
     X_cp = torch_to_cupy(X).view('complex64')
     X_conj = torch.cuda.FloatTensor(*X.shape)
     X_conj_cp = torch_to_cupy(X_conj).view('complex64')
@@ -110,8 +113,8 @@ class Conjugate(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X):
-        return conjugate(X)
-        # return conjugate_cupy(X)
+        # return conjugate(X)
+        return conjugate_cupy(X)
 
     def backward(ctx, grad):
         return Conjugate.apply(grad)
@@ -189,16 +192,20 @@ class ComplexMult(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad):
-        # TODO: This is not correct if the multiplication was broadcasted
         X, Y = ctx.saved_tensors
-        # There's probably a better way to do this, maybe define a Conjugate function
-        X_conj = torch.cuda.FloatTensor(*X.shape)
-        X_cp, X_conj_cp = torch_to_cupy(X).view('complex64'), torch_to_cupy(X_conj).view('complex64')
-        cp.conj(X_cp, out=X_conj_cp)
-        Y_conj = torch.cuda.FloatTensor(*Y.shape)
-        Y_cp, Y_conj_cp = torch_to_cupy(Y).view('complex64'), torch_to_cupy(Y_conj).view('complex64')
-        cp.conj(Y_cp, out=Y_conj_cp)
-        return Variable(complex_multiply_cupy(grad.data, Y_conj)), Variable(complex_multiply_cupy(grad.data, X_conj))
+        grad_X, grad_Y = complex_multiply_cupy(grad.data, conjugate_cupy(Y)), complex_multiply_cupy(grad.data, conjugate_cupy(X))
+        # Need to sum over dimensions that were broadcasted
+        dims_to_sum_X = [grad.dim() - i for i in range(1, X.dim() + 1) if X.shape[-i] != grad.shape[-i]]
+        dims_to_sum_Y = [grad.dim() - i for i in range(1, Y.dim() + 1) if Y.shape[-i] != grad.shape[-i]]
+        for dim in dims_to_sum_X:
+            grad_X = grad_X.sum(dim=dim, keepdim=True)
+        for dim in range(grad.dim() - X.dim())[::-1]:
+            grad_X = grad_X.sum(dim=dim)
+        for dim in dims_to_sum_Y:
+            grad_Y = grad_Y.sum(dim=dim, keepdim=True)
+        for dim in range(grad.dim() - Y.dim())[::-1]:
+            grad_Y = grad_Y.sum(dim=dim)
+        return Variable(grad_X), Variable(grad_Y)
 
 class Rfft(torch.autograd.Function):
     def forward(self, X_re):
@@ -358,14 +365,14 @@ def krylov_transpose_multiply_fast(subdiag, v, u):
         # polynomial multiplications
         S_f = Rfft_fast.apply(S)
         S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
-        # T_00_f = ComplexMult.apply(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        # T_01_f = ComplexMult.apply(S1_01_f, S0_11_f)
-        # T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
-        # T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
-        T_00_f = complex_mult_slow(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        T_01_f = complex_mult_slow(S1_01_f, S0_11_f)
-        T_10_f = complex_mult_slow(S1_11_f, S0_10_f)
-        T_11_f = complex_mult_slow(S1_11_f, S0_11_f)
+        T_00_f = ComplexMult.apply(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        T_01_f = ComplexMult.apply(S1_01_f, S0_11_f)
+        T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
+        T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
+        # T_00_f = complex_mult_slow(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        # T_01_f = complex_mult_slow(S1_01_f, S0_11_f)
+        # T_10_f = complex_mult_slow(S1_11_f, S0_10_f)
+        # T_11_f = complex_mult_slow(S1_11_f, S0_11_f)
 
         T_f = torch.cat((torch.cat((T_00_f, T_01_f[:, np.newaxis]), dim=1),
                          torch.cat((T_10_f[np.newaxis], T_11_f[np.newaxis, np.newaxis]), dim=1)))
@@ -470,10 +477,10 @@ def krylov_multiply_forward_fast(subdiag, v):
         S0_10_f, S0_11_f, S1_11_f = S_f[:rank], S_f[-2], S_f[-1]
         save_for_backward[d] = (S0_10_f, S0_11_f)
 
-        # T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
-        # T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
-        T_10_f = complex_mult_slow(S1_11_f, S0_10_f)
-        T_11_f = complex_mult_slow(S1_11_f, S0_11_f)
+        T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
+        T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
+        # T_10_f = complex_mult_slow(S1_11_f, S0_10_f)
+        # T_11_f = complex_mult_slow(S1_11_f, S0_11_f)
 
         T_f = torch.cat((T_10_f, T_11_f[np.newaxis]))
 
@@ -581,8 +588,8 @@ def krylov_multiply_fast(subdiag, v, w):
         dT_00_f, dT_01_f = dT_f[:, :rank], dT_f[:, -1]
 
         S0_10_f, S0_11_f = save_for_backward[d]
-        # dS1_01_f = ComplexMult.apply(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + ComplexMult.apply(S0_11_f, dT_01_f)
-        dS1_01_f = complex_mult_slow(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + complex_mult_slow(S0_11_f, dT_01_f)
+        dS1_01_f = ComplexMult.apply(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + ComplexMult.apply(S0_11_f, dT_01_f)
+        # dS1_01_f = complex_mult_slow(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + complex_mult_slow(S0_11_f, dT_01_f)
 
         # dS1_01 = Hfft_fast.apply(dS1_01_f)
         dS1_01 = Hfft_fast(dS1_01_f)
@@ -676,7 +683,7 @@ def test_multiply():
     print(np.mean(abs(result1 - result2)))
 
     # Combine transpose multiply follow by non-transpose multiply
-    result = krylov_multiply(subdiag, v, krylov_transpose_multiply(subdiag, v, u))
+    result = krylov_multiply_fast(subdiag, v, krylov_transpose_multiply_fast(subdiag, v, u))
 
 def test_misc():
     a = Variable(torch.rand(3, 4, 8).cuda(), requires_grad=True)
