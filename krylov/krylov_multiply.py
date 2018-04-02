@@ -38,12 +38,18 @@ def complex_multiply_cupy(X, Y):
     cp.multiply(X_complex, Y_complex, out_complex)
     return out
 
+@functools.lru_cache(maxsize=1024)
+def cufft_plan1d(n, fft_type, batch_size):
+    # Put in a separate function so we can cache the plans.
+    # Actually this only saves about 2ms, from 65.5ms to 63.4ms, for n=4096, batchsize=512, and rank=3.
+    return cufft.Plan1d(n, fft_type, batch_size)
+
 def rfft(X):
     assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
     assert X.is_contiguous(), 'Input must be contiguous'
     fft_type = cufft.CUFFT_R2C
     direction = cufft.CUFFT_FORWARD
-    plan = cufft.Plan1d(X.shape[-1], fft_type, X.numel() // X.shape[-1])
+    plan = cufft_plan1d(X.shape[-1], fft_type, X.numel() // X.shape[-1])
     out_shape = X.shape[:-1] + (2 * (X.shape[-1] // 2 + 1),)
     out = torch.cuda.FloatTensor(*out_shape)
     cufft.execR2C(plan.plan, X.data_ptr(), out.data_ptr())
@@ -57,7 +63,7 @@ def irfft(X, norm=True):
     fft_type = cufft.CUFFT_C2R
     direction = cufft.CUFFT_INVERSE
     out_size = (X.shape[-1] // 2 - 1) * 2
-    plan = cufft.Plan1d(out_size, fft_type, X.numel() // X.shape[-1])
+    plan = cufft_plan1d(out_size, fft_type, X.numel() // X.shape[-1])
     out_shape = X.shape[:-1] + (out_size,)
     out = torch.cuda.FloatTensor(*out_shape)
     cufft.execC2R(plan.plan, X.data_ptr(), out.data_ptr())
@@ -93,7 +99,7 @@ def conjugate_cupy(X):
     return X_conj
 
 def complex_mult_slow(X, Y):
-    # I'm writing in this efficient many because writing autodiff for complex mult is really hard
+    # I'm writing in this inefficient way because writing autodiff for complex mult is really hard
     # thanks for broadcasting. I'm just using Pytorch's functions here.
     real = X[..., ::2] * Y[..., ::2] - X[..., 1::2] * Y[..., 1::2]
     imag = X[..., ::2] * Y[..., 1::2] + X[..., 1::2] * Y[..., 0::2]
