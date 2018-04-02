@@ -39,7 +39,7 @@ def complex_multiply_cupy(X, Y):
     return out
 
 def rfft(X):
-    assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
+    assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
     assert X.is_contiguous(), 'Input must be contiguous'
     fft_type = cufft.CUFFT_R2C
     direction = cufft.CUFFT_FORWARD
@@ -51,7 +51,7 @@ def rfft(X):
 
 def irfft(X, norm=True):
     # TODO: Maybe support out_size because Rfft backward might need it for odd size input.
-    assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
+    assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
     assert X.is_contiguous(), 'Input must be contiguous'
     assert X.shape[-1] % 2 == 0, 'Last dimension must be even'
     fft_type = cufft.CUFFT_C2R
@@ -82,6 +82,34 @@ def hfft(X):
     cp.conj(X_cp, out=X_conj_cp)
     return irfft(X_conj, norm=False)
 
+def conjugate(X):
+    return (X.view(-1, 2) * torch.cuda.FloatTensor((1, -1))).view_as(X)
+
+def conjugate_cupy(X):
+    X_cp = torch_to_cupy(X).view('complex64')
+    X_conj = torch.cuda.FloatTensor(*X.shape)
+    X_conj_cp = torch_to_cupy(X_conj).view('complex64')
+    cp.conj(X_cp, out=X_conj_cp)
+    return X_conj
+
+def complex_mult_slow(X, Y):
+    # I'm writing in this efficient many because writing autodiff for complex mult is really hard
+    # thanks for broadcasting. I'm just using Pytorch's functions here.
+    real = X[..., ::2] * Y[..., ::2] - X[..., 1::2] * Y[..., 1::2]
+    imag = X[..., ::2] * Y[..., 1::2] + X[..., 1::2] * Y[..., 0::2]
+    result = torch.cat((real.view(-1, 1), imag.view(-1, 1)), dim=-1)
+    return result.view(*(real.shape[:-1] + (2 * real.shape[-1], )))
+
+class Conjugate(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X):
+        return conjugate(X)
+        # return conjugate_cupy(X)
+
+    def backward(ctx, grad):
+        return Conjugate.apply(grad)
+
 class Rfft_fast(torch.autograd.Function):
 
     @staticmethod
@@ -90,7 +118,14 @@ class Rfft_fast(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad):
-        return hfft(grad.contiguous())
+        input_size = (grad.shape[-1] // 2 - 1) * 2
+        grad = grad.data.contiguous()
+        if input_size & 1:
+            grad[..., 2:] /= 2
+        elif input_size > 2:
+            grad[..., 2:-2] /= 2
+        return Variable(irfft(grad) * input_size)
+        # return Hfft_fast.apply(grad)
 
 class Irfft_fast(torch.autograd.Function):
 
@@ -100,27 +135,44 @@ class Irfft_fast(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad):
-        return hfft(grad.contiguous())
+        grad = grad.data.contiguous()
+        n = grad.shape[-1]
+        grad_f = rfft(grad) / n
+        if grad_f.shape[-1] > 4:
+            grad_f[..., 2:-2] *= 2
+        return Variable(grad_f)
+        # return Ihfft_fast.apply(grad)
 
-class Ihfft_fast(torch.autograd.Function):
+def Ihfft_fast(X):
+    # np.fft.ihfft is the same as np.fft.rfft().conj() / n
+    n = X.shape[-1]
+    return Conjugate.apply(Rfft_fast.apply(X)) / n
 
-    @staticmethod
-    def forward(ctx, X):
-        return ihfft(X.contiguous())
+def Hfft_fast(X):
+    # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
+    n = (X.shape[-1] // 2 - 1) * 2
+    return Irfft_fast.apply(Conjugate.apply(X)) * n
 
-    @staticmethod
-    def backward(ctx, grad):
-        return irfft(grad.contiguous())
 
-class Hfft_fast(torch.autograd.Function):
+# class Ihfft_fast(torch.autograd.Function):
 
-    @staticmethod
-    def forward(ctx, X):
-        return hfft(X.contiguous())
+#     @staticmethod
+#     def forward(ctx, X):
+#         return ihfft(X.contiguous())
 
-    @staticmethod
-    def backward(ctx, grad):
-        return rfft(grad.contiguous())
+#     @staticmethod
+#     def backward(ctx, grad):
+#         return Irfft_fast.apply(grad)
+
+# class Hfft_fast(torch.autograd.Function):
+
+#     @staticmethod
+#     def forward(ctx, X):
+#         return hfft(X.contiguous())
+
+#     @staticmethod
+#     def backward(ctx, grad):
+#         return Rfft_fast.apply(grad)
 
 class ComplexMult(torch.autograd.Function):
 
@@ -131,6 +183,7 @@ class ComplexMult(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad):
+        # TODO: This is not correct if the multiplication was broadcasted
         X, Y = ctx.saved_tensors
         # There's probably a better way to do this, maybe define a Conjugate function
         X_conj = torch.cuda.FloatTensor(*X.shape)
@@ -299,10 +352,14 @@ def krylov_transpose_multiply_fast(subdiag, v, u):
         # polynomial multiplications
         S_f = Rfft_fast.apply(S)
         S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
-        T_00_f = ComplexMult.apply(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        T_01_f = ComplexMult.apply(S1_01_f, S0_11_f)
-        T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
-        T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
+        # T_00_f = ComplexMult.apply(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        # T_01_f = ComplexMult.apply(S1_01_f, S0_11_f)
+        # T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
+        # T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
+        T_00_f = complex_mult_slow(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        T_01_f = complex_mult_slow(S1_01_f, S0_11_f)
+        T_10_f = complex_mult_slow(S1_11_f, S0_10_f)
+        T_11_f = complex_mult_slow(S1_11_f, S0_11_f)
 
         T_f = torch.cat((torch.cat((T_00_f, T_01_f[:, np.newaxis]), dim=1),
                          torch.cat((T_10_f[np.newaxis], T_11_f[np.newaxis, np.newaxis]), dim=1)))
@@ -341,7 +398,7 @@ def krylov_multiply_by_autodiff(subdiag, v, w):
 
     # u = Variable(torch.zeros((batch_size, n)).cuda(), requires_grad=True)
     u = Variable(torch.cuda.FloatTensor(batch_size, n).fill_(0.0), requires_grad=True)
-    prod = krylov_transpose_multiply(subdiag, v, u)
+    prod = krylov_transpose_multiply_fast(subdiag, v, u)
     result, = torch.autograd.grad(prod, u, grad_outputs=w, retain_graph=True)
     return result
 
@@ -407,8 +464,10 @@ def krylov_multiply_forward_fast(subdiag, v):
         S0_10_f, S0_11_f, S1_11_f = S_f[:rank], S_f[-2], S_f[-1]
         save_for_backward[d] = (S0_10_f, S0_11_f)
 
-        T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
-        T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
+        # T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
+        # T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
+        T_10_f = complex_mult_slow(S1_11_f, S0_10_f)
+        T_11_f = complex_mult_slow(S1_11_f, S0_11_f)
 
         T_f = torch.cat((T_10_f, T_11_f[np.newaxis]))
 
@@ -511,13 +570,16 @@ def krylov_multiply_fast(subdiag, v, w):
         dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
         dT = dT * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
-        dT_f = Ihfft_fast.apply(dT)
+        # dT_f = Ihfft_fast.apply(dT)
+        dT_f = Ihfft_fast(dT)
         dT_00_f, dT_01_f = dT_f[:, :rank], dT_f[:, -1]
 
         S0_10_f, S0_11_f = save_for_backward[d]
-        dS1_01_f = ComplexMult.apply(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + ComplexMult.apply(S0_11_f, dT_01_f)
+        # dS1_01_f = ComplexMult.apply(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + ComplexMult.apply(S0_11_f, dT_01_f)
+        dS1_01_f = complex_mult_slow(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + complex_mult_slow(S0_11_f, dT_01_f)
 
-        dS1_01 = Hfft_fast.apply(dS1_01_f)
+        # dS1_01 = Hfft_fast.apply(dS1_01_f)
+        dS1_01 = Hfft_fast(dS1_01_f)
         dS_01[:, 1::2] = dS1_01[:, :, :n2]
 
         dT_00, dT_01 = dS_00, dS_01
@@ -536,8 +598,12 @@ def test_tranpose_multiply():
     u = Variable(torch.rand((batch_size, n)), requires_grad=True).cuda()
     v = Variable(torch.rand((rank, n)), requires_grad=True).cuda()
     result = krylov_transpose_multiply_fast(subdiag, v, u)
+    grad,  = torch.autograd.grad(torch.sum(result), v, retain_graph=True)
+    grad = grad.data.cpu().numpy()
     result = result.data.cpu().numpy()
     result1 = krylov_transpose_multiply(subdiag, v, u)
+    grad1, = torch.autograd.grad(torch.sum(result1), v, retain_graph=True)
+    grad1 = grad1.data.cpu().numpy()
     result1 = result1.data.cpu().numpy()
     # CPU dense multiply
     Ks = [krylov_construct(A, v.data.cpu().numpy()[i], n) for i in range(rank)]
@@ -556,6 +622,8 @@ def test_tranpose_multiply():
     # np.allclose(result1, result2)
     print(np.max(abs(result - result1)))
     print(np.mean(abs(result - result1)))
+    print(np.max(abs(grad - grad1)))
+    print(np.mean(abs(grad - grad1)))
     print(np.max(abs(result1 - result2)))
     print(np.mean(abs(result1 - result2)))
     print(np.max(abs(result3 - result2)))
@@ -574,8 +642,12 @@ def test_multiply():
     v = Variable(torch.rand((rank, n)), requires_grad=True).cuda()
     w = Variable(torch.rand((batch_size, rank, n)), requires_grad=True).cuda()
     result_fast = krylov_multiply_fast(subdiag, v, w)
+    grad_fast,  = torch.autograd.grad(torch.sum(result_fast), v, retain_graph=True)
+    grad_fast = grad_fast.data.cpu().numpy()
     result_fast = result_fast.data.cpu().numpy()
     result = krylov_multiply(subdiag, v, w)
+    grad, = torch.autograd.grad(torch.sum(result), v, retain_graph=True)
+    grad = grad.data.cpu().numpy()
     result = result.data.cpu().numpy()
     # Using autodiff
     result1 = krylov_multiply_by_autodiff(subdiag, v, w)
@@ -590,6 +662,8 @@ def test_multiply():
     np.allclose(result1, result2)
     print(np.max(abs(result_fast - result)))
     print(np.mean(abs(result_fast - result)))
+    print(np.max(abs(grad_fast - grad)))
+    print(np.mean(abs(grad_fast - grad)))
     print(np.max(abs(result - result1)))
     print(np.mean(abs(result - result1)))
     print(np.max(abs(result1 - result2)))
