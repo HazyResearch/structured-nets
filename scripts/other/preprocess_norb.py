@@ -7,15 +7,15 @@ from norb import NORBDataset
 from scipy.misc import imresize
 
 MAX_VAL = 255.0
-DS_SIZE = (27, 27)
+DS_SIZE = (28, 28)
 N_CATEGORIES = 6
 TRAIN = True#False
 
-names = ['train' + str(i+1) for i in range(10)]
-OUT_LOC = '/dfs/scratch1/thomasat/datasets/norb/processed_py2_train.pkl'
+names = ['train' + str(i+1) for i in range(5)]
+OUT_LOC = '/dfs/scratch1/thomasat/datasets/norb/processed_py2_train_' + str(DS_SIZE[0]) + '.pkl'
 if not TRAIN:
 	names = ['test' + str(i+1) for i in range(2)]
-	OUT_LOC = '/dfs/scratch1/thomasat/datasets/norb/processed_py2_test.pkl'
+	OUT_LOC = '/dfs/scratch1/thomasat/datasets/norb/processed_py2_test' + str(DS_SIZE[0]) + '.pkl'
 
 
 """

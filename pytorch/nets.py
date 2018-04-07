@@ -5,6 +5,9 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torch_krylov import *
 from torch_reconstruction import *
+import sys
+sys.path.insert(0, '../../krylov/')
+from krylov_multiply import *
 
 def construct_net(params):
     if params.model == 'LeNet':
@@ -14,7 +17,7 @@ def construct_net(params):
     elif params.model == 'RNN':
         return RNN(params)
     else:
-        print 'Model not supported: ', params.model
+        print('Model not supported: ', params.model)
         assert 0
 
 # Assumes Stein displacement. 
@@ -60,27 +63,29 @@ def set_mult_fns(net, params):
         fn_B_T = functools.partial(tridiag_transpose_mult_fn, net.subdiag_f_B, net.diag_B, net.supdiag_B)
 
     else:
-        print 'Not supported: ', params.class_type  
+        print('Not supported: ', params.class_type)  
         assert 0  
     return fn_A, fn_B_T    
 
 def structured_layer(net, x):
-    if net.params.class_type == 'unconstrained':
-        return torch.matmul(x, net.W)
-    elif net.params.class_type == 'low_rank':
-        xH = torch.matmul(x, net.H)
-        return torch.matmul(xH, net.G.t())        
-    elif net.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like', 
+	if net.params.class_type == 'unconstrained':
+		return torch.matmul(x, net.W)
+	elif net.params.class_type == 'low_rank':
+		xH = torch.matmul(x, net.H)
+		return torch.matmul(xH, net.G.t())        
+	elif net.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like', 
         'circulant_sparsity', 'tridiagonal_corner']:
-        W = krylov_recon(net.params, net.G, net.H, net.fn_A, net.fn_B_T)
-        
-        # NORMALIZE W
-
-        return torch.matmul(x, W)
-
-    else:
-        print 'Not supported: ', params.class_type  
-        assert 0 
+		#print('krylov fast')
+		#print('net.H: ', net.H.t())
+		#print('x: ', x)
+		#print(KB)
+		#return krylov_multiply_fast(net.subdiag_f_A[1:], net.G.t(), krylov_transpose_multiply_fast(net.subdiag_f_B[1:], net.H.t(), x))
+		W = krylov_recon(net.params, net.G, net.H, net.fn_A, net.fn_B_T)
+		# NORMALIZE W
+		return torch.matmul(x, W)
+	else:
+		print('Not supported: ', params.class_type)  
+		assert 0 
 
 def set_structured_W(net, params):
     if params.class_type == 'unconstrained':
@@ -98,7 +103,7 @@ def set_structured_W(net, params):
             net.fn_A = fn_A
             net.fn_B_T = fn_B_T
     else:
-        print 'Not supported: ', params.class_type  
+        print('Not supported: ', params.class_type)  
         assert 0
 
 class LeNet(nn.Module):
@@ -148,7 +153,7 @@ class MLP(nn.Module):
             y = torch.matmul(h, self.W2) + self.b2
             return y
         else:
-            print 'Not supported: ', params.num_layers
+            print('Not supported: ', params.num_layers)
             assert 0
 
 class RNN(nn.Module):

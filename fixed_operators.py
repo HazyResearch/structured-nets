@@ -52,13 +52,13 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 	 
 		if step % test_freq == 0:
-			print('Training step: ', step)
+			print(('Training step: ', step))
 			# Verify displacement rank
 			if params.check_disp:
 				v_real, W1_real = sess.run([v, W1], feed_dict={x: batch_xs, y_: batch_ys})
 				A = np.diag(v_real)
 				E = W1_real - np.dot(A, np.dot(W1_real, B_vand))
-				print('Disp rank: ', np.linalg.matrix_rank(E))
+				print(('Disp rank: ', np.linalg.matrix_rank(E)))
 
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
@@ -75,15 +75,15 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			print('Train loss, accuracy: ', train_loss, train_accuracy)
-			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+			print(('Train loss, accuracy: ', train_loss, train_accuracy))
+			print(('Validation loss, accuracy: ', val_loss, val_accuracy))
 
 			if verbose:
-				print('Current W1: ', W1_real)
+				print(('Current W1: ', W1_real))
 
 		if step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
-			print("Model saved in file: %s" % save_path)
+			print(("Model saved in file: %s" % save_path))
 
 		step += 1
 
@@ -101,8 +101,8 @@ def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 		summary_writer.add_summary(test_loss_summ, step)
 		summary_writer.add_summary(test_acc_summ, step)
 
-		print('SGD test loss, Vandermonde-like: ', test_loss)
-		print('SGD test accuracy, Vandermonde-like: ', test_accuracy)
+		print(('SGD test loss, Vandermonde-like: ', test_loss))
+		print(('SGD test accuracy, Vandermonde-like: ', test_accuracy))
 
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy
@@ -159,12 +159,12 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
  
 		if step % test_freq == 0:
-			print('Training step: ', step)
+			print(('Training step: ', step))
 			if params.check_disp:
 				# Verify displacement rank
 				W1_real = sess.run(W1, feed_dict={x: batch_xs, y_: batch_ys})
 				E = W1_real - np.dot(A, np.dot(W1_real, B))
-				print('Disp rank: ', np.linalg.matrix_rank(E))
+				print(('Disp rank: ', np.linalg.matrix_rank(E)))
 			
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
@@ -181,15 +181,15 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			print('Train loss, accuracy: ', train_loss, train_accuracy)
-			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+			print(('Train loss, accuracy: ', train_loss, train_accuracy))
+			print(('Validation loss, accuracy: ', val_loss, val_accuracy))
 
 			if verbose:
-				print('Current W1: ', W1_real)
+				print(('Current W1: ', W1_real))
 
 		if step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
-			print("Model saved in file: %s" % save_path)
+			print(("Model saved in file: %s" % save_path))
 
 		step += 1
 
@@ -208,8 +208,8 @@ def hankel_like(dataset, params, test_freq=100, verbose=False):
 		summary_writer.add_summary(test_loss_summ, step)
 		summary_writer.add_summary(test_acc_summ, step)
 
-		print('SGD test loss, Hankel-like: ', test_loss)
-		print('SGD test accuracy, Hankel-like: ', test_accuracy)
+		print(('SGD test loss, Hankel-like: ', test_loss))
+		print(('SGD test accuracy, Hankel-like: ', test_accuracy))
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy
 
@@ -264,12 +264,12 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 
 	 
 		if step % test_freq == 0:
-			print('Training step: ', step)
+			print(('Training step: ', step))
 			if params.check_disp:
 				# Verify displacement rank
 				W1_real = sess.run(W1, feed_dict={x: batch_xs, y_: batch_ys})
 				E_sylv = np.dot(A, W1_real) - np.dot(W1_real, B)
-				print('Disp rank, Sylv: ', np.linalg.matrix_rank(E_sylv))
+				print(('Disp rank, Sylv: ', np.linalg.matrix_rank(E_sylv)))
 
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
@@ -286,15 +286,15 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			print('Train loss, accuracy: ', train_loss, train_accuracy)
-			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+			print(('Train loss, accuracy: ', train_loss, train_accuracy))
+			print(('Validation loss, accuracy: ', val_loss, val_accuracy))
 
 			if verbose:
-				print('Current W1: ', W1_real)
+				print(('Current W1: ', W1_real))
 
 		if step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
-			print("Model saved in file: %s" % save_path)
+			print(("Model saved in file: %s" % save_path))
 
 		step += 1
 
@@ -314,8 +314,8 @@ def toeplitz_like(dataset, params, test_freq=100, verbose=False):
 		summary_writer.add_summary(test_loss_summ, step)
 		summary_writer.add_summary(test_acc_summ, step)
 
-		print('SGD test loss, Toeplitz-like: ', test_loss)
-		print('SGD test accuracy, Toeplitz-like: ', test_accuracy)
+		print(('SGD test loss, Toeplitz-like: ', test_loss))
+		print(('SGD test accuracy, Toeplitz-like: ', test_accuracy))
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy
 
@@ -365,7 +365,7 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 
 	 
 		if step % test_freq == 0:
-			print('Training step: ', step)
+			print(('Training step: ', step))
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
@@ -381,15 +381,15 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			print('Train loss, accuracy: ', train_loss, train_accuracy)
-			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+			print(('Train loss, accuracy: ', train_loss, train_accuracy))
+			print(('Validation loss, accuracy: ', val_loss, val_accuracy))
 
 			if verbose:
-				print('Current W1: ', W1_real)
+				print(('Current W1: ', W1_real))
 
 		if step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
-			print("Model saved in file: %s" % save_path)
+			print(("Model saved in file: %s" % save_path))
 
 		step += 1
 
@@ -408,8 +408,8 @@ def low_rank(dataset, params, test_freq=100, verbose=False):
 		summary_writer.add_summary(test_loss_summ, step)
 		summary_writer.add_summary(test_acc_summ, step)
 		
-		print('SGD test loss, low rank: ', test_loss)
-		print('SGD test accuracy, low rank: ', test_accuracy)
+		print(('SGD test loss, low rank: ', test_loss))
+		print(('SGD test accuracy, low rank: ', test_accuracy))
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy
 
@@ -455,7 +455,7 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 
 	 
 		if step % test_freq == 0:
-			print('Training step: ', step)
+			print(('Training step: ', step))
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
@@ -471,15 +471,15 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			print('Train loss, accuracy: ', train_loss, train_accuracy)
-			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+			print(('Train loss, accuracy: ', train_loss, train_accuracy))
+			print(('Validation loss, accuracy: ', val_loss, val_accuracy))
 
 			if verbose:
-				print('Current W1: ', W1_real)
+				print(('Current W1: ', W1_real))
 
 		if step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
-			print("Model saved in file: %s" % save_path)
+			print(("Model saved in file: %s" % save_path))
 
 		step += 1
 
@@ -499,8 +499,8 @@ def unconstrained(dataset, params, test_freq=100, verbose=False):
 		summary_writer.add_summary(test_loss_summ, step)
 		summary_writer.add_summary(test_acc_summ, step)
 		
-		print('SGD test loss, unconstrained: ', test_loss)
-		print('SGD test accuracy, unconstrained: ', test_accuracy)
+		print(('SGD test loss, unconstrained: ', test_loss))
+		print(('SGD test accuracy, unconstrained: ', test_accuracy))
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy
 

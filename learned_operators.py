@@ -71,7 +71,7 @@ def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if step % test_freq == 0:
-			print('Training step: ', step)
+			print(('Training step: ', step))
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
@@ -87,15 +87,15 @@ def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			print('Train loss, accuracy: ', train_loss, train_accuracy)
-			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+			print(('Train loss, accuracy: ', train_loss, train_accuracy))
+			print(('Validation loss, accuracy: ', val_loss, val_accuracy))
 
 			if verbose:
-				print('Current W1: ', W1_real)
+				print(('Current W1: ', W1_real))
 
 		if step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
-			print("Model saved in file: %s" % save_path)
+			print(("Model saved in file: %s" % save_path))
 
 		step += 1
 
@@ -113,8 +113,8 @@ def tridiagonal_corner(dataset, params, test_freq=100, verbose=False):
 		summary_writer.add_summary(test_loss_summ, step)
 		summary_writer.add_summary(test_acc_summ, step)
 		
-		print('SGD test loss, tridiagonal+corner: ', test_loss)
-		print('SGD test accuracy, tridiagonal+corner: ', test_accuracy)
+		print(('SGD test loss, tridiagonal+corner: ', test_loss))
+		print(('SGD test accuracy, tridiagonal+corner: ', test_accuracy))
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy
 
@@ -186,15 +186,15 @@ def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if step % test_freq == 0:
-			print('Training step: ', step)
+			print(('Training step: ', step))
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ, this_diag_A, this_off_diag_A, this_diag_B = sess.run([loss, accuracy, val_loss_summary, 
 				val_acc_summary, diag_A, off_diag_A, diag_B], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
 			
-			print 'diag_A: ', this_diag_A
-			print 'off_diag_A: ', this_off_diag_A
-			print 'diag_B: ', this_diag_B
+			print('diag_A: ', this_diag_A)
+			print('off_diag_A: ', this_off_diag_A)
+			print('diag_B: ', this_diag_B)
 
 			summary_writer.add_summary(train_loss_summ, step)
 			summary_writer.add_summary(train_acc_summ, step)
@@ -206,15 +206,15 @@ def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			print('Train loss, accuracy: ', train_loss, train_accuracy)
-			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+			print(('Train loss, accuracy: ', train_loss, train_accuracy))
+			print(('Validation loss, accuracy: ', val_loss, val_accuracy))
 
 			if verbose:
-				print('Current W1: ', W1_real)
+				print(('Current W1: ', W1_real))
 
 		if step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
-			print("Model saved in file: %s" % save_path)
+			print(("Model saved in file: %s" % save_path))
 
 		step += 1
 
@@ -232,8 +232,8 @@ def polynomial_transform(dataset, params, test_freq=100, verbose=False):
 		summary_writer.add_summary(test_loss_summ, step)
 		summary_writer.add_summary(test_acc_summ, step)
 
-		print('SGD test loss, polynomial transform: ', test_loss)
-		print('SGD test accuracy, polynomial transform: ', test_accuracy)
+		print(('SGD test loss, polynomial transform: ', test_loss))
+		print(('SGD test accuracy, polynomial transform: ', test_accuracy))
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy
 
@@ -311,7 +311,7 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 
 
 		if step % test_freq == 0:
-			print('Training step: ', step)
+			print(('Training step: ', step))
 			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
 				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
@@ -327,15 +327,15 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 			val_losses.append(val_loss)
 			val_accuracies.append(val_accuracy)
 			
-			print('Train loss, accuracy: ', train_loss, train_accuracy)
-			print('Validation loss, accuracy: ', val_loss, val_accuracy)
+			print(('Train loss, accuracy: ', train_loss, train_accuracy))
+			print(('Validation loss, accuracy: ', val_loss, val_accuracy))
 
 			if verbose:
-				print('Current W1: ', W1_real)
+				print(('Current W1: ', W1_real))
 
 		if step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(step)))
-			print("Model saved in file: %s" % save_path)
+			print(("Model saved in file: %s" % save_path))
 
 		step += 1
 
@@ -353,8 +353,8 @@ def circulant_sparsity(dataset, params, test_freq=100, verbose=False):
 		summary_writer.add_summary(test_loss_summ, step)
 		summary_writer.add_summary(test_acc_summ, step)
 
-		print('SGD test loss, circulant sparsity operators: ', test_loss)
-		print('SGD test accuracy, circulant sparsity operators: ', test_accuracy)
+		print(('SGD test loss, circulant sparsity operators: ', test_loss))
+		print(('SGD test accuracy, circulant sparsity operators: ', test_accuracy))
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy
 
@@ -372,7 +372,7 @@ def circulant_sparsity_hadamard(dataset, params, test_freq=100, verbose=False):
 	t1 = time.time()
 	W1, f_A, f_B, v_A, v_B = circ_sparsity_recon(G, H, params.n, params.r, params.learn_corner, 
 		params.n_diag_learned, params.init_type, params.init_stddev)
-	print 'overall time of circ_sparsity_recon: ', time.time() - t1
+	print('overall time of circ_sparsity_recon: ', time.time() - t1)
 
 	y = compute_y(x, W1, params)
 	
@@ -411,7 +411,7 @@ def circulant_sparsity_hadamard(dataset, params, test_freq=100, verbose=False):
 		summary_writer.add_summary(summary, step)
 	 
 		if step % test_freq == 0:
-			print('Training step: ', step)
+			print(('Training step: ', step))
 			# Verify displacement rank: Stein
 			v_A_real = None
 			v_B_real = None
@@ -424,20 +424,20 @@ def circulant_sparsity_hadamard(dataset, params, test_freq=100, verbose=False):
 			B = gen_Z_f(params.n, f_B_real, v_B_real)
 
 			E = W1_real - np.dot(A, np.dot(W1_real, B))
-			print('Disp rank: ', np.linalg.matrix_rank(E))
+			print(('Disp rank: ', np.linalg.matrix_rank(E)))
 
 			this_loss, this_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
 			losses.append(this_loss)
 			accuracies.append(this_accuracy)
-			print('Test loss: ', this_loss)
-			print('Test accuracy: ', this_accuracy)
+			print(('Test loss: ', this_loss))
+			print(('Test accuracy: ', this_accuracy))
 			if verbose:
-				print('Current W1: ', W1_real)
+				print(('Current W1: ', W1_real))
 
 		step += 1
 
 	# Test trained model
-	print('SGD final loss, learned operators (fixed circulant sparsity pattern): ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
-	print('SGD final accuracy, learned operators (fixed circulant sparsity pattern): ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y}))
+	print(('SGD final loss, learned operators (fixed circulant sparsity pattern): ', sess.run(loss, feed_dict={x: dataset.test_X, y_: dataset.test_Y})))
+	print(('SGD final accuracy, learned operators (fixed circulant sparsity pattern): ', sess.run(accuracy, feed_dict={x: dataset.test_X, y_: dataset.test_Y})))
 
 	return losses, accuracies

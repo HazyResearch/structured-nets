@@ -15,16 +15,14 @@ def compute_loss_and_accuracy(pred, true, params, loss_fn):
 
 		return mse, accuracy
 	elif params.loss == 'cross_entropy':
-		print 'pred: ', pred
-		print 'true: ', true
-		cross_entropy = loss_fn(pred, true)
-
 		_, true_argmax = torch.max(true, 1)
+		cross_entropy = loss_fn(pred, true_argmax)
+
 		_, pred_argmax = torch.max(pred, 1)
-		correct_prediction = torch.equal(true_argmax, pred_argmax)
-		accuracy = torch.mean(correct_prediction)
+		correct_prediction = torch.eq(true_argmax, pred_argmax)
+		accuracy = torch.mean(correct_prediction.float())
 
 		return cross_entropy, accuracy
 	else:
-		print 'Not supported: ', params.loss
+		print('Not supported: ', params.loss)
 		assert 0

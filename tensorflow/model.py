@@ -15,14 +15,14 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 			A = sess.run(model['A'], feed_dict={x: batch_xs, y_: batch_ys})
 			B = sess.run(model['B'], feed_dict={x: batch_xs, y_: batch_ys})
 
-			print 'A: ', A
-			print 'B: ', B
+			print('A: ', A)
+			print('B: ', B)
 
 		return
 	if params.class_type in ['toeplitz_like', 'hankel_like']:
 		A,B = gen_operators(params)
 		W = sess.run(model['W'], feed_dict={x: batch_xs, y_: batch_ys})
-		print 'W: ', W.shape
+		print('W: ', W.shape)
 		E = compute_disp(params.disp_type, W, A, B)
 
 		dr = np.linalg.matrix_rank(E)
@@ -103,11 +103,11 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
 		ratio = np.linalg.norm(E)/np.linalg.norm(W)
 
 	else:
-		print 'class_type not supported: ', params.class_type
+		print('class_type not supported: ', params.class_type)
 		assert 0 
-	print E.shape
-	print('(Displacement) Rank: ', np.linalg.matrix_rank(E))
-	print('||E||/||W||: ', ratio)
+	print(E.shape)
+	print(('(Displacement) Rank: ', np.linalg.matrix_rank(E)))
+	print(('||E||/||W||: ', ratio))
 	#print 'eigvals: ', np.linalg.eigvals(E)
 	return dr, ratio
 
@@ -211,7 +211,7 @@ def get_structured_W(params):
 
 			elif params.fix_A_identity:
 				# f_x_A is unused
-				print 'fixing A to be identity'
+				print('fixing A to be identity')
 				fn_A = identity_mult_fn
 				fn_B = functools.partial(circ_transpose_mult_fn, tf.reverse(f_x_B, [0]))
 
@@ -260,11 +260,11 @@ def get_structured_W(params):
 
 
 	else:
-		print 'Not supported: ', params.class_type	
+		print('Not supported: ', params.class_type)	
 		assert 0	
 
 def forward(x, params):
- 	W, model = get_structured_W(params)
+	W, model = get_structured_W(params)
 	y = compute_y(x, W, params)
 	return y, model
 
@@ -284,5 +284,5 @@ def compute_y(x, W1, params):
 		y = tf.matmul(h, W2) + b2
 		return y
 	else:
-		print 'Not supported: ', params.num_layers
+		print('Not supported: ', params.num_layers)
 		assert 0

@@ -124,11 +124,11 @@ def test_tridiag_corner():
 	A = diags([subdiag, diag, supdiag], [-1, 0, 1], (n,n)).toarray()
 
 	A[0, -1] = f
-	print A
+	print(A)
 
 	x = np.array([1,2,3,4])
 
-	print np.dot(np.linalg.matrix_power(A.T, 3), x)
+	print(np.dot(np.linalg.matrix_power(A.T, 3), x))
 
 	fn = functools.partial(tridiag_corner_transpose_mult_fn, tf.constant(subdiag, dtype=tf.float64), 
 		tf.constant(diag, dtype=tf.float64), tf.constant(supdiag, dtype=tf.float64), tf.constant(f, dtype=tf.float64))
@@ -139,7 +139,7 @@ def test_tridiag_corner():
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
 
-	print sess.run(result)	
+	print(sess.run(result))	
 
 def test_symm_tridiag():
 	n = 4
@@ -148,13 +148,13 @@ def test_symm_tridiag():
 
 	A = diags([off_diag, diag, off_diag], [-1, 0, 1], (n,n)).toarray()
 
-	print A
+	print(A)
 
-	print np.linalg.norm(A - A.T)
+	print(np.linalg.norm(A - A.T))
 
 	x = np.array([1,2,3,4])
 
-	print np.dot(np.linalg.matrix_power(A, 3), x)
+	print(np.dot(np.linalg.matrix_power(A, 3), x))
 
 	fn = functools.partial(symm_tridiag_mult_fn, tf.constant(diag, dtype=tf.float64), 
 		tf.constant(off_diag, dtype=tf.float64))
@@ -165,7 +165,7 @@ def test_symm_tridiag():
 	sess = tf.InteractiveSession()
 	tf.initialize_all_variables().run()
 
-	print sess.run(result)	
+	print(sess.run(result))	
 
 if __name__ == '__main__':
 	#test_tridiag_corner()

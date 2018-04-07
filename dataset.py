@@ -25,7 +25,7 @@ class Dataset:
 		self.train_size = train_size
 		self.true_test = true_test
 		self.input_size = self.get_input_size()
-		print('input size: ', self.input_size)
+		print(('input size: ', self.input_size))
 		self.train_loc = ''
 		self.test_loc = ''
 		
@@ -36,20 +36,20 @@ class Dataset:
 			self.test_loc = '/dfs/scratch1/thomasat/datasets/cifar10/test_batch'
 			self.num_batches = 5
 			self.iters_per_batch = int(self.num_iters/self.num_batches)
-			print 'iters per batch: ', self.iters_per_batch
+			print('iters per batch: ', self.iters_per_batch)
 			self.load_train_cifar10(0)
 			self.load_test_data()
 			self.val_X = self.test_X
 			self.val_Y = self.test_Y
 		elif self.name == 'norb':
-			data_loc = '/dfs/scratch1/thomasat/datasets/norb/processed_py2_train.pkl'
+			data_loc = '/dfs/scratch1/thomasat/datasets/norb/processed_py2_train_28.pkl'
 			data = pkl.load(open(data_loc, 'rb'))
-			train_X = data['train_X']
-			train_Y = data['train_Y']
+			train_X = data['X']
+			train_Y = data['Y']
 			val_size = 2000
 			train_size = train_X.shape[0] - val_size
 
-			print('train size, val size: ', train_size, val_size)
+			print(('train size, val size: ', train_size, val_size))
 
 			# Shuffle X
 			idx = np.arange(0, train_X.shape[0])
@@ -67,7 +67,7 @@ class Dataset:
 			self.train_Y = train_Y[train_idx, :]
 
 
-			print self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape 
+			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape) 
 		elif self.name == 'smallnorb':
 			data_loc = '/dfs/scratch1/thomasat/datasets/smallnorb/processed_py2.pkl'
 			# Load
@@ -79,7 +79,7 @@ class Dataset:
 			val_size = 2000
 			train_size = train_X.shape[0] - val_size
 
-			print('train size, val size: ', train_size, val_size)
+			print(('train size, val size: ', train_size, val_size))
 
 			# Shuffle X
 			idx = np.arange(0, train_X.shape[0])
@@ -97,7 +97,7 @@ class Dataset:
 			self.train_Y = train_Y[train_idx, :]
 
 
-			print self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape 
+			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape) 
 
 
 		elif self.name == 'mnist':
@@ -138,7 +138,7 @@ class Dataset:
 			self.val_X = X[val_idx, :]
 			self.val_Y = Y[val_idx, :]
 
-			print self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape 
+			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape) 
 
 
 		elif self.name == 'mnist_rand_bg':
@@ -179,7 +179,7 @@ class Dataset:
 			self.train_X = X[train_idx, :]
 			self.train_Y = Y[train_idx, :]
 
-			print self.val_X.shape, self.val_Y.shape, self.test_X.shape, self.test_Y.shape, self.train_X.shape, self.train_Y.shape 
+			print(self.val_X.shape, self.val_Y.shape, self.test_X.shape, self.test_Y.shape, self.train_X.shape, self.train_Y.shape) 
 
 		elif self.name == 'convex':
 			self.train_loc = '/dfs/scratch1/thomasat/datasets/convex/convex_train.amat'
@@ -214,7 +214,7 @@ class Dataset:
 			self.val_X = X[val_idx, :]
 			self.val_Y = Y[val_idx, :]
 
-			print self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape
+			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape)
 
 		elif self.name == 'rect_images':
 			self.train_loc = '/dfs/scratch1/thomasat/datasets/rect_images/rectangles_im_train.amat'
@@ -245,7 +245,7 @@ class Dataset:
 			self.val_X = X[val_idx, :]
 			self.val_Y = Y[val_idx, :]
 
-			print self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape 
+			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape) 
 
 		elif self.name == 'true_pert_circ_T':
 			# Generate matrix which satisfies M - MB = Q, for a circulant sparsity transpose pattern B
@@ -287,7 +287,7 @@ class Dataset:
 				self.train_X = train_X	
 				self.train_Y = train_Y
 		else:
-			print 'Not supported: ', self.name
+			print('Not supported: ', self.name)
 			assert 0
 
 	def get_input_size(self):
@@ -296,21 +296,21 @@ class Dataset:
 		elif self.name == 'smallnorb':
 			return 576
 		elif self.name == 'norb':
-			return 729
+			return 784#729
 		elif self.name == 'cifar10':
-			return 3072
-			if self.transform == 'grayscale':
+			if 'grayscale' in self.transform:
 				return 1024
-			elif self.transform == 'downsample':
+			elif 'downsample' in self.transform:
 				return 768
+			return 3072
 		elif self.name.startswith('true_'):
 			return self.layer_size	
 		else:
-			print 'Name not recognized: ', name
+			print('Name not recognized: ', name)
 			assert 0
 
 	def process_cifar10(self, data):
-		if self.transform == 'grayscale':
+		if 'grayscale' in self.transform:
 			n = data.shape[0]
 			im_r = data[:, 0:1024].reshape((n, 32, 32))
 			im_g = data[:, 1024:2048].reshape((n, 32, 32))
@@ -318,7 +318,7 @@ class Dataset:
 			img = np.stack((im_r, im_g, im_b), axis=-1)
 			avg_img = np.mean(img, axis=-1)
 			data = avg_img.reshape((n, 32*32))
-		elif self.transform == 'downsample':
+		elif 'downsample' in self.transform:
 			n = data.shape[0]
 
 			im_r = data[:, 0:1024].reshape((n, 32, 32))
@@ -353,7 +353,7 @@ class Dataset:
 		enc = OneHotEncoder()
 		self.train_Y = enc.fit_transform(self.train_Y).todense()			
 
-		print 'batch, train_X.shape, train_Y.shape: ', batch_num, self.train_X.shape, self.train_Y.shape
+		print('batch, train_X.shape, train_Y.shape: ', batch_num, self.train_X.shape, self.train_Y.shape)
 
 
 	def out_size(self):
@@ -447,6 +447,6 @@ class Dataset:
 				idx = np.random.randint(self.train_X.shape[0], size=batch_size)
 				return self.train_X[idx, :], self.train_Y[idx, :]
 		else:
-			print 'Not supported: ', name
+			print('Not supported: ', name)
 			assert 0
 

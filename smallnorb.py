@@ -118,7 +118,7 @@ class SmallNORBDataset:
         None
         """
         if self.initialized:
-            print('Exporting images to {}...'.format(export_dir)) #end='', flush=True)
+            print(('Exporting images to {}...'.format(export_dir))) #end='', flush=True)
             for split_name in ['train', 'test']:
 
                 split_dir = join(export_dir, split_name)
@@ -268,7 +268,7 @@ class SmallNORBDataset:
             struct.unpack('<BBBB', f.read(4))  # ignore this integer
 
             examples = np.zeros(shape=num_examples, dtype=np.int32)
-            for i in tqdm(range(num_examples), desc='Loading categories...'):
+            for i in tqdm(list(range(num_examples)), desc='Loading categories...'):
                 category, = struct.unpack('<i', f.read(4))
                 examples[i] = category
 
@@ -298,7 +298,7 @@ class SmallNORBDataset:
 
             examples = np.zeros(shape=(num_examples * channels, height, width), dtype=np.uint8)
 
-            for i in tqdm(range(num_examples * channels), desc='Loading images...'):
+            for i in tqdm(list(range(num_examples * channels)), desc='Loading images...'):
 
                 # Read raw image data and restore shape as appropriate
                 image = struct.unpack('<' + height * width * 'B', f.read(height * width))
@@ -339,7 +339,7 @@ class SmallNORBDataset:
 
             examples = np.zeros(shape=(num_examples, num_info), dtype=np.int32)
 
-            for r in tqdm(range(num_examples), desc='Loading info...'):
+            for r in tqdm(list(range(num_examples)), desc='Loading info...'):
                 for c in range(num_info):
                     info, = struct.unpack('<i', f.read(4))
                     examples[r, c] = info

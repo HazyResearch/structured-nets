@@ -38,7 +38,7 @@ def hankel_project_frob(A):
 
 if __name__ == '__main__':
 	A = np.random.randint(5, size=(3,3))
-	print A
+	print(A)
 	#print kth_diag_indices(A, -4)
 
-	print hankel_project_frob(A)
+	print(hankel_project_frob(A))

@@ -15,11 +15,11 @@ def optimize_torch(dataset, params):
 
 	net.cuda()
 
-	print torch.cuda.get_device_name(0)
+	print(torch.cuda.get_device_name(0))
 
 	for name, param in net.named_parameters():
 	    if param.requires_grad:
-	        print name #, param.data
+	        print(name) #, param.data
 
 	optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
 
@@ -37,25 +37,24 @@ def optimize_torch(dataset, params):
 		batch_xs, batch_ys = Variable(torch.FloatTensor(batch_xs).cuda()), Variable(torch.FloatTensor(batch_ys).cuda())
 		optimizer.zero_grad()   # zero the gradient buffers
 
-		t2 = time.time()
 		output = net.forward(batch_xs)
-		#print 'forward: ', time.time() - t2
 
 
 		train_loss, train_accuracy = compute_loss_and_accuracy(output, batch_ys, params, loss_fn)
+
 		train_loss.backward()
 
 		optimizer.step()
 
 		if step % params.test_freq == 0:
-			print time.time() - t1
+			print('Time: ', time.time() - t1)
 			t1 = time.time()
 			losses['train'].append(train_loss)
 			accuracies['train'].append(train_accuracy)
 			writer.add_scalar('Train/Loss', train_loss, step)
 			writer.add_scalar('Train/Accuracy', train_accuracy, step)
 
-			print('Training step: ', step)
+			print(('Training step: ', step))
 
 			# Test on validation set
 			output = net.forward(val_X)
@@ -67,14 +66,14 @@ def optimize_torch(dataset, params):
 			losses['val'].append(val_loss)
 			accuracies['val'].append(val_accuracy)
 			
-			print('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss, train_accuracy))
-			print('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss, val_accuracy))
+			print(('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss, train_accuracy)))
+			print(('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss, val_accuracy)))
 
 		if step % params.checkpoint_freq == 0:
 			save_path = os.path.join(params.checkpoint_path, str(step))
 			with open(save_path, 'wb') as f: 
 				torch.save(net.state_dict(), f)
-			print("Model saved in file: %s" % save_path)
+			print(("Model saved in file: %s" % save_path))
 
 	# Test trained model
 	if params.test:
@@ -88,8 +87,8 @@ def optimize_torch(dataset, params):
 		writer.add_scalar('Test/Loss', test_loss)
 		writer.add_scalar('Test/Accuracy', test_accuracy)
 
-		print('Test loss, %s: %f' % (params.class_type, test_loss))
-		print('Test accuracy, %s: %f ' % (params.class_type, test_accuracy))
+		print(('Test loss, %s: %f' % (params.class_type, test_loss)))
+		print(('Test accuracy, %s: %f ' % (params.class_type, test_accuracy)))
 
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy

@@ -10,7 +10,7 @@ class ModelParams:
 			fix_A_identity, stochastic_train, flip_K_B, num_conv_layers, 
 			torch, model):
 		if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner']:
-			print 'Class type ' + class_type + ' not supported'
+			print('Class type ' + class_type + ' not supported')
 			assert 0
 		self.dataset_name = dataset_name
 		# grayscale
@@ -91,16 +91,16 @@ class ModelParams:
 		#	cnn_params['p2_strides'] = 1
 		#	cnn_params['p2_flat_size'] = 9 * 9 * cnn_params['c2_filters']
 		else:
-			print 'dataset_name not supported: ', self.dataset_name
+			print('dataset_name not supported: ', self.dataset_name)
 			assert 0
 
 
 
 	def save(self, results_dir, name, commit_id):
 		# Append git commit ID
-		param_str = commit_id + '\n' + str(self)
+		param_str = ''#commit_id + '\n' + str(self)
 
-		print param_str
+		print(param_str)
 
 		# Make new dir with timestamp
 		this_results_dir = os.path.join(results_dir, name + '_' + str(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))

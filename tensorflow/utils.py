@@ -39,7 +39,7 @@ def compute_disp(disp_type, M, A, B):
 	elif disp_type == 'stein':
 		return stein_disp(M,A,B)
 	else:
-		print 'disp_type not supported: ', disp_type
+		print('disp_type not supported: ', disp_type)
 		assert 0 		
 
 def gen_tridiag_corner(subdiag, supdiag, diag, f):
@@ -57,7 +57,7 @@ def get_f(learn_corner, init_type, stddev):
       f_A = tf.Variable(tf.truncated_normal([1], stddev=stddev, dtype=tf.float64), dtype=tf.float64)
       f_B = tf.Variable(tf.truncated_normal([1], stddev=stddev, dtype=tf.float64), dtype=tf.float64)
     else:
-      print 'init_type not supported: ', init_type
+      print('init_type not supported: ', init_type)
       assert 0   
   else:
     f_A = tf.constant([1], dtype=tf.float64)
@@ -72,7 +72,7 @@ def get_subdiag(n_diag_learned, init_type, stddev):
     elif init_type == 'random':
       x = tf.Variable(tf.truncated_normal([n_diag_learned], stddev=stddev, dtype=tf.float64))
     else:
-      print 'init_type not supported: ', init_type
+      print('init_type not supported: ', init_type)
       assert 0 
   return x
 
@@ -108,13 +108,13 @@ def get_symm_pos_tridiag_vars(n, init_type, stddev=0.01):
 		# A: 0 on diagonal
 		# A: 1/2 on on sub/super diagonal 
 		# B: uniform(-1, 1)	
-		print 'chebyshev initialization'
+		print('chebyshev initialization')
 		diag_A = tf.Variable(tf.zeros([n], dtype=tf.float64))
 		off_diag_A = tf.get_variable('off_diag_A', initializer=0.5*tf.ones([n-1], dtype=tf.float64), 
 			constraint=lambda x: tf.clip_by_value(x, 0, np.infty))
 		diag_B = tf.Variable(tf.random_uniform([n],minval=-1, maxval=1, dtype=tf.float64))
 	else:
-		print 'init_type not supported: ', init_type
+		print('init_type not supported: ', init_type)
 
 	return diag_A, off_diag_A, diag_B
 
@@ -128,7 +128,7 @@ def get_tridiag_vars(n, init_type, stddev=0.01):
 		supdiag = tf.Variable(tf.truncated_normal([n-1], stddev=stddev, dtype=tf.float64))
 		diag = tf.Variable(tf.truncated_normal([n], stddev=stddev, dtype=tf.float64))
 	else:
-		print 'init_type not supported: ', init_type
+		print('init_type not supported: ', init_type)
 		assert 0 
 	return subdiag, supdiag, diag	
 
@@ -154,7 +154,7 @@ def compute_loss_and_accuracy(y, y_, params):
 		accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 		return cross_entropy, accuracy
 	else:
-		print 'Not supported: ', params.loss
+		print('Not supported: ', params.loss)
 		assert 0
 
 def compute_y_cnn(x, W1, params):
@@ -163,7 +163,7 @@ def compute_y_cnn(x, W1, params):
 	input_layer = tf.reshape(x, [-1, dim, dim, 1])  # Assuming single channel
 	input_layer = tf.cast(input_layer, tf.float32)
 
-	print 'input ', input_layer
+	print('input ', input_layer)
 	
 	# Reshape to x to 32x32x3
 	# Convolutional Layer #1
@@ -175,19 +175,19 @@ def compute_y_cnn(x, W1, params):
 	activation=tf.nn.relu)
 
 
-	print 'conv1', conv1
+	print('conv1', conv1)
 	# Pooling Layer #1
 	pool1 = tf.layers.max_pooling2d(inputs=conv1, 
 		pool_size=[params.cnn_params['p1_size'], params.cnn_params['p1_size']], 
 		strides=params.cnn_params['p1_strides'])
 
-	print 'pool1 ', pool1
+	print('pool1 ', pool1)
 
 	if params.num_conv_layers == 1:
 		pool2_flat = tf.reshape(pool1, [-1, params.cnn_params['p2_flat_size']])
 		pool2_flat = tf.cast(pool2_flat, tf.float64)
 
-		print 'pool2_flat: ', pool2_flat
+		print('pool2_flat: ', pool2_flat)
 
 		dense = tf.nn.relu(tf.matmul(pool2_flat, W1))
 	else:
@@ -199,30 +199,30 @@ def compute_y_cnn(x, W1, params):
 		  padding="same",
 		  activation=tf.nn.relu)
 		
-		print 'conv2 ', conv2
+		print('conv2 ', conv2)
 
 		pool2 = tf.layers.max_pooling2d(inputs=conv2, 
 			pool_size=[params.cnn_params['p2_size'], params.cnn_params['p2_size']], 
 			strides=params.cnn_params['p2_strides'])
 		
-		print 'pool2 ', pool2
+		print('pool2 ', pool2)
 		# Dense Layer: replace with structured matrix
 		pool2_flat = tf.reshape(pool2, [-1, params.cnn_params['p2_flat_size']])
 		pool2_flat = tf.cast(pool2_flat, tf.float64)
 
-		print 'pool2_flat: ', pool2_flat
+		print('pool2_flat: ', pool2_flat)
 
 		dense = tf.nn.relu(tf.matmul(pool2_flat, W1))
 
-	print 'dense ', dense
+	print('dense ', dense)
 	#dense = tf.layers.dense(inputs=pool3_flat, units=1024, activation=tf.nn.relu)
 
 	# Logits Layer
 	logits = tf.layers.dense(inputs=dense, units=params.out_size)
-	print 'dense ', dense
+	print('dense ', dense)
 
 	
-	print 'logits', logits
+	print('logits', logits)
 
 	return logits
 
@@ -235,7 +235,7 @@ def gen_operators(params):
 	elif params.disp_type == 'stein':
 		return gen_stein_operators(params.class_type, params.layer_size, params.layer_size)
 	else:
-		print 'disp_type not supported: ', params.disp_type
+		print('disp_type not supported: ', params.disp_type)
 		assert 0
 
 # Operators for Stein type displacement.
@@ -257,7 +257,7 @@ def gen_sylvester_operators(class_type, m, n):
 		A = np.random.random((m, m))
 		B = np.random.random((n, n))
 	else:
-		print 'Class ' + prefix + ' not supported'
+		print('Class ' + prefix + ' not supported')
 		assert 0
 	return A,B
 
@@ -277,7 +277,7 @@ def gen_stein_operators(class_type, m, n):
 		A = np.random.random((m, m))
 		B = np.random.random((n, n))
 	else:
-		print 'Class ' + prefix + ' not supported'
+		print('Class ' + prefix + ' not supported')
 		assert 0
 	return A,B
 
@@ -354,7 +354,7 @@ def gen_circ_scaling_tf(x, mask, num_learned):
 
 	t0 = time.time()
 	final_mask = update_mask(x[0], mask)
-	print 'time of first update_mask call: ', time.time() - t0
+	print('time of first update_mask call: ', time.time() - t0)
 
 	sum_update = 0
 	sum_mult = 0
@@ -368,8 +368,8 @@ def gen_circ_scaling_tf(x, mask, num_learned):
 		final_mask = tf.multiply(final_mask, shifted_mask)
 		sum_mult += (time.time() - t2)
 
-	print 'time of all update_mask calls: ', sum_update
-	print 'time of all tf.multiply calls: ', sum_mult		
+	print('time of all update_mask calls: ', sum_update)
+	print('time of all tf.multiply calls: ', sum_mult)		
 	return final_mask
 
 def gen_f_mask(f, m,n):
@@ -493,7 +493,7 @@ def gen_matrix(n, prefix, r=2):
 
 		return sylvester(A, B, n, r)
 	else:
-		print 'Type ' + prefix + ' not supported'
+		print('Type ' + prefix + ' not supported')
 		assert 0
 
 
@@ -542,21 +542,21 @@ def sylvester_project(M, A, B, r):
 
 	lowrank = np.dot(G_r, H_r.T)
 
-	print 'norm(E-lowrank): ', np.linalg.norm(E-lowrank)
+	print('norm(E-lowrank): ', np.linalg.norm(E-lowrank))
 
 	# Sylvester solve
 	M_class = solve_sylvester(A, -B, lowrank)
 
-	print 'rank(lowrank): ', np.linalg.matrix_rank(lowrank)
-	print 'rank(A): ', np.linalg.matrix_rank(A)
-	print 'rank(B): ', np.linalg.matrix_rank(B)
-	print 'norm(M-M_class): ', np.linalg.norm(M-M_class)
+	print('rank(lowrank): ', np.linalg.matrix_rank(lowrank))
+	print('rank(A): ', np.linalg.matrix_rank(A))
+	print('rank(B): ', np.linalg.matrix_rank(B))
+	print('norm(M-M_class): ', np.linalg.norm(M-M_class))
 
 	E_class = np.dot(A, M_class) - np.dot(M_class, B)
-	print 'rank of E_class',np.linalg.matrix_rank(E_class)
+	print('rank of E_class',np.linalg.matrix_rank(E_class))
 	#print 'eigvals of E_class',np.linalg.eigvals(E_class)
 
-	print 'time of sylv project: ', time.time() - t
+	print('time of sylv project: ', time.time() - t)
 
 	return M_class
 
@@ -591,12 +591,12 @@ def krylov_circ_transpose(n, x, v, num_learned, f_mask, scaling_mask, index_arr)
 	t2 = time.time()
 	# Get scaling term
 	scale_term = gen_circ_scaling_tf(x, scaling_mask, num_learned)
-	print 'time of gen_circ_scaling_tf', time.time() - t2
+	print('time of gen_circ_scaling_tf', time.time() - t2)
 
 	# Call circulant_tf on flipped v
 	t3 = time.time()
 	Z = circulant_tf(tf.reverse(v, [0]), index_arr, f_mask)
-	print 'time of circulant_tf', time.time() - t3
+	print('time of circulant_tf', time.time() - t3)
 
 	# Flip row-wise
 	JZ = tf.reverse(Z, [0])

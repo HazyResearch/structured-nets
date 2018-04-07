@@ -44,7 +44,7 @@ def optimize_tf(dataset, params):
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if this_step % params.test_freq == 0:
-			print time.time() - t1
+			print(time.time() - t1)
 			t1 = time.time()
 			print('Training step: ', this_step)
 			# Verify displacement rank

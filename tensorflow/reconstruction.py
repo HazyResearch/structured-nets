@@ -22,9 +22,6 @@ def general_recon(G, H, A, B):
 
   eig_A_reshaped = tf.reshape(eig_A, [-1, 1])
 
-  print 'eig_A: ', eig_A
-  print 'eig_A_reshaped: ', eig_A_reshaped
-  print 'eig_B: ', eig_B
 
   diff = eig_A_reshaped - eig_B
   C = 1.0/diff
@@ -62,7 +59,7 @@ def circ_sparsity_recon_hadamard(G, H, n, r, learn_corner, n_diag_learned, init_
       f_A = tf.Variable(tf.truncated_normal([1], stddev=stddev, dtype=tf.float64), dtype=tf.float64)
       f_B = tf.Variable(tf.truncated_normal([1], stddev=stddev, dtype=tf.float64), dtype=tf.float64)  
     else:
-      print 'init_type not supported: ', init_type
+      print('init_type not supported: ', init_type)
       assert 0   
   else:
     f_A = tf.constant([1], dtype=tf.float64)
@@ -79,12 +76,11 @@ def circ_sparsity_recon_hadamard(G, H, n, r, learn_corner, n_diag_learned, init_
       v_A = tf.Variable(tf.truncated_normal([n_diag_learned], stddev=stddev, dtype=tf.float64))
       v_B = tf.Variable(tf.truncated_normal([n_diag_learned], stddev=stddev, dtype=tf.float64))     
     else:
-      print 'init_type not supported: ', init_type
+      print('init_type not supported: ', init_type)
       assert 0  
 
   t0 = time.time()
   scaling_mask = tf.constant(gen_circ_scaling_mask(n))
-  print 'time to gen scaling mask: ', time.time() - t0
 
   t1 = time.time()
 
@@ -96,14 +92,12 @@ def circ_sparsity_recon_hadamard(G, H, n, r, learn_corner, n_diag_learned, init_
 
   # Reconstruct W1 from G and H
   index_arr = gen_index_arr(n)
-  print 'time for additional masks: ', time.time() - t1
 
 
   W1 = tf.zeros([n, n], dtype=tf.float64)
   for i in range(r):
     t = time.time()
     prod = circ_sparsity_recon_rank1(n, v_A, v_B, G[:, i], H[:, i], f_A_mask, f_B_mask, scaling_mask, index_arr, n_diag_learned)
-    print 'time of rank 1 recon: ', time.time() - t
     W1 = tf.add(W1, prod)
 
   # Compute a and b
@@ -129,8 +123,6 @@ def circ_sparsity_recon_rank1(n, v_A, v_B, g, h, f_A_mask, f_B_mask, scaling_mas
   K1 = krylov_circ_transpose(n, v_A, g, num_learned, f_A_mask, scaling_mask, index_arr)
   t2 = time.time()
   K2 = krylov_circ_transpose(n, v_B, h, num_learned, f_B_mask, scaling_mask, index_arr)
-  print 'time of K(A, g_i): ', t2 - t1
-  print 'time of K(B, h_i): ', time.time() - t2
 
   prod = tf.matmul(K1, tf.transpose(K2))
 
@@ -247,7 +239,6 @@ def sylvester(M, N, n, r):
 
   E = np.dot(M,A) - np.dot(A,N)
 
-  print 'Error in Sylvester solver: ', np.linalg.norm(E - GH)
 
   return A,G,H
 
@@ -268,6 +259,5 @@ if __name__ == '__main__':
 
     W_real = sess.run(W)
 
-    print np.linalg.norm(W_real - M)
 
     quit()
