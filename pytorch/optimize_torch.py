@@ -19,7 +19,7 @@ def optimize_torch(dataset, params):
 
 	for name, param in net.named_parameters():
 	    if param.requires_grad:
-	        print(name) #, param.data
+	        print('Parameter name, shape: ', name, param.data.shape)
 
 	optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
 
