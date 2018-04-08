@@ -7,7 +7,10 @@ from torch_krylov import *
 from torch_reconstruction import *
 import sys
 sys.path.insert(0, '../../krylov/')
-from krylov_multiply import *
+sys.path.insert(0, '../../pytorch/attention/')
+from attention import *
+#from krylov_multiply import *
+import copy
 
 def construct_net(params):
     if params.model == 'LeNet':
@@ -16,57 +19,12 @@ def construct_net(params):
         return MLP(params)
     elif params.model == 'RNN':
         return RNN(params)
+    elif params.model == 'Attention':
+        return Attention(params)
     else:
         print('Model not supported: ', params.model)
         assert 0
-
-# Assumes Stein displacement. 
-def set_mult_fns(net, params):
-    assert params.disp_type == 'stein'
-    if params.class_type == 'toeplitz_like':
-        fn_A = functools.partial(Z_transpose_mult_fn, 1)
-        fn_B_T = functools.partial(Z_transpose_mult_fn, -1)
-    elif params.class_type == 'hankel_like':
-        fn_A = functools.partial(Z_transpose_mult_fn, 1)
-        fn_B_T = functools.partial(Z_mult_fn, 0)
-    elif params.class_type == 'vandermonde_like':
-        v = Parameter(torch.Tensor(params.layer_size))
-        torch.nn.init.normal(v,std=params.init_stddev)
-        net.v = v
-        fn_A = functools.partial(diag_mult_fn, net.v)
-        fn_B_T = functools.partial(Z_transpose_mult_fn, 0)
-    elif params.class_type == 'circulant_sparsity':
-        net.subdiag_f_A = Parameter(torch.Tensor(params.layer_size))
-        net.subdiag_f_B = Parameter(torch.Tensor(params.layer_size))
-        torch.nn.init.normal(net.subdiag_f_A,std=params.init_stddev)
-        torch.nn.init.normal(net.subdiag_f_B,std=params.init_stddev)
-
-        fn_A = functools.partial(circ_transpose_mult_fn, net.subdiag_f_A)
-        fn_B_T = functools.partial(circ_transpose_mult_fn, net.subdiag_f_B)
-
-    elif params.class_type == 'tridiagonal_corner':
-        net.subdiag_f_A = Parameter(torch.Tensor(params.layer_size))
-        net.subdiag_f_B = Parameter(torch.Tensor(params.layer_size))
-        net.diag_A = Parameter(torch.Tensor(params.layer_size))
-        net.diag_B = Parameter(torch.Tensor(params.layer_size))
-        net.supdiag_A = Parameter(torch.Tensor(params.layer_size-1))
-        net.supdiag_B = Parameter(torch.Tensor(params.layer_size-1))
-
-        torch.nn.init.normal(net.subdiag_f_A,std=params.init_stddev)
-        torch.nn.init.normal(net.subdiag_f_B,std=params.init_stddev)
-        torch.nn.init.normal(net.diag_A,std=params.init_stddev)
-        torch.nn.init.normal(net.diag_B,std=params.init_stddev)
-        torch.nn.init.normal(net.supdiag_A,std=params.init_stddev)
-        torch.nn.init.normal(net.supdiag_B,std=params.init_stddev)
-
-        fn_A = functools.partial(tridiag_transpose_mult_fn, net.subdiag_f_A, net.diag_A, net.supdiag_A)
-        fn_B_T = functools.partial(tridiag_transpose_mult_fn, net.subdiag_f_B, net.diag_B, net.supdiag_B)
-
-    else:
-        print('Not supported: ', params.class_type)  
-        assert 0  
-    return fn_A, fn_B_T    
-
+  
 def structured_layer(net, x):
 	if net.params.class_type == 'unconstrained':
 		return torch.matmul(x, net.W)
@@ -155,6 +113,15 @@ class MLP(nn.Module):
         else:
             print('Not supported: ', params.num_layers)
             assert 0
+
+class Attention(nn.Module):
+    def __init__(self, params):
+        super(Attention, self).__init__()
+        self.model = make_model(10, 10, 2)#(params.src_vocab, params.tgt_vocab, 
+            #params.N, params.d_model, params.d_ff, params.h, params.dropout)
+
+    def forward(self, x):
+        return self.model.forward(x)
 
 class RNN(nn.Module):
     def __init__(self, params):

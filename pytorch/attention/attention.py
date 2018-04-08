@@ -151,7 +151,7 @@ def attention(query, key, value, mask=None, dropout=None):
     return torch.matmul(p_attn, value), p_attn
 
 class MultiHeadedAttention(nn.Module):
-    def __init__(self, h, d_model, dropout=0.1):
+    def __init__(self, params, h, d_model, dropout=0.1):
         "Take in model size and number of heads."
         super(MultiHeadedAttention, self).__init__()
         assert d_model % h == 0
@@ -159,9 +159,10 @@ class MultiHeadedAttention(nn.Module):
         self.d_k = d_model // h
         self.h = h
         print('d_model, h, d_k: ', d_model, h, self.d_k)
-        self.struct = StructuredLinear(yo)
-        quit()
-        self.linears = clones(nn.Linear(d_model, d_model), 4)
+        #self.struct = StructuredLinear(yo)
+        #quit()
+        self.linears = clones(StructuredLinear(params), 4)
+        #self.linears = clones(nn.Linear(d_model, d_model), 4)
         self.attn = None
         self.dropout = nn.Dropout(p=dropout)
         
@@ -227,11 +228,11 @@ class PositionalEncoding(nn.Module):
                          requires_grad=False)
         return self.dropout(x)
 
-def make_model(src_vocab, tgt_vocab, N=6, 
+def make_model(params, src_vocab, tgt_vocab, N=6, 
                d_model=512, d_ff=2048, h=8, dropout=0.1):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
-    attn = MultiHeadedAttention(h, d_model)
+    attn = MultiHeadedAttention(params, h, d_model)
     ff = PositionwiseFeedForward(d_model, d_ff, dropout)
     position = PositionalEncoding(d_model, dropout)
     model = EncoderDecoder(

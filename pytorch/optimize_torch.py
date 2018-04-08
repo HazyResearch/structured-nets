@@ -8,8 +8,12 @@ from torch_utils import *
 from torch.autograd import Variable
 import torch.optim as optim
 from tensorboardX import SummaryWriter
+from optimize_nmt import optimize_nmt
 
 def optimize_torch(dataset, params):
+	if params.model == 'Attention':
+		return optimize_nmt(dataset, params)
+
 	writer = SummaryWriter(params.log_path)
 	net = construct_net(params)
 
