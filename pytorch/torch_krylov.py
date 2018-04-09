@@ -10,7 +10,10 @@ def Z_mult_fn(f, x):
 
 # Up shift
 def Z_transpose_mult_fn(f, x):
-	return torch.cat((x[1:], f * x[0]))
+	#print('x[1:]: ', x[1:])
+	#print('f*x[0]: ', f*x[0])
+	#return torch.cat((x[1:], torch.FloatTensor([f * x[0]])))
+	return torch.cat((x[1:], f*x[0]))
 
 # Diagonal multiplication
 def diag_mult_fn(diag, x):

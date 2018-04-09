@@ -24,7 +24,7 @@ class StructuredLinear(nn.Module):
                 self.fn_A = fn_A
                 self.fn_B_T = fn_B_T
         else:
-            print('Not supported: ', self.params.class_type)  
+            print(('Not supported: ', self.params.class_type))  
             assert 0
 
     # Assumes Stein displacement. 

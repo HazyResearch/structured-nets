@@ -25,7 +25,7 @@ def krylov_recon(r, n, G, H, fn_A, fn_B_T):
 		prod = torch.matmul(K_A, K_B).cuda()
 		#print('W1: ', W1)
 		#print('prod: ', prod)
-		W1 += prod
+		W1 = torch.add(W1, prod)
 
 	return W1
 
@@ -43,7 +43,7 @@ def recon(net):
 		coeff = 1.0/(1 - a*b)
 		return coeff*W
 	else:
-		print('Class_type not supported: ', net.params.class_type)
+		print(('Class_type not supported: ', net.params.class_type))
 		assert 0
 
 if __name__ == '__main__':
@@ -58,16 +58,16 @@ if __name__ == '__main__':
 	A = gen_Z_f(n, 1).T
 	B = gen_Z_f(n, -1)
 	E = T - np.dot(A,np.dot(T,B))
-	print np.linalg.matrix_rank(E)
+	print(np.linalg.matrix_rank(E))
 
 	U, S, V = np.linalg.svd(E, full_matrices=False)
 
 	SV = np.dot(np.diag(S), V)
-	G = U[:, 0:disp_rank]
-	H = SV[0:disp_rank, :].T
+	G = torch.FloatTensor(U[:, 0:disp_rank])
+	H = torch.FloatTensor(SV[0:disp_rank, :].T)
 	fn_A = functools.partial(Z_transpose_mult_fn, 1)
 	fn_B_T = functools.partial(Z_transpose_mult_fn, -1)
 
 	W = 0.5*krylov_recon(disp_rank, n, G, H, fn_A, fn_B_T)
-	print 'W: ', W
-	print 'T: ', T
+	print('W: ', W)
+	print('T: ', T)
