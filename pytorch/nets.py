@@ -22,7 +22,7 @@ def construct_net(params):
     elif params.model == 'Attention':
         return Attention(params)
     else:
-        print('Model not supported: ', params.model)
+        print(('Model not supported: ', params.model))
         assert 0
   
 def structured_layer(net, x):
@@ -42,7 +42,7 @@ def structured_layer(net, x):
 		# NORMALIZE W
 		return torch.matmul(x, W)
 	else:
-		print('Not supported: ', params.class_type)  
+		print(('Not supported: ', params.class_type))  
 		assert 0 
 
 def set_structured_W(net, params):
@@ -61,7 +61,7 @@ def set_structured_W(net, params):
             net.fn_A = fn_A
             net.fn_B_T = fn_B_T
     else:
-        print('Not supported: ', params.class_type)  
+        print(('Not supported: ', params.class_type))  
         assert 0
 
 class LeNet(nn.Module):
@@ -111,7 +111,7 @@ class MLP(nn.Module):
             y = torch.matmul(h, self.W2) + self.b2
             return y
         else:
-            print('Not supported: ', params.num_layers)
+            print(('Not supported: ', params.num_layers))
             assert 0
 
 class Attention(nn.Module):

@@ -1,4 +1,4 @@
-from __future__ import division
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -150,8 +150,8 @@ def run_epoch(data_iter, model, loss_compute):
         tokens += batch.ntokens
         if i % 50 == 1:
             elapsed = time.time() - start
-            print("Epoch Step: %d Loss: %f Tokens per Sec: %f" %
-                    (i, loss / batch.ntokens, tokens / elapsed))
+            print(("Epoch Step: %d Loss: %f Tokens per Sec: %f" %
+                    (i, loss / batch.ntokens, tokens / elapsed)))
             start = time.time()
             tokens = 0
     return total_loss / total_tokens
@@ -265,7 +265,7 @@ if __name__ == '__main__':
 
     for name, param in model.named_parameters():
         if param.requires_grad:
-            print name, param.data.shape
+            print(name, param.data.shape)
 
     quit()
 
@@ -277,5 +277,5 @@ if __name__ == '__main__':
         run_epoch(data_gen(V, 30, 20), model, 
                   SimpleLossCompute(model.generator, criterion, model_opt))
         model.eval()
-        print(run_epoch(data_gen(V, 30, 5), model, 
-                        SimpleLossCompute(model.generator, criterion, None)))
+        print((run_epoch(data_gen(V, 30, 5), model, 
+                        SimpleLossCompute(model.generator, criterion, None))))

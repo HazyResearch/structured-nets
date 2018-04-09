@@ -19,11 +19,11 @@ def optimize_torch(dataset, params):
 
 	net.cuda()
 
-	print(torch.cuda.get_device_name(0))
+	print((torch.cuda.get_device_name(0)))
 
 	for name, param in net.named_parameters():
 	    if param.requires_grad:
-	        print('Parameter name, shape: ', name, param.data.shape)
+	        print(('Parameter name, shape: ', name, param.data.shape))
 
 	optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
 
@@ -51,7 +51,7 @@ def optimize_torch(dataset, params):
 		optimizer.step()
 
 		if step % params.test_freq == 0:
-			print('Time: ', time.time() - t1)
+			print(('Time: ', time.time() - t1))
 			t1 = time.time()
 			losses['train'].append(train_loss)
 			accuracies['train'].append(train_accuracy)

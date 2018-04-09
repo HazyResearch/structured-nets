@@ -158,7 +158,7 @@ class MultiHeadedAttention(nn.Module):
         # We assume d_v always equals d_k
         self.d_k = d_model // h
         self.h = h
-        print('d_model, h, d_k: ', d_model, h, self.d_k)
+        print(('d_model, h, d_k: ', d_model, h, self.d_k))
         #self.struct = StructuredLinear(yo)
         #quit()
         self.linears = clones(StructuredLinear(params), 4)
@@ -252,4 +252,4 @@ def make_model(params, src_vocab, tgt_vocab, N=6,
 
 if __name__ == '__main__':
 	tmp_model = make_model(10, 10, 2)
-	print tmp_model
+	print(tmp_model)

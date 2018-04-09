@@ -17,7 +17,9 @@ def krylov_recon(params, G, H, fn_A, fn_B_T):
 		
 		K_B = krylov(fn_B_T, H[:, i], params.layer_size).t()
 
-		prod = torch.matmul(K_A, K_B)
+		prod = torch.matmul(K_A, K_B).cuda()
+		#print('W1: ', W1)
+		#print('prod: ', prod)
 		W1 += prod
 
 	return W1

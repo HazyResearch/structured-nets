@@ -117,5 +117,5 @@ def compute_loss_and_accuracy(pred, true, params, loss_fn, ntokens=None):
 		return loss, accuracy
 
 	else:
-		print('Not supported: ', params.loss)
+		print(('Not supported: ', params.loss))
 		assert 0

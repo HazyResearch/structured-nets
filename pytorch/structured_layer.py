@@ -48,7 +48,7 @@ def set_mult_fns(net, params):
         fn_B_T = functools.partial(tridiag_transpose_mult_fn, net.subdiag_f_B, net.diag_B, net.supdiag_B)
 
     else:
-        print('Not supported: ', params.class_type)  
+        print(('Not supported: ', params.class_type))  
         assert 0  
     return fn_A, fn_B_T  
 
@@ -71,7 +71,7 @@ class StructuredLinear(nn.Module):
                 self.fn_A = fn_A
                 self.fn_B_T = fn_B_T
         else:
-            print 'Not supported: ', self.params.class_type  
+            print('Not supported: ', self.params.class_type)  
             assert 0
 
     def forward(self,x):
@@ -86,4 +86,4 @@ class StructuredLinear(nn.Module):
             
             # NORMALIZE W
 
-            return torch.matmul(x, self.W)
+            return torch.matmul(x, W)
