@@ -13,7 +13,7 @@ import argparse
 
 # Available datasets: norb, cifar10, smallnorb, mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
 # Example command: 
-# python compare.py --name=test --methods=tridiagonal_corner,toeplitz-like --dataset=true_toeplitz --result_dir=2_25_18 --r=1 --lr=1e-3 --decay_rate=1.0 --mom=0.9 --test=0 --layer_size=50 --transform=none
+# python compare.py --name=test --methods=tridiagonal_corner,toeplitz-like --dataset=true_toeplitz --result_dir=2_25_18 --r=1 --lr=1e-3 --decay_rate=1.0 --mom=0.9 --test=0 --layer_size=50 --transform=none --torch=1 --model=Attention
 
 # Command line params
 parser = argparse.ArgumentParser()
@@ -34,7 +34,7 @@ args = parser.parse_args()
 
 # Fixed params
 num_layers = 1
-out_dir = '/dfs/scratch1/thomasat/'
+out_dir = '../../results'#'/dfs/scratch1/thomasat/'
 loss = 'cross_entropy'
 steps = 50000
 decay_freq = 0.1

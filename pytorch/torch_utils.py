@@ -3,6 +3,20 @@ import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
 
+# Circulant sparsity pattern
+def gen_Z_f(m, f, v=None):
+    if v is not None:
+        assert v.size <= m-1
+    I_m = np.eye(m-1, m-1)
+    Z_f = np.hstack((I_m, np.zeros((m-1, 1))))
+    Z_f = np.vstack((np.zeros((1, m)), Z_f)) 
+    Z_f[0, -1] = f
+    if v is not None:
+        for i in range(v.size):
+            Z_f[i+1, i] = v[i]
+
+    return Z_f
+
 def subsequent_mask(size):
     "Mask out subsequent positions."
     attn_shape = (1, size, size)
