@@ -9,10 +9,14 @@ from torch.autograd import Variable
 import torch.optim as optim
 from tensorboardX import SummaryWriter
 from optimize_nmt import optimize_nmt
+from optimize_iwslt import optimize_iwslt
 
 def optimize_torch(dataset, params):
 	if params.model == 'Attention':
-		return optimize_nmt(dataset, params)
+		if dataset.name == 'copy':
+			return optimize_nmt(dataset, params)
+		elif dataset.name == 'iwslt':
+			return optimize_iwslt(dataset, params)
 
 	writer = SummaryWriter(params.log_path)
 	net = construct_net(params)

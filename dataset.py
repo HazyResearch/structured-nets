@@ -11,6 +11,30 @@ import torch
 from torch.autograd import Variable
 sys.path.insert(0, '../../pytorch/')
 from torch_utils import *
+from torchtext import data
+
+class MyIterator(data.Iterator):
+    def create_batches(self):
+        if self.train:
+            def pool(d, random_shuffler):
+                for p in data.batch(d, self.batch_size * 100):
+                    p_batch = data.batch(
+                        sorted(p, key=self.sort_key),
+                        self.batch_size, self.batch_size_fn)
+                    for b in random_shuffler(list(p_batch)):
+                        yield b
+            self.batches = pool(self.data(), self.random_shuffler)
+            
+        else:
+            self.batches = []
+            for b in data.batch(self.data(), self.batch_size,
+                                          self.batch_size_fn):
+                self.batches.append(sorted(b, key=self.sort_key))
+
+def rebatch(pad_idx, batch):
+    "Fix order in torchtext to match ours"
+    src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
+    return Batch(src, trg, pad_idx)
 
 def data_gen(V, batch, nbatches):
     "Generate random data for a src-tgt copy task."
@@ -75,7 +99,9 @@ class Dataset:
 		self.train_loc = ''
 		self.test_loc = ''
 		
-		if self.name == 'cifar10':
+		if self.name in ['iwslt', 'copy']:
+			return
+		elif self.name == 'cifar10':
 			# Load the first batch
 			data_dir = '/dfs/scratch1/thomasat/datasets/cifar10'
 
@@ -349,7 +375,7 @@ class Dataset:
 			elif 'downsample' in self.transform:
 				return 768
 			return 3072
-		elif self.name.startswith('true_'):
+		elif self.name.startswith('true_') or self.name in ['iwslt', 'copy']:
 			return self.layer_size	
 		else:
 			print('Name not recognized: ', name)

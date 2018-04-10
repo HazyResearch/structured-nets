@@ -71,6 +71,12 @@ def optimize_nmt(dataset, params):
             print('Val, epoch: ', val_total_loss_fraction, epoch)
             writer.add_scalar('Val/Loss', val_total_loss_fraction, epoch)
 
+            # Checkpoint
+            save_path = os.path.join(params.checkpoint_path, str(epoch))
+            with open(save_path, 'wb') as f: 
+                torch.save(model.state_dict(), f)
+            print(("Model saved in file: %s" % save_path))
+
 
 	writer.export_scalars_to_json(os.path.join(params.log_path, "all_scalars.json"))
 	writer.close()
