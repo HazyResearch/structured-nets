@@ -83,7 +83,7 @@ class ModelParams:
 		elif self.dataset_name.startswith('true'):
 			self.cnn_params = cnn_params
 
-		elif self.dataset_name in ['copy', 'iwslt']:
+		elif self.dataset_name in ['copy', 'iwslt', 'mnist_bg_rot']:
 			return
 		#elif self.dataset_name.startswith('norb'):
 		#	cnn_params['c1_filters'] = 9

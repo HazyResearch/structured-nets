@@ -71,7 +71,7 @@ def optimize_tf(dataset, params):
 			print('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss, train_accuracy))
 			print('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss, val_accuracy))
 
-		if this_step % params.checkpoint_freq == 0:
+		if this_step > 0 and this_step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(this_step)))
 			print("Model saved in file: %s" % save_path)
 
