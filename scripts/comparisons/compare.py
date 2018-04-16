@@ -10,6 +10,7 @@ from utils import *
 from model_params import ModelParams
 from dataset import Dataset
 import argparse
+import threading
 
 # Available datasets: norb, cifar10, smallnorb, mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
 # Example command: 
@@ -17,6 +18,39 @@ import argparse
 
 method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'low_rank': 'lr', 'unconstrained': 'u', 
 	'toeplitz_like': 't', 'hankel_like': 'h', 'vandermonde_like': 'v'}
+
+def compare(args, method, rank, lr, decay_rate, mom):
+	params = ModelParams(args.dataset, args.transform, args.test, log_path, 
+			dataset.input_size, args.layer_size, dataset.out_size(), num_layers, 
+			loss, rank, args.steps, args.batch_size, lr, mom, init_type, 
+			method, learn_corner, n_diag_learned, init_stddev, fix_G, 
+			check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose, 
+			decay_rate, args.decay_freq, learn_diagonal, fix_A_identity, 
+			stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model)
+
+	# Save params + git commit ID
+	this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) 
+	this_results_dir = params.save(results_dir, this_id, commit_id)
+	print('this_results_dir: ', this_results_dir)
+
+	for test_iter in range(n_trials):
+		this_iter_name = this_id + '_' + str(test_iter)
+		params.log_path = os.path.join(log_path, this_iter_name)
+		params.checkpoint_path = os.path.join(checkpoint_path, this_iter_name)
+
+		print('Tensorboard log path: ', params.log_path)
+		print('Tensorboard checkpoint path: ', params.checkpoint_path)
+		if not os.path.exists(params.checkpoint_path):
+			os.makedirs(params.checkpoint_path)
+
+		losses, accuracies = optimize(dataset, params)
+		tf.reset_default_graph()
+
+		out_loc = os.path.join(this_results_dir, this_iter_name)
+		pkl.dump(losses, open(out_loc + '_losses.p', 'wb'), protocol=2)
+		pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'), protocol=2)
+
+		print('Saved losses and accuracies for ' + method + ' to: ' + out_loc) 
 
 # Command line params
 parser = argparse.ArgumentParser()
@@ -36,6 +70,7 @@ parser.add_argument('--layer_size', type=int) # Size of hidden layer
 parser.add_argument('--transform') # Any transform of dataset, e.g. grayscale
 parser.add_argument('--torch', type=int) # Pytorch or TF
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
+parser.add_argument('--parallel') # 
 args = parser.parse_args()
 
 
@@ -85,35 +120,8 @@ for method in methods:
 		for lr in lrs:
 			for decay_rate in decay_rates: 
 				for mom in moms:
-					params = ModelParams(args.dataset, args.transform, args.test, log_path, 
-							dataset.input_size, args.layer_size, dataset.out_size(), num_layers, 
-							loss, rank, args.steps, args.batch_size, lr, mom, init_type, 
-							method, learn_corner, n_diag_learned, init_stddev, fix_G, 
-							check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose, 
-							decay_rate, args.decay_freq, learn_diagonal, fix_A_identity, 
-							stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model)
-
-					# Save params + git commit ID
-					this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) 
-					this_results_dir = params.save(results_dir, this_id, commit_id)
-					print('this_results_dir: ', this_results_dir)
-
-					for test_iter in range(n_trials):
-						this_iter_name = this_id + '_' + str(test_iter)
-						params.log_path = os.path.join(log_path, this_iter_name)
-						params.checkpoint_path = os.path.join(checkpoint_path, this_iter_name)
-
-						print('Tensorboard log path: ', params.log_path)
-						print('Tensorboard checkpoint path: ', params.checkpoint_path)
-						if not os.path.exists(params.checkpoint_path):
-							os.makedirs(params.checkpoint_path)
-
-						losses, accuracies = optimize(dataset, params)
-						tf.reset_default_graph()
-
-						out_loc = os.path.join(this_results_dir, this_iter_name)
-						pkl.dump(losses, open(out_loc + '_losses.p', 'wb'), protocol=2)
-						pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'), protocol=2)
-
-						print('Saved losses and accuracies for ' + method + ' to: ' + out_loc)
+					if args.parallel:
+						threading.Thread(target=compare,args=(args, method, rank, lr, decay_rate, mom),).start()
+					else:
+						compare(args, method, rank, lr, decay_rate, mom)
 
