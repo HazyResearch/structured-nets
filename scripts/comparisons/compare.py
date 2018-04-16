@@ -11,6 +11,9 @@ from model_params import ModelParams
 from dataset import Dataset
 import argparse
 import threading
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadName)s %(message)s')
 
 # Available datasets: norb, cifar10, smallnorb, mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
 # Example command: 
@@ -31,15 +34,15 @@ def compare(args, method, rank, lr, decay_rate, mom):
 	# Save params + git commit ID
 	this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) 
 	this_results_dir = params.save(results_dir, this_id, commit_id)
-	print('this_results_dir: ', this_results_dir)
+	logging.debug('this_results_dir: ' + this_results_dir)
 
 	for test_iter in range(n_trials):
 		this_iter_name = this_id + '_' + str(test_iter)
 		params.log_path = os.path.join(log_path, this_iter_name)
 		params.checkpoint_path = os.path.join(checkpoint_path, this_iter_name)
 
-		print('Tensorboard log path: ', params.log_path)
-		print('Tensorboard checkpoint path: ', params.checkpoint_path)
+		logging.debug('Tensorboard log path: ' + params.log_path)
+		logging.debug('Tensorboard checkpoint path: ' + params.checkpoint_path)
 		if not os.path.exists(params.checkpoint_path):
 			os.makedirs(params.checkpoint_path)
 
@@ -50,7 +53,7 @@ def compare(args, method, rank, lr, decay_rate, mom):
 		pkl.dump(losses, open(out_loc + '_losses.p', 'wb'), protocol=2)
 		pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'), protocol=2)
 
-		print('Saved losses and accuracies for ' + method + ' to: ' + out_loc) 
+		logging.debug('Saved losses and accuracies for ' + method + ' to: ' + out_loc) 
 
 # Command line params
 parser = argparse.ArgumentParser()
@@ -80,11 +83,11 @@ lrs = [float(lr) for lr in args.lr.split(',')]
 decay_rates = [float(dr) for dr in args.decay_rate.split(',')]
 moms = [float(mom) for mom in args.mom.split(',')]
 
-print('Testing methods: ', methods)
-print('Testing ranks: ', ranks)
-print('Testing lrs: ', lrs)
-print('Testing decay rates: ', decay_rates)
-print('Testing moms: ', moms)
+logging.debug('Testing methods: ', methods)
+logging.debug('Testing ranks: ', ranks)
+logging.debug('Testing lrs: ', lrs)
+logging.debug('Testing decay rates: ', decay_rates)
+logging.debug('Testing moms: ', moms)
 
 # Fixed params
 num_layers = 1
@@ -121,6 +124,7 @@ for method in methods:
 			for decay_rate in decay_rates: 
 				for mom in moms:
 					if args.parallel:
+						logging.debug('Starting thread')
 						threading.Thread(target=compare,args=(args, method, rank, lr, decay_rate, mom),).start()
 					else:
 						compare(args, method, rank, lr, decay_rate, mom)

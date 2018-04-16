@@ -5,6 +5,7 @@ from utils import *
 from reconstruction import *
 from model import *
 import time
+import logging
 
 def optimize_tf(dataset, params):
 	# Create model
@@ -44,9 +45,9 @@ def optimize_tf(dataset, params):
 		_ = sess.run([train_step], feed_dict={x: batch_xs, y_: batch_ys})
 
 		if this_step % params.test_freq == 0:
-			print(time.time() - t1)
+			logging.debug(time.time() - t1)
 			t1 = time.time()
-			print('Training step: ', this_step)
+			logging.debug('Training step: ' + str(this_step))
 			# Verify displacement rank
 			if params.check_disp:
 				dr, ratio = check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
@@ -68,12 +69,12 @@ def optimize_tf(dataset, params):
 			losses['val'].append(val_loss)
 			accuracies['val'].append(val_accuracy)
 			
-			print('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss, train_accuracy))
-			print('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss, val_accuracy))
+			logging.debug('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss, train_accuracy))
+			logging.debug('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss, val_accuracy))
 
 		if this_step > 0 and this_step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(this_step)))
-			print("Model saved in file: %s" % save_path)
+			logging.debug("Model saved in file: %s" % save_path)
 
 	# Test trained model
 	if params.test:
@@ -84,8 +85,8 @@ def optimize_tf(dataset, params):
 		summary_writer.add_summary(test_loss_summ, this_step)
 		summary_writer.add_summary(test_acc_summ, this_step)
 
-		print('Test loss, %s: %f' % (params.class_type, test_loss))
-		print('Test accuracy, %s: %f ' % (params.class_type, test_accuracy))
+		logging.debug('Test loss, %s: %f' % (params.class_type, test_loss))
+		logging.debug('Test accuracy, %s: %f ' % (params.class_type, test_accuracy))
 
 		losses['test'] = test_loss
 		accuracies['test'] = test_accuracy
