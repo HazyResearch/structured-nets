@@ -54,8 +54,8 @@ def optimize_tf(dataset, params):
 				losses['DR'].append(dr)
 				losses['ratio'].append(ratio)
 
-			train_loss, train_accuracy, train_loss_summ, train_acc_summ = sess.run([loss, accuracy, train_loss_summary, 
-				train_acc_summary], feed_dict={x: batch_xs, y_: batch_ys})
+			train_loss, train_accuracy, train_loss_summ, train_acc_summ, y_pred = sess.run([loss, accuracy, train_loss_summary, 
+				train_acc_summary, y], feed_dict={x: batch_xs, y_: batch_ys})
 			val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary, 
 				val_acc_summary], feed_dict={x: dataset.val_X, y_: dataset.val_Y})			
 			
@@ -75,6 +75,9 @@ def optimize_tf(dataset, params):
 		if this_step > 0 and this_step % params.checkpoint_freq == 0:
 			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(this_step)))
 			logging.debug("Model saved in file: %s" % save_path)
+
+		if this_step > 0 and this_step % params.viz_freq == 0:
+			visualize(params,sess,model,batch_xs,batch_ys,y_pred,this_step)
 
 	# Test trained model
 	if params.test:
