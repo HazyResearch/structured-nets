@@ -122,6 +122,8 @@ def get_structured_W(params):
 		'vandermonde_like', 'hankel_like', 'circulant_sparsity', 'tridiagonal_corner']:
 		G = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=params.init_stddev, dtype=tf.float64))
 		H = tf.Variable(tf.truncated_normal([params.layer_size, params.r], stddev=params.init_stddev, dtype=tf.float64))
+		model['G'] = G
+		model['H'] = H
 		if params.class_type == 'low_rank':
 			W = tf.matmul(G, tf.transpose(H))
 		elif params.class_type == 'symm_tridiag_corner_pan':
