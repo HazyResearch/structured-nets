@@ -1,5 +1,5 @@
 """
-Compare methods.
+Compare methods and hyperparameter settings sequentially.
 """
 
 import sys, os, datetime
@@ -10,7 +10,6 @@ from utils import *
 from model_params import ModelParams
 from dataset import Dataset
 import argparse
-import multiprocessing
 
 # Available datasets: norb, cifar10, smallnorb, mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
 # Example command: 
