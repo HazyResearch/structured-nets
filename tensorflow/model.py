@@ -115,7 +115,7 @@ def get_structured_W(params):
 	model = {}
 	if params.class_type == 'unconstrained':
 		W = tf.Variable(tf.truncated_normal([params.layer_size, params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
-		if params.check_disp:
+		if params.check_disp or params.viz_freq > 0:
 			model['W'] = W
 		return W, model
 	elif params.class_type in ['low_rank', 'symm_tridiag_corner_pan', 'symm_tridiag_corner_krylov','symmetric', 'toeplitz_like', 
@@ -135,7 +135,7 @@ def get_structured_W(params):
 			B = tf.multiply(B, mask)
 
 			W = general_recon(G, H, A, B)
-			if params.check_disp:
+			if params.check_disp or params.viz_freq > 0:
 				model['A'] = A
 				model['B'] = B
 		elif params.class_type == 'symm_tridiag_corner_krylov':
@@ -145,7 +145,7 @@ def get_structured_W(params):
 			off_diag_B = tf.Variable(tf.truncated_normal([params.layer_size-1], stddev=params.init_stddev, dtype=tf.float64))
 			f_A = tf.Variable(tf.truncated_normal([1], stddev=params.init_stddev, dtype=tf.float64))
 			f_B = tf.Variable(tf.truncated_normal([1], stddev=params.init_stddev, dtype=tf.float64))
-			if params.check_disp:
+			if params.check_disp or params.viz_freq > 0:
 				model['diag_A'] = diag_A
 				model['off_diag_A'] = off_diag_A
 				model['f_A'] = f_A
@@ -187,7 +187,7 @@ def get_structured_W(params):
 			B_symm = 0.5 * (B_upper + tf.transpose(B_upper))
 
 			W = general_recon(G, H, A_symm, B_symm)
-			if params.check_disp:
+			if params.check_disp or params.viz_freq > 0:
 				model['A'] = A_symm
 				model['B'] = B_symm
 		elif params.class_type == 'toeplitz_like':
@@ -230,13 +230,13 @@ def get_structured_W(params):
 			coeff = 1.0/(1 - a*b)
 
 			W = tf.scalar_mul(coeff, W)
-			if params.check_disp:
+			if params.check_disp or params.viz_freq > 0:
 				model['f_x_A'] = f_x_A
 				model['f_x_B'] = f_x_B
 
 		elif params.class_type == 'tridiagonal_corner':
 			subdiag_A, supdiag_A, diag_A, f_A, subdiag_B, supdiag_B, diag_B, f_B = get_tridiag_corner_vars(params.layer_size, params.init_type, params.init_stddev, params.learn_corner)
-			if params.check_disp:
+			if params.check_disp or params.viz_freq > 0:
 				model['subdiag_A'] = subdiag_A
 				model['supdiag_A'] = supdiag_A
 				model['diag_A'] = diag_A
@@ -256,7 +256,7 @@ def get_structured_W(params):
 			coeff = 1.0/(1 - a*b)
 
 			W = tf.multiply(coeff, W)
-		if params.check_disp:
+		if params.check_disp or params.viz_freq > 0:
 			model['W'] = W
 		return W, model
 
