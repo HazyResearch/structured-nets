@@ -218,7 +218,7 @@ def compute_y_cnn(x, W1, params):
 	#dense = tf.layers.dense(inputs=pool3_flat, units=1024, activation=tf.nn.relu)
 
 	# Logits Layer
-	logits = tf.layers.dense(inputs=dense, units=params.out_size)
+	logits = tf.layers.dense(inputs=dense, units=params.out_size,name='forward')
 	print('dense ', dense)
 
 	

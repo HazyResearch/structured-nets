@@ -274,7 +274,7 @@ def compute_y(x, W1, params):
 	if 'cnn' in params.transform:
 		return compute_y_cnn(x, W1, params)
 	elif params.num_layers==0:
-		y = tf.matmul(x, W1)
+		y = tf.matmul(x, W1,name='forward')
 		return y
 	elif params.num_layers==1:
 		b1 = tf.Variable(tf.truncated_normal([params.layer_size], stddev=params.init_stddev, dtype=tf.float64))
@@ -283,7 +283,8 @@ def compute_y(x, W1, params):
 		xW = tf.matmul(x, W1)
 
 		h = tf.nn.relu(xW + b1)
-		y = tf.matmul(h, W2) + b2
+		prod = tf.matmul(h, W2)
+		y = tf.add(prod, b2,name='forward')
 		return y
 	else:
 		print('Not supported: ', params.num_layers)
