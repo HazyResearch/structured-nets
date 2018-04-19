@@ -88,3 +88,32 @@ class K_Toeplitz():
         wv_ = v_.reshape((1, rank, n)) * w_
         ans = 1/self.eta * np.fft.ifft(np.sum(wv_, axis=1))
         return np.real(ans)
+
+
+def toeplitz_mult(G, H, x, cycle=True):
+    rank, n = G.shape
+    batch_size = x.shape[0]
+    f = (1,-1) if cycle else (0,0)
+    transpose_out = KT_Toeplitz(n, f[1], batch_size, rank)(H, x)
+    krylov_out = K_Toeplitz(n, f[0], batch_size, rank)(G, transpose_out)
+    return krylov_out
+
+
+##### Slow mult
+
+def krylov_construct(f, v, m):
+    n = v.shape[0]
+    K = np.zeros(shape=(m,n))
+    K[0,:] = v
+    for i in range(1,m):
+        K[i,1:] = K[i-1,:-1]
+        K[i,0] = f*K[i-1,-1]
+    return K.T
+
+def toeplitz_mult_slow(G, H, x, cycle=True):
+    assert G.shape == H.shape
+    rank, n = G.shape
+    f = (1,-1) if cycle else (0,0)
+    krylovs = [(krylov_construct(f[0], G[i], n), krylov_construct(f[1], H[i], n).T) for i in range(rank)]
+    prods = [K[0] @ K[1] @ x.T for K in krylovs]
+    return np.sum(np.array(prods), axis=0).T
