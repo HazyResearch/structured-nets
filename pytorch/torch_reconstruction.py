@@ -19,7 +19,7 @@ def krylov_recon(r, n, G, H, fn_A, fn_B_T):
 
 	for i in range(r):
 		K_A = krylov(fn_A, G[:, i], n)
-		
+
 		K_B = krylov(fn_B_T, H[:, i], n).t()
 
 		prod = torch.matmul(K_A, K_B).cuda()
@@ -34,7 +34,7 @@ def recon(net):
 
 	# Normalize
 	if net.params.class_type == 'toeplitz_like':
-		return 0.5*W 
+		return 0.5*W
 	elif net.params.class_type in ['circulant_sparsity', 'tridiagonal_corner']:
 		# Compute a and b
 		a = torch.prod(net.subdiag_f_A)

@@ -24,14 +24,14 @@ def construct_net(params):
     else:
         print(('Model not supported: ', params.model))
         assert 0
-  
+
 def structured_layer(net, x):
 	if net.params.class_type == 'unconstrained':
 		return torch.matmul(x, net.W)
 	elif net.params.class_type == 'low_rank':
 		xH = torch.matmul(x, net.H)
-		return torch.matmul(xH, net.G.t())        
-	elif net.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like', 
+		return torch.matmul(xH, net.G.t())
+	elif net.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
 		#print('krylov fast')
 		#print('net.H: ', net.H.t())
@@ -42,14 +42,14 @@ def structured_layer(net, x):
 		# NORMALIZE W
 		return torch.matmul(x, W)
 	else:
-		print(('Not supported: ', params.class_type))  
-		assert 0 
+		print(('Not supported: ', params.class_type))
+		assert 0
 
 def set_structured_W(net, params):
     if params.class_type == 'unconstrained':
         net.W = Parameter(torch.Tensor(params.layer_size, params.layer_size))
         torch.nn.init.normal(net.W, std=params.init_stddev)
-    elif params.class_type in ['low_rank', 'toeplitz_like', 'vandermonde_like', 'hankel_like', 
+    elif params.class_type in ['low_rank', 'toeplitz_like', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
         net.G = Parameter(torch.Tensor(params.layer_size, params.r))
         net.H = Parameter(torch.Tensor(params.layer_size, params.r))
@@ -61,7 +61,7 @@ def set_structured_W(net, params):
             net.fn_A = fn_A
             net.fn_B_T = fn_B_T
     else:
-        print(('Not supported: ', params.class_type))  
+        print(('Not supported: ', params.class_type))
         assert 0
 
 class LeNet(nn.Module):
@@ -117,7 +117,7 @@ class MLP(nn.Module):
 class Attention(nn.Module):
     def __init__(self, params):
         super(Attention, self).__init__()
-        self.model = make_model(10, 10, 2)#(params.src_vocab, params.tgt_vocab, 
+        self.model = make_model(10, 10, 2)#(params.src_vocab, params.tgt_vocab,
             #params.N, params.d_model, params.d_ff, params.h, params.dropout)
 
     def forward(self, x):

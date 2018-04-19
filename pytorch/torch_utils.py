@@ -9,7 +9,7 @@ def gen_Z_f(m, f, v=None):
         assert v.size <= m-1
     I_m = np.eye(m-1, m-1)
     Z_f = np.hstack((I_m, np.zeros((m-1, 1))))
-    Z_f = np.vstack((np.zeros((1, m)), Z_f)) 
+    Z_f = np.vstack((np.zeros((1, m)), Z_f))
     Z_f[0, -1] = f
     if v is not None:
         for i in range(v.size):
@@ -32,7 +32,7 @@ class NoamOpt:
         self.factor = factor
         self.model_size = model_size
         self._rate = 0
-        
+
     def step(self):
         "Update parameters and rate"
         self._step += 1
@@ -41,7 +41,7 @@ class NoamOpt:
             p['lr'] = rate
         self._rate = rate
         self.optimizer.step()
-        
+
     def rate(self, step = None):
         "Implement `lrate` above"
         if step is None:
@@ -49,7 +49,7 @@ class NoamOpt:
         return self.factor * \
             (self.model_size ** (-0.5) *
             min(step ** (-0.5), step * self.warmup ** (-1.5)))
-        
+
 def get_std_opt(model):
     return NoamOpt(model.src_embed[0].d_model, 2, 4000,
             torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
@@ -74,10 +74,10 @@ class SimpleLossCompute:
         self.generator = generator
         self.criterion = criterion
         self.opt = opt
-        
+
     def __call__(self, x, y, norm):
         x = self.generator(x)
-        loss = self.criterion(x.contiguous().view(-1, x.size(-1)), 
+        loss = self.criterion(x.contiguous().view(-1, x.size(-1)),
                               y.contiguous().view(-1)) / norm
         loss.backward()
         if self.opt is not None:
@@ -95,7 +95,7 @@ class LabelSmoothing(nn.Module):
         self.smoothing = smoothing
         self.size = size
         self.true_dist = None
-        
+
     def forward(self, x, target):
         assert x.size(1) == self.size
         true_dist = x.data.clone()

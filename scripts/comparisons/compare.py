@@ -16,23 +16,23 @@ import logging
 logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadName)s %(message)s')
 
 # Available datasets: norb, cifar10, smallnorb, mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
-# Example command: 
-# python compare.py --name=test --methods=tridiagonal_corner,toeplitz-like --dataset=true_toeplitz --result_dir=2_25_18 --r=1 --lr=1e-3 --decay_rate=1.0 --decay_steps=0.1 --mom=0.9 --steps=50000 --batch_size=1024 --test=0 --layer_size=50 --transform=none --torch=1 --model=Attention
+# Example command:
+# python compare.py --name=test --methods=tridiagonal_corner,toeplitz_like --dataset=true_toeplitz --result_dir=2_25_18 --r=1 --lr=1e-3 --decay_rate=1.0 --decay_steps=0.1 --mom=0.9 --steps=50000 --batch_size=1024 --test=0 --layer_size=50 --transform=none --torch=1 --model=Attention
 
-method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'low_rank': 'lr', 'unconstrained': 'u', 
+method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'low_rank': 'lr', 'unconstrained': 'u',
 	'toeplitz_like': 't', 'hankel_like': 'h', 'vandermonde_like': 'v'}
 
 def compare(args, method, rank, lr, decay_rate, mom):
-	params = ModelParams(args.dataset, args.transform, args.test, log_path, 
-			dataset.input_size, args.layer_size, dataset.out_size(), num_layers, 
-			loss, rank, args.steps, args.batch_size, lr, mom, init_type, 
-			method, learn_corner, n_diag_learned, init_stddev, fix_G, 
-			check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose, 
-			decay_rate, args.decay_freq, learn_diagonal, fix_A_identity, 
+	params = ModelParams(args.dataset, args.transform, args.test, log_path,
+			dataset.input_size, args.layer_size, dataset.out_size(), num_layers,
+			loss, rank, args.steps, args.batch_size, lr, mom, init_type,
+			method, learn_corner, n_diag_learned, init_stddev, fix_G,
+			check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose,
+			decay_rate, args.decay_freq, learn_diagonal, fix_A_identity,
 			stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model)
 
 	# Save params + git commit ID
-	this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) 
+	this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom)
 	this_results_dir = params.save(results_dir, this_id, commit_id)
 	logging.debug('this_results_dir: ' + this_results_dir)
 
@@ -53,7 +53,7 @@ def compare(args, method, rank, lr, decay_rate, mom):
 		pkl.dump(losses, open(out_loc + '_losses.p', 'wb'), protocol=2)
 		pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'), protocol=2)
 
-		logging.debug('Saved losses and accuracies for ' + method + ' to: ' + out_loc) 
+		logging.debug('Saved losses and accuracies for ' + method + ' to: ' + out_loc)
 
 # Command line params
 parser = argparse.ArgumentParser()
@@ -73,7 +73,7 @@ parser.add_argument('--layer_size', type=int) # Size of hidden layer
 parser.add_argument('--transform') # Any transform of dataset, e.g. grayscale
 parser.add_argument('--torch', type=int) # Pytorch or TF
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
-parser.add_argument('--parallel') # 
+parser.add_argument('--parallel') #
 args = parser.parse_args()
 
 
@@ -110,10 +110,10 @@ checkpoint_freq = 1000
 num_conv_layers = 2
 n_trials = 3
 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
-results_dir = os.path.join(out_dir, 'results', args.result_dir) 
+results_dir = os.path.join(out_dir, 'results', args.result_dir)
 checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
 
-dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform, 
+dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform,
 	stochastic_train, test_size, train_size, args.test)
 n_diag_learned = dataset.input_size - 1
 commit_id = get_commit_id()
@@ -121,11 +121,10 @@ commit_id = get_commit_id()
 for method in methods:
 	for rank in ranks:
 		for lr in lrs:
-			for decay_rate in decay_rates: 
+			for decay_rate in decay_rates:
 				for mom in moms:
 					if args.parallel:
 						logging.debug('Starting thread')
 						threading.Thread(target=compare,args=(args, method, rank, lr, decay_rate, mom),).start()
 					else:
 						compare(args, method, rank, lr, decay_rate, mom)
-

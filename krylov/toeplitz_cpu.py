@@ -70,6 +70,7 @@ class K_Toeplitz():
                 arg = np.ones(n)
             else:
                 arg = np.fft.fft(np.eye(1,2*n,2*n-1))[0,:n]
+                # arg = np.exp(np.arange(n) * 1j * np.pi / n)
             self.eta = mod * arg
 
     def __call__(self, v, w):

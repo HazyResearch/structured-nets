@@ -12,7 +12,7 @@ class StructuredLinear(nn.Module):
         if self.params.class_type == 'unconstrained':
             self.W = Parameter(torch.Tensor(params.layer_size, params.layer_size))
             torch.nn.init.normal(self.W, std=params.init_stddev)
-        elif self.params.class_type in ['low_rank', 'toeplitz_like', 'vandermonde_like', 'hankel_like', 
+        elif self.params.class_type in ['low_rank', 'toeplitz_like', 'vandermonde_like', 'hankel_like',
             'circulant_sparsity', 'tridiagonal_corner']:
             self.G = Parameter(torch.Tensor(params.layer_size, params.r))
             self.H = Parameter(torch.Tensor(params.layer_size, params.r))
@@ -24,10 +24,10 @@ class StructuredLinear(nn.Module):
                 self.fn_A = fn_A
                 self.fn_B_T = fn_B_T
         else:
-            print(('Not supported: ', self.params.class_type))  
+            print(('Not supported: ', self.params.class_type))
             assert 0
 
-    # Assumes Stein displacement. 
+    # Assumes Stein displacement.
     def set_mult_fns(self, params):
         assert params.disp_type == 'stein'
         if params.class_type == 'toeplitz_like':
@@ -70,9 +70,9 @@ class StructuredLinear(nn.Module):
             fn_B_T = functools.partial(tridiag_transpose_mult_fn, self.subdiag_f_B, self.diag_B, self.supdiag_B)
 
         else:
-            print(('Not supported: ', params.class_type))  
-            assert 0  
-        return fn_A, fn_B_T  
+            print(('Not supported: ', params.class_type))
+            assert 0
+        return fn_A, fn_B_T
 
 
     def forward(self,x):
@@ -80,10 +80,10 @@ class StructuredLinear(nn.Module):
             return torch.matmul(x, self.W)
         elif self.params.class_type == 'low_rank':
             xH = torch.matmul(x, self.H)
-            return torch.matmul(xH, self.G.t())        
-        elif self.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like', 
+            return torch.matmul(xH, self.G.t())
+        elif self.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
             'circulant_sparsity', 'tridiagonal_corner']:
-            
+
             W = recon(self)
 
             return torch.matmul(x, W)
