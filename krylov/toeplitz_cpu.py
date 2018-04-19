@@ -117,3 +117,21 @@ def toeplitz_mult_slow(G, H, x, cycle=True):
     krylovs = [(krylov_construct(f[0], G[i], n), krylov_construct(f[1], H[i], n).T) for i in range(rank)]
     prods = [K[0] @ K[1] @ x.T for K in krylovs]
     return np.sum(np.array(prods), axis=0).T
+
+if __name__ == '__main__':
+    v = np.array([[0,1,0,-1],[0,1,2,3]])
+    u = np.array([[1,1,1,1],[0,1,2,3]])
+
+    w = KT_Toeplitz(4, -1, 2, 2)(v, u)
+    # output:
+    # [[[ 0 2  2 0]
+    #   [ 6 0 -4 -6]]
+
+    #  [[ -2 2 4  2]
+    #   [ 14 8 0 -8]]]
+
+    toeplitz_mult(v, v, u)
+    toeplitz_mult_slow(v, v, u)
+    # output:
+    # array([[-16., -20.,  -4.,  16.],
+    #        [ 16.,  -8.,  12.,  64.]])
