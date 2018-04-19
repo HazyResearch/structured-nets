@@ -28,12 +28,6 @@ class KT_Toeplitz():
             self.eta = mod * arg
 
 
-    def mult(self, v, u): # assume rank 1, batch 1 for now
-        u_ = np.fft.ifft(1/self.eta * u)
-        v_ = np.fft.fft(self.eta * v)
-        ans = self.eta * np.fft.fft(w_ * v_)
-        return np.real(ans)
-
     def __call__(self, v, u):
         """
         Multiply Krylov(Z_f, v)^T @ u
@@ -41,10 +35,17 @@ class KT_Toeplitz():
         u: (batch, n)
         """
         n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
-        u_ = np.fft.ifft(1/self.eta * u)
-        v_ = np.fft.fft(self.eta * v)
-        uv_ = u_.reshape(batch_size, 1, n) * v_.reshape(1, rank, n)
-        ans = self.eta * np.fft.fft(uv_)
+
+        if self.eta is not None: # cycle version
+            u_ = np.fft.ifft(1/self.eta * u)
+            v_ = np.fft.fft(self.eta * v)
+            uv_ = u_.reshape(batch_size, 1, n) * v_.reshape(1, rank, n)
+            ans = self.eta * np.fft.fft(uv_)
+        else:
+            u_ = np.fft.fft(np.concatenate((u[...,::-1], np.zeros_like(u)), axis=-1))
+            v_ = np.fft.fft(np.concatenate((v, np.zeros_like(v)), axis=-1))
+            uv_ = u_.reshape(batch_size, 1, 2*n) * v_.reshape(1, rank, 2*n)
+            ans = np.fft.ifft(uv_)[..., n-1::-1]
         return np.real(ans)
 
 
@@ -71,22 +72,22 @@ class K_Toeplitz():
                 arg = np.fft.fft(np.eye(1,2*n,2*n-1))[0,:n]
             self.eta = mod * arg
 
-    def mult(self, v, w): # assume rank 1, batch 1 for now
-        w_ = np.fft.fft(self.eta * w)
-        v_ = np.fft.fft(self.eta * v)
-        ans = 1/self.eta * np.fft.ifft(w_ * v_)
-        return np.real(ans)
-
     def __call__(self, v, w):
         """
         v: (rank, n)
         w: (batch_size, rank, n)
         """
         n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
-        w_ = np.fft.fft(self.eta * w)
-        v_ = np.fft.fft(self.eta * v)
-        wv_ = v_.reshape((1, rank, n)) * w_
-        ans = 1/self.eta * np.fft.ifft(np.sum(wv_, axis=1))
+        if self.eta is not None:
+            w_ = np.fft.fft(self.eta * w)
+            v_ = np.fft.fft(self.eta * v)
+            wv_ =  w_ * v_.reshape((1, rank, n))
+            ans = 1/self.eta * np.fft.ifft(np.sum(wv_, axis=1))[..., :n]
+        else:
+            w_ = np.fft.fft(np.concatenate((w, np.zeros_like(w)), axis=-1))
+            v_ = np.fft.fft(np.concatenate((v, np.zeros_like(v)), axis=-1))
+            wv_ =  w_ * v_.reshape((1, rank, 2*n))
+            ans = np.fft.ifft(np.sum(wv_, axis=1))[..., :n]
         return np.real(ans)
 
 
@@ -135,3 +136,9 @@ if __name__ == '__main__':
     # output:
     # array([[-16., -20.,  -4.,  16.],
     #        [ 16.,  -8.,  12.,  64.]])
+
+    toeplitz_mult(v, v, u, cycle=False)
+    toeplitz_mult_slow(v, v, u, cycle=False)
+    # output:
+    # array([[ 0.,  6., 16., 26.],
+    #        [ 0., 12., 38., 66.]])
