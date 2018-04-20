@@ -142,6 +142,7 @@ class Conjugate(torch.autograd.Function):
     def backward(ctx, grad):
         return Conjugate.apply(grad)
 
+# TODO: change this to be consistent: from now on e.g. Rfft should be fast and Rfft_slow should be slow
 class Fft(torch.autograd.Function):
 
     @staticmethod

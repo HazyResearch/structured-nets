@@ -33,6 +33,7 @@ class KT_Toeplitz():
         Multiply Krylov(Z_f, v)^T @ u
         v: (rank, n)
         u: (batch, n)
+        out: (batch, rank, n)
         """
         n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
 
@@ -77,18 +78,19 @@ class K_Toeplitz():
         """
         v: (rank, n)
         w: (batch_size, rank, n)
+        out: (batch_size, n)
         """
         n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
         if self.eta is not None:
             w_ = np.fft.fft(self.eta * w)
             v_ = np.fft.fft(self.eta * v)
             wv_ =  w_ * v_.reshape((1, rank, n))
-            ans = 1/self.eta * np.fft.ifft(np.sum(wv_, axis=1))[..., :n]
+            ans = 1/self.eta * np.fft.ifft(np.sum(wv_, axis=1))
         else:
-            w_ = np.fft.fft(np.concatenate((w, np.zeros_like(w)), axis=-1))
-            v_ = np.fft.fft(np.concatenate((v, np.zeros_like(v)), axis=-1))
-            wv_ =  w_ * v_.reshape((1, rank, 2*n))
-            ans = np.fft.ifft(np.sum(wv_, axis=1))[..., :n]
+            w_ = np.fft.rfft(np.concatenate((w, np.zeros_like(w)), axis=-1))
+            v_ = np.fft.rfft(np.concatenate((v, np.zeros_like(v)), axis=-1))
+            wv_ =  w_ * v_.reshape((1, rank, -1))
+            ans = np.fft.irfft(np.sum(wv_, axis=1))[..., :n]
         return np.real(ans)
 
 
@@ -132,14 +134,20 @@ if __name__ == '__main__':
     #  [[ -2 2 4  2]
     #   [ 14 8 0 -8]]]
 
-    toeplitz_mult(v, v, u)
-    toeplitz_mult_slow(v, v, u)
+    w = KT_Toeplitz(4, 0, 2, 2)(v, u)
+    # [[[  0 1 1 0]
+    #   [  6 3 1 0]]
+    #  [[ -2 2 3 0]
+    #   [ 14 8 3 0]]]
+
+    print(toeplitz_mult(v, v, u))
+    print(toeplitz_mult_slow(v, v, u))
     # output:
     # array([[-16., -20.,  -4.,  16.],
     #        [ 16.,  -8.,  12.,  64.]])
 
-    toeplitz_mult(v, v, u, cycle=False)
-    toeplitz_mult_slow(v, v, u, cycle=False)
+    print(toeplitz_mult(v, v, u, cycle=False))
+    print(toeplitz_mult_slow(v, v, u, cycle=False))
     # output:
     # array([[ 0.,  6., 16., 26.],
     #        [ 0., 12., 38., 66.]])
