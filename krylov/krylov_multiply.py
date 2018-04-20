@@ -3,317 +3,11 @@ import numpy as np
 
 import torch
 from torch.autograd import Variable
-import pytorch_fft.fft as fft
 
-import cupy as cp
-from cupy.cuda import cufft
-
-CUPY_MEM = cp.ndarray(1, dtype='float32').data.mem
-
+import cufat as cf
 from triextrafat import krylov_construct
 # from triXXF import KrylovTransposeMultiply
 
-def torch_to_cupy(tensor):
-    '''Super hacky way to convert torch.cuda.FloatTensor to CuPy array.
-    Probably not safe, since we're manipulating GPU memory addresses directly.
-    '''
-    assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
-    # assert tensor.is_contiguous(), 'Input must be contiguous'
-    offset = tensor.data_ptr() - CUPY_MEM.ptr
-    array_mem = cp.cuda.memory.MemoryPointer(CUPY_MEM, offset)
-    array = cp.ndarray(tensor.shape, dtype='float32', memptr=array_mem)
-    array._strides = [4 * s for s in tensor.stride()]
-    return array
-
-def complex_multiply_cupy(X, Y):
-    '''X and Y are complex64 tensors but stored as torch.cuda.FloatTensor.
-    The even indices represent the real part and odd indices represent imaginary parts.
-    '''
-    assert isinstance(X, torch.cuda.FloatTensor) and isinstance(Y, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
-    assert X.shape[-1] % 2 == 0 and Y.shape[-1] % 2 == 0, 'Last dimension must be even'
-    X_cp, Y_cp = torch_to_cupy(X), torch_to_cupy(Y)
-    X_complex, Y_complex = X_cp.view('complex64'), Y_cp.view('complex64')
-    out = torch.cuda.FloatTensor(*cp.broadcast(X_cp, Y_cp).shape)
-    out_complex = torch_to_cupy(out).view('complex64')
-    cp.multiply(X_complex, Y_complex, out_complex)
-    return out
-
-@functools.lru_cache(maxsize=1024)
-def cufft_plan1d(n, fft_type, batch_size):
-    # Put in a separate function so we can cache the plans.
-    # Actually this only saves about 2ms, from 65.5ms to 63.4ms, for n=4096, batchsize=512, and rank=3.
-    return cufft.Plan1d(n, fft_type, batch_size)
-
-def fft(X):
-    assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
-    assert X.is_contiguous(), 'Input must be contiguous'
-    fft_type = cufft.CUFFT_C2C
-    direction = cufft.CUFFT_FORWARD
-    plan = cufft_plan1d(X.shape[-1] // 2, fft_type, X.numel() // X.shape[-1])
-    out_shape = X.shape
-    out = torch.cuda.FloatTensor(*out_shape)
-    cufft.execC2C(plan.plan, X.data_ptr(), out.data_ptr(), direction)
-    return out
-
-def ifft(X):
-    assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
-    assert X.is_contiguous(), 'Input must be contiguous'
-    fft_type = cufft.CUFFT_C2C
-    direction = cufft.CUFFT_INVERSE
-    plan = cufft_plan1d(X.shape[-1] // 2, fft_type, X.numel() // X.shape[-1])
-    out_shape = X.shape
-    out = torch.cuda.FloatTensor(*out_shape)
-    cufft.execC2C(plan.plan, X.data_ptr(), out.data_ptr(), direction)
-    out /= X.shape[-1] // 2
-    return out
-
-def rfft(X):
-    assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
-    assert X.is_contiguous(), 'Input must be contiguous'
-    fft_type = cufft.CUFFT_R2C
-    direction = cufft.CUFFT_FORWARD
-    plan = cufft_plan1d(X.shape[-1], fft_type, X.numel() // X.shape[-1])
-    out_shape = X.shape[:-1] + (2 * (X.shape[-1] // 2 + 1),)
-    out = torch.cuda.FloatTensor(*out_shape)
-    cufft.execR2C(plan.plan, X.data_ptr(), out.data_ptr())
-    return out
-
-def irfft(X, norm=True):
-    # TODO: Maybe support out_size because Rfft backward might need it for odd size input.
-    assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
-    assert X.is_contiguous(), 'Input must be contiguous'
-    assert X.shape[-1] % 2 == 0, 'Last dimension must be even'
-    fft_type = cufft.CUFFT_C2R
-    direction = cufft.CUFFT_INVERSE
-    out_size = (X.shape[-1] // 2 - 1) * 2
-    plan = cufft_plan1d(out_size, fft_type, X.numel() // X.shape[-1])
-    out_shape = X.shape[:-1] + (out_size,)
-    out = torch.cuda.FloatTensor(*out_shape)
-    cufft.execC2R(plan.plan, X.data_ptr(), out.data_ptr())
-    if norm:
-        out /= out_size
-    return out
-
-def ihfft(X):
-    # np.fft.ihfft is the same as np.fft.rfft().conj() / n
-    n = X.shape[-1]
-    out = rfft(X)
-    out_cp = torch_to_cupy(out).view('complex64')
-    cp.conj(out_cp, out=out_cp)
-    out /= n
-    return out
-
-def hfft(X):
-    # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
-    n = (X.shape[-1] // 2 - 1) * 2
-    X_conj = torch.cuda.FloatTensor(*X.shape)
-    X_cp, X_conj_cp = torch_to_cupy(X).view('complex64'), torch_to_cupy(X_conj).view('complex64')
-    cp.conj(X_cp, out=X_conj_cp)
-    return irfft(X_conj, norm=False)
-
-def conjugate(X):
-    # This doesn't work if X isn't contiguous
-    assert X.shape[-1] % 2 == 0, 'Last dimension must be even'
-    return (X.view(-1, 2) * torch.cuda.FloatTensor((1, -1))).view_as(X)
-
-def conjugate_cupy(X):
-    assert X.shape[-1] % 2 == 0, 'Last dimension must be even'
-    X_cp = torch_to_cupy(X).view('complex64')
-    X_conj = torch.cuda.FloatTensor(*X.shape)
-    X_conj_cp = torch_to_cupy(X_conj).view('complex64')
-    cp.conj(X_cp, out=X_conj_cp)
-    return X_conj
-
-def complex_mult_slow(X, Y):
-    # I'm writing in this inefficient way because writing autodiff for complex mult is really hard
-    # due to broadcasting. I'm just using Pytorch's functions here.
-    real = X[..., ::2] * Y[..., ::2] - X[..., 1::2] * Y[..., 1::2]
-    imag = X[..., ::2] * Y[..., 1::2] + X[..., 1::2] * Y[..., 0::2]
-    result = torch.cat((real.view(-1, 1), imag.view(-1, 1)), dim=-1)
-    return result.view(*(real.shape[:-1] + (2 * real.shape[-1], )))
-
-class Conjugate(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, X):
-        # return conjugate(X)
-        return conjugate_cupy(X)
-
-    def backward(ctx, grad):
-        return Conjugate.apply(grad)
-
-# TODO: change this to be consistent: from now on e.g. Rfft should be fast and Rfft_slow should be slow
-class Fft(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, X):
-        return fft(X.contiguous())
-
-    @staticmethod
-    def backward(ctx, grad):
-        grad = grad.data.contiguous()
-        return Fft.apply(grad)
-
-class Ifft(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, X):
-        return ifft(X.contiguous())
-
-    @staticmethod
-    def backward(ctx, grad):
-        grad = grad.data.contiguous()
-        return Ifft.apply(grad)
-
-class Rfft_fast(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, X):
-        return rfft(X.contiguous())
-
-    @staticmethod
-    def backward(ctx, grad):
-        input_size = (grad.shape[-1] // 2 - 1) * 2
-        grad = grad.data.contiguous()
-        if input_size & 1:
-            grad[..., 2:] /= 2
-        elif input_size > 2:
-            grad[..., 2:-2] /= 2
-        return Variable(irfft(grad) * input_size)
-        # return Hfft_fast.apply(grad)
-
-class Irfft_fast(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, X):
-        return irfft(X.contiguous())
-
-    @staticmethod
-    def backward(ctx, grad):
-        grad = grad.data.contiguous()
-        n = grad.shape[-1]
-        grad_f = rfft(grad) / n
-        if grad_f.shape[-1] > 4:
-            grad_f[..., 2:-2] *= 2
-        return Variable(grad_f)
-        # return Ihfft_fast.apply(grad)
-
-def Ihfft_fast(X):
-    # np.fft.ihfft is the same as np.fft.rfft().conj() / n
-    n = X.shape[-1]
-    return Conjugate.apply(Rfft_fast.apply(X)) / n
-
-def Hfft_fast(X):
-    # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
-    n = (X.shape[-1] // 2 - 1) * 2
-    return Irfft_fast.apply(Conjugate.apply(X)) * n
-
-
-# class Ihfft_fast(torch.autograd.Function):
-
-#     @staticmethod
-#     def forward(ctx, X):
-#         return ihfft(X.contiguous())
-
-#     @staticmethod
-#     def backward(ctx, grad):
-#         return Irfft_fast.apply(grad)
-
-# class Hfft_fast(torch.autograd.Function):
-
-#     @staticmethod
-#     def forward(ctx, X):
-#         return hfft(X.contiguous())
-
-#     @staticmethod
-#     def backward(ctx, grad):
-#         return Rfft_fast.apply(grad)
-
-class ComplexMult(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, X, Y):
-        ctx.save_for_backward(X, Y)
-        return complex_multiply_cupy(X, Y)
-
-    @staticmethod
-    def backward(ctx, grad):
-        X, Y = ctx.saved_tensors
-        grad_X, grad_Y = complex_multiply_cupy(grad.data, conjugate_cupy(Y)), complex_multiply_cupy(grad.data, conjugate_cupy(X))
-        # Need to sum over dimensions that were broadcasted
-        dims_to_sum_X = [grad.dim() - i for i in range(1, X.dim() + 1) if X.shape[-i] != grad.shape[-i]]
-        dims_to_sum_Y = [grad.dim() - i for i in range(1, Y.dim() + 1) if Y.shape[-i] != grad.shape[-i]]
-        for dim in dims_to_sum_X:
-            grad_X = grad_X.sum(dim=dim, keepdim=True)
-        for dim in range(grad.dim() - X.dim())[::-1]:
-            grad_X = grad_X.sum(dim=dim)
-        for dim in dims_to_sum_Y:
-            grad_Y = grad_Y.sum(dim=dim, keepdim=True)
-        for dim in range(grad.dim() - Y.dim())[::-1]:
-            grad_Y = grad_Y.sum(dim=dim)
-        return Variable(grad_X), Variable(grad_Y)
-
-class Rfft(torch.autograd.Function):
-    def forward(self, X_re):
-        X_re = X_re.contiguous()
-        self._to_save_input_size = X_re.size(-1)
-        return fft.rfft(X_re)
-
-    def backward(self, grad_output_re, grad_output_im):
-        # Clone the array and make contiguous if needed
-        grad_output_re = fft.autograd.contiguous_clone(grad_output_re)
-        grad_output_im = fft.autograd.contiguous_clone(grad_output_im)
-
-        if self._to_save_input_size & 1:
-            grad_output_re[...,1:] /= 2
-        elif self._to_save_input_size > 2:
-            grad_output_re[...,1:-1] /= 2
-
-        if self._to_save_input_size & 1:
-            grad_output_im[...,1:] /= 2
-        elif self._to_save_input_size > 2:
-            grad_output_im[...,1:-1] /= 2
-
-        gr = fft.irfft(grad_output_re,grad_output_im,self._to_save_input_size, normalize=False)
-        return gr
-
-class Irfft(torch.autograd.Function):
-
-    def forward(self, k_re, k_im):
-        k_re, k_im = fft.autograd.make_contiguous(k_re, k_im)
-        return fft.irfft(k_re, k_im)
-
-    def backward(self, grad_output_re):
-        grad_output_re = grad_output_re.contiguous()
-        gr, gi = fft.rfft(grad_output_re)
-
-        N = grad_output_re.size(-1)
-        gr[...,0] /= N
-        if gr.shape[-1] > 2:
-            gr[...,1:-1] /= N/2
-        gr[...,-1] /= N
-
-        gi[...,0] /= N
-        if gi.shape[-1] > 2:
-            gi[...,1:-1] /= N/2
-        gi[...,-1] /= N
-        return gr, gi
-
-def Ihfft(X_re):
-    # np.fft.ihfft is the same as np.fft.rfft().conj() / n
-    n = X_re.shape[-1]
-    X_f_re, X_f_im = Rfft()(X_re)
-    return X_f_re / n, -X_f_im / n
-
-def Hfft(X_re, X_im):
-    # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
-    n = (X_re.shape[-1] - 1) * 2
-    return Irfft()(X_re, -X_im) * n
-
-def complex_mult(X, Y):
-    X_re, X_im = X
-    Y_re, Y_im = Y
-    return X_re * Y_re - X_im * Y_im, X_re * Y_im + X_im * Y_re
 
 def krylov_transpose_multiply(subdiag, v, u):
     """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
@@ -345,25 +39,25 @@ def krylov_transpose_multiply(subdiag, v, u):
         S = torch.cat((S0_10, S0_11[np.newaxis], S1_01, S1_11[np.newaxis]))
 
         # polynomial multiplications
-        S_f_re, S_f_im = Rfft()(S)
+        S_f_re, S_f_im = cf.Rfft()(S)
         S0_10_f_re, S0_11_f_re, S1_01_f_re, S1_11_f_re = S_f_re[:rank], S_f_re[rank], S_f_re[rank+1:rank+1+batch_size], S_f_re[-1]
         S0_10_f_im, S0_11_f_im, S1_01_f_im, S1_11_f_im = S_f_im[:rank], S_f_im[rank], S_f_im[rank+1:rank+1+batch_size], S_f_im[-1]
         S1_01_f = (S1_01_f_re, S1_01_f_im)
         S0_11_f = (S0_11_f_re, S0_11_f_im)
         S1_11_f = (S1_11_f_re, S1_11_f_im)
         S0_10_f = (S0_10_f_re, S0_10_f_im)
-        T_00_f_re, T_00_f_im = complex_mult((S1_01_f_re[:, np.newaxis], S1_01_f_im[:, np.newaxis]),
+        T_00_f_re, T_00_f_im = cf.complex_mult((S1_01_f_re[:, np.newaxis], S1_01_f_im[:, np.newaxis]),
                                             (S0_10_f_re[np.newaxis], S0_10_f_im[np.newaxis]))
-        T_01_f_re, T_01_f_im = complex_mult(S1_01_f, S0_11_f)
-        T_10_f_re, T_10_f_im = complex_mult(S1_11_f, S0_10_f)
-        T_11_f_re, T_11_f_im = complex_mult(S1_11_f, S0_11_f)
+        T_01_f_re, T_01_f_im = cf.complex_mult(S1_01_f, S0_11_f)
+        T_10_f_re, T_10_f_im = cf.complex_mult(S1_11_f, S0_10_f)
+        T_11_f_re, T_11_f_im = cf.complex_mult(S1_11_f, S0_11_f)
 
         T_f_re = torch.cat((torch.cat((T_00_f_re, T_01_f_re[:, np.newaxis]), dim=1),
                             torch.cat((T_10_f_re[np.newaxis], T_11_f_re[np.newaxis, np.newaxis]), dim=1)))
         T_f_im = torch.cat((torch.cat((T_00_f_im, T_01_f_im[:, np.newaxis]), dim=1),
                             torch.cat((T_10_f_im[np.newaxis], T_11_f_im[np.newaxis, np.newaxis]), dim=1)))
 
-        T = Irfft()(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T = cf.Irfft()(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
 
         # polynomial additions
@@ -409,21 +103,21 @@ def krylov_transpose_multiply_fast(subdiag, v, u):
         S = torch.cat((S0_10, S0_11[np.newaxis], S1_01, S1_11[np.newaxis]))
 
         # polynomial multiplications
-        S_f = Rfft_fast.apply(S)
+        S_f = cf.Rfft_fast.apply(S)
         S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
-        T_00_f = ComplexMult.apply(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        T_01_f = ComplexMult.apply(S1_01_f, S0_11_f)
-        T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
-        T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
-        # T_00_f = complex_mult_slow(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        # T_01_f = complex_mult_slow(S1_01_f, S0_11_f)
-        # T_10_f = complex_mult_slow(S1_11_f, S0_10_f)
-        # T_11_f = complex_mult_slow(S1_11_f, S0_11_f)
+        # T_00_f = cf.ComplexMult.apply(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        # T_01_f = cf.ComplexMult.apply(S1_01_f, S0_11_f)
+        # T_10_f = cf.ComplexMult.apply(S1_11_f, S0_10_f)
+        # T_11_f = cf.ComplexMult.apply(S1_11_f, S0_11_f)
+        T_00_f = cf.complex_mult_slow(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        T_01_f = cf.complex_mult_slow(S1_01_f, S0_11_f)
+        T_10_f = cf.complex_mult_slow(S1_11_f, S0_10_f)
+        T_11_f = cf.complex_mult_slow(S1_11_f, S0_11_f)
 
         T_f = torch.cat((torch.cat((T_00_f, T_01_f[:, np.newaxis]), dim=1),
                          torch.cat((T_10_f[np.newaxis], T_11_f[np.newaxis, np.newaxis]), dim=1)))
 
-        T = Irfft_fast.apply(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T = cf.Irfft_fast.apply(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
 
         # polynomial additions
@@ -479,7 +173,7 @@ def krylov_multiply_forward(subdiag, v):
         S = torch.cat((S0_10, S0_11[np.newaxis], S1_11[np.newaxis]))
 
         # polynomial multiplications
-        S_f_re, S_f_im = Rfft()(S)
+        S_f_re, S_f_im = cf.Rfft()(S)
         S0_10_f_re, S0_11_f_re, S1_11_f_re = S_f_re[:rank], S_f_re[-2], S_f_re[-1]
         S0_10_f_im, S0_11_f_im, S1_11_f_im = S_f_im[:rank], S_f_im[-2], S_f_im[-1]
         S0_10_f = (S0_10_f_re, S0_10_f_im)
@@ -487,13 +181,13 @@ def krylov_multiply_forward(subdiag, v):
         S1_11_f = (S1_11_f_re, S1_11_f_im)
         save_for_backward[d] = (S0_10_f, S0_11_f)
 
-        T_10_f_re, T_10_f_im = complex_mult(S1_11_f, S0_10_f)
-        T_11_f_re, T_11_f_im = complex_mult(S1_11_f, S0_11_f)
+        T_10_f_re, T_10_f_im = cf.complex_mult(S1_11_f, S0_10_f)
+        T_11_f_re, T_11_f_im = cf.complex_mult(S1_11_f, S0_11_f)
 
         T_f_re = torch.cat((T_10_f_re, T_11_f_re[np.newaxis]))
         T_f_im = torch.cat((T_10_f_im, T_11_f_im[np.newaxis]))
 
-        T = Irfft()(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T = cf.Irfft()(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_10, T_11 = T[:rank], T[-1]
 
         # polynomial additions
@@ -519,18 +213,18 @@ def krylov_multiply_forward_fast(subdiag, v):
         S = torch.cat((S0_10, S0_11[np.newaxis], S1_11[np.newaxis]))
 
         # polynomial multiplications
-        S_f = Rfft_fast.apply(S)
+        S_f = cf.Rfft_fast.apply(S)
         S0_10_f, S0_11_f, S1_11_f = S_f[:rank], S_f[-2], S_f[-1]
         save_for_backward[d] = (S0_10_f, S0_11_f)
 
-        T_10_f = ComplexMult.apply(S1_11_f, S0_10_f)
-        T_11_f = ComplexMult.apply(S1_11_f, S0_11_f)
-        # T_10_f = complex_mult_slow(S1_11_f, S0_10_f)
-        # T_11_f = complex_mult_slow(S1_11_f, S0_11_f)
+        # T_10_f = cf.ComplexMult.apply(S1_11_f, S0_10_f)
+        # T_11_f = cf.ComplexMult.apply(S1_11_f, S0_11_f)
+        T_10_f = cf.complex_mult_slow(S1_11_f, S0_10_f)
+        T_11_f = cf.complex_mult_slow(S1_11_f, S0_11_f)
 
         T_f = torch.cat((T_10_f, T_11_f[np.newaxis]))
 
-        T = Irfft_fast.apply(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T = cf.Irfft_fast.apply(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_10, T_11 = T[:rank], T[-1]
 
         # polynomial additions
@@ -572,7 +266,7 @@ def krylov_multiply(subdiag, v, w):
         dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
         dT = dT * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
-        dT_f_re, dT_f_im = Ihfft(dT)
+        dT_f_re, dT_f_im = cf.Ihfft(dT)
         dT_00_f_re, dT_01_f_re = dT_f_re[:, :rank], dT_f_re[:, -1]
         dT_00_f_im, dT_01_f_im = dT_f_im[:, :rank], dT_f_im[:, -1]
         dT_00_f = (dT_00_f_re, dT_00_f_im)
@@ -580,13 +274,13 @@ def krylov_multiply(subdiag, v, w):
 
         S0_10_f, S0_11_f = save_for_backward[d]
         S0_10_f_re, S0_10_f_im = S0_10_f
-        dS1_01_f_re, dS1_01_f_im = complex_mult((S0_10_f_re[np.newaxis], S0_10_f_im[np.newaxis]),
+        dS1_01_f_re, dS1_01_f_im = cf.complex_mult((S0_10_f_re[np.newaxis], S0_10_f_im[np.newaxis]),
                                                  dT_00_f)
-        prod_re, prod_im = complex_mult(S0_11_f, dT_01_f)
+        prod_re, prod_im = cf.complex_mult(S0_11_f, dT_01_f)
         dS1_01_f_re = dS1_01_f_re.sum(dim=1) + prod_re
         dS1_01_f_im = dS1_01_f_im.sum(dim=1) + prod_im
 
-        dS1_01 = Hfft(dS1_01_f_re, dS1_01_f_im)
+        dS1_01 = cf.Hfft(dS1_01_f_re, dS1_01_f_im)
         dS_01[:, 1::2] = dS1_01[:, :, :n2]
 
         dT_00, dT_01 = dS_00, dS_01
@@ -629,16 +323,16 @@ def krylov_multiply_fast(subdiag, v, w):
         dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
         dT = dT * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
-        # dT_f = Ihfft_fast.apply(dT)
-        dT_f = Ihfft_fast(dT)
+        # dT_f = cf.Ihfft_fast.apply(dT)
+        dT_f = cf.Ihfft_fast(dT)
         dT_00_f, dT_01_f = dT_f[:, :rank], dT_f[:, -1]
 
         S0_10_f, S0_11_f = save_for_backward[d]
-        dS1_01_f = ComplexMult.apply(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + ComplexMult.apply(S0_11_f, dT_01_f)
-        # dS1_01_f = complex_mult_slow(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + complex_mult_slow(S0_11_f, dT_01_f)
+        # dS1_01_f = cf.ComplexMult.apply(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + cf.ComplexMult.apply(S0_11_f, dT_01_f)
+        dS1_01_f = cf.complex_mult_slow(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + cf.complex_mult_slow(S0_11_f, dT_01_f)
 
-        # dS1_01 = Hfft_fast.apply(dS1_01_f)
-        dS1_01 = Hfft_fast(dS1_01_f)
+        # dS1_01 = cf.Hfft_fast.apply(dS1_01_f)
+        dS1_01 = cf.Hfft_fast(dS1_01_f)
         dS_01[:, 1::2] = dS1_01[:, :, :n2]
 
         dT_00, dT_01 = dS_00, dS_01
@@ -647,7 +341,7 @@ def krylov_multiply_fast(subdiag, v, w):
     return du
 
 
-def test_tranpose_multiply():
+def test_transpose_multiply():
     m = 12
     n = 1<<m
     batch_size = 512
@@ -747,14 +441,14 @@ def test_misc():
     g = autograd.grad(s, a)
 
     u = Variable(torch.rand((1, 8)), requires_grad=True).cuda()
-    re, im = Rfft(u)
-    t = Irfft(re, im)
-    t1_re, t1_im = Rfft(t)
+    re, im = cf.Rfft(u)
+    t = cf.Irfft(re, im)
+    t1_re, t1_im = cf.Rfft(t)
 
     grad, = torch.autograd.grad(torch.sum(re), u, retain_graph=True)
     w = Variable(torch.rand((1, 5)), requires_grad=True).cuda()
     ggrad = torch.autograd.grad(torch.sum(grad), u)
-    torch.autograd.gradcheck(Rfft, (u, ))
+    torch.autograd.gradcheck(cf.Rfft, (u, ))
 
     analytic_grad = fft.irfft(torch.ones_like(re).data, -torch.ones_like(im).data, normalize=False)
 
@@ -764,7 +458,7 @@ def test_misc():
         one_hot[0, i] = epsilon
         u_new = u + one_hot
         u_new_minus = u - one_hot
-        print((torch.sum(Rfft(u_new)[0]) - torch.sum(Rfft(u_new_minus)[0])) / (2 * epsilon))
+        print((torch.sum(cf.Rfft(u_new)[0]) - torch.sum(cf.Rfft(u_new_minus)[0])) / (2 * epsilon))
 
 def shift(v, f=1):
     return torch.cat((f * v[[v.size(0) - 1]], v[:-1]))
