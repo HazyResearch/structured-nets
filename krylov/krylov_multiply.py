@@ -151,7 +151,7 @@ class Fft(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         grad = grad.data.contiguous()
-        return FFt.apply(grad)
+        return Fft.apply(grad)
 
 class Ifft(torch.autograd.Function):
 
