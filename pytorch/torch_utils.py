@@ -55,10 +55,10 @@ def get_std_opt(model):
             torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
 def get_loss(params, generator=None, model_opt=None):
-	if params.dataset.startswith('true'):
+	if params.dataset_name.startswith('true'):
 		assert params.loss == 'mse'
 		return nn.MSELoss()
-	elif params.dataset.startswith('copy'):
+	elif params.dataset_name.startswith('copy'):
 		assert params.loss == 'label_smoothing'
 		ls = LabelSmoothing(params.ls_size, params.ls_padding_idx, params.ls_smoothing)
 		return SimpleLossCompute(generator, ls, model_opt)

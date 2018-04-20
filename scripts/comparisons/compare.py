@@ -91,7 +91,7 @@ logging.debug('Testing moms: ', moms)
 
 # Fixed params
 num_layers = 1
-out_dir = '/dfs/scratch1/thomasat/'
+out_dir = '../../'
 loss = 'cross_entropy'
 test_size = 1000
 train_size = 10000

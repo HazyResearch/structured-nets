@@ -10,6 +10,7 @@ sys.path.insert(0, '../../krylov/')
 sys.path.insert(0, '../../pytorch/attention/')
 from attention import *
 #from krylov_multiply import *
+# import structured_layer # this is already in attention
 import copy
 
 def construct_net(params):
@@ -38,7 +39,7 @@ def structured_layer(net, x):
 		#print('x: ', x)
 		#print(KB)
 		#return krylov_multiply_fast(net.subdiag_f_A[1:], net.G.t(), krylov_transpose_multiply_fast(net.subdiag_f_B[1:], net.H.t(), x))
-		W = krylov_recon(net.params, net.G, net.H, net.fn_A, net.fn_B_T)
+		W = krylov_recon(net.params.r, net.params.layer_size, net.G, net.H, net.fn_A, net.fn_B_T)
 		# NORMALIZE W
 		return torch.matmul(x, W)
 	else:
@@ -57,7 +58,7 @@ def set_structured_W(net, params):
         torch.nn.init.normal(net.H, std=params.init_stddev)
 
         if params.class_type != 'low_rank':
-            fn_A, fn_B_T = set_mult_fns(net, params)
+            fn_A, fn_B_T = StructuredLinear.set_mult_fns(net, params)
             net.fn_A = fn_A
             net.fn_B_T = fn_B_T
     else:
