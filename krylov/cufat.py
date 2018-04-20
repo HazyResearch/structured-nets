@@ -76,7 +76,7 @@ def rfft(X):
     return out
 
 def irfft(X, norm=True):
-    # TODO: Maybe support out_size because Rfft backward might need it for odd size input.
+    # TODO: Maybe support out_size because Rfft_slow backward might need it for odd size input.
     assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
     assert X.is_contiguous(), 'Input must be contiguous'
     assert X.shape[-1] % 2 == 0, 'Last dimension must be even'
@@ -139,7 +139,6 @@ class Conjugate(torch.autograd.Function):
     def backward(ctx, grad):
         return Conjugate.apply(grad)
 
-# TODO: change this to be consistent: from now on e.g. Rfft should be fast and Rfft_slow should be slow
 class Fft(torch.autograd.Function):
 
     @staticmethod
@@ -162,7 +161,7 @@ class Ifft(torch.autograd.Function):
         grad = grad.data.contiguous()
         return Ifft.apply(grad)
 
-class Rfft_fast(torch.autograd.Function):
+class Rfft(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X):
@@ -177,9 +176,9 @@ class Rfft_fast(torch.autograd.Function):
         elif input_size > 2:
             grad[..., 2:-2] /= 2
         return Variable(irfft(grad) * input_size)
-        # return Hfft_fast.apply(grad)
+        # return Hfft.apply(grad)
 
-class Irfft_fast(torch.autograd.Function):
+class Irfft(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X):
@@ -193,20 +192,20 @@ class Irfft_fast(torch.autograd.Function):
         if grad_f.shape[-1] > 4:
             grad_f[..., 2:-2] *= 2
         return Variable(grad_f)
-        # return Ihfft_fast.apply(grad)
+        # return Ihfft.apply(grad)
 
-def Ihfft_fast(X):
+def Ihfft(X):
     # np.fft.ihfft is the same as np.fft.rfft().conj() / n
     n = X.shape[-1]
-    return Conjugate.apply(Rfft_fast.apply(X)) / n
+    return Conjugate.apply(Rfft.apply(X)) / n
 
-def Hfft_fast(X):
+def Hfft(X):
     # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
     n = (X.shape[-1] // 2 - 1) * 2
-    return Irfft_fast.apply(Conjugate.apply(X)) * n
+    return Irfft.apply(Conjugate.apply(X)) * n
 
 
-# class Ihfft_fast(torch.autograd.Function):
+# class Ihfft(torch.autograd.Function):
 
 #     @staticmethod
 #     def forward(ctx, X):
@@ -214,9 +213,9 @@ def Hfft_fast(X):
 
 #     @staticmethod
 #     def backward(ctx, grad):
-#         return Irfft_fast.apply(grad)
+#         return Irfft.apply(grad)
 
-# class Hfft_fast(torch.autograd.Function):
+# class Hfft(torch.autograd.Function):
 
 #     @staticmethod
 #     def forward(ctx, X):
@@ -224,7 +223,7 @@ def Hfft_fast(X):
 
 #     @staticmethod
 #     def backward(ctx, grad):
-#         return Rfft_fast.apply(grad)
+#         return Rfft.apply(grad)
 
 class ComplexMult(torch.autograd.Function):
 
@@ -250,7 +249,7 @@ class ComplexMult(torch.autograd.Function):
             grad_Y = grad_Y.sum(dim=dim)
         return Variable(grad_X), Variable(grad_Y)
 
-class Rfft(torch.autograd.Function):
+class Rfft_slow(torch.autograd.Function):
     def forward(self, X_re):
         X_re = X_re.contiguous()
         self._to_save_input_size = X_re.size(-1)
@@ -274,7 +273,7 @@ class Rfft(torch.autograd.Function):
         gr = pyfft.irfft(grad_output_re,grad_output_im,self._to_save_input_size, normalize=False)
         return gr
 
-class Irfft(torch.autograd.Function):
+class Irfft_slow(torch.autograd.Function):
 
     def forward(self, k_re, k_im):
         k_re, k_im = pyfft.autograd.make_contiguous(k_re, k_im)
@@ -296,16 +295,16 @@ class Irfft(torch.autograd.Function):
         gi[...,-1] /= N
         return gr, gi
 
-def Ihfft(X_re):
+def Ihfft_slow(X_re):
     # np.fft.ihfft is the same as np.fft.rfft().conj() / n
     n = X_re.shape[-1]
-    X_f_re, X_f_im = Rfft()(X_re)
+    X_f_re, X_f_im = Rfft_slow()(X_re)
     return X_f_re / n, -X_f_im / n
 
-def Hfft(X_re, X_im):
+def Hfft_slow(X_re, X_im):
     # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
     n = (X_re.shape[-1] - 1) * 2
-    return Irfft()(X_re, -X_im) * n
+    return Irfft_slow()(X_re, -X_im) * n
 
 def complex_mult(X, Y):
     X_re, X_im = X

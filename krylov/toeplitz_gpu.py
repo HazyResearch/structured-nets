@@ -49,10 +49,10 @@ class KT_Toeplitz():
             # output of rfft has size (2n/2)+1 = n+1 complex numbers, so 2n+2 real comps
             rev_idx_2n = torch.arange(2*n+1, -1, -1, out=torch.cuda.LongTensor())
 
-            u_ = cf.Rfft_fast.apply(torch.cat((u[...,rev_idx_n], torch.zeros_like(u)), dim=-1))
-            v_ = cf.Rfft_fast.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
+            u_ = cf.Rfft.apply(torch.cat((u[...,rev_idx_n], torch.zeros_like(u)), dim=-1))
+            v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
             uv_ = cf.complex_mult_slow(u_.view(batch_size, 1, -1), v_.view(1, rank, -1))
-            ans = cf.Irfft_fast.apply(uv_)[..., rev_idx_n]
+            ans = cf.Irfft.apply(uv_)[..., rev_idx_n]
             return ans
     # TODO can this be done with rfft
 
@@ -96,10 +96,10 @@ class K_Toeplitz():
             ans = cf.complex_mult_slow(self.ieta, cf.Ifft.apply(torch.sum(wv_, dim=1)))
             return ans[..., ::2]
         else:
-            w_ = cf.Rfft_fast.apply(torch.cat((w, torch.zeros_like(w)), dim=-1))
-            v_ = cf.Rfft_fast.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
+            w_ = cf.Rfft.apply(torch.cat((w, torch.zeros_like(w)), dim=-1))
+            v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
             wv_ = cf.complex_mult_slow(w_, v_.view((1, rank, -1)))
-            ans = cf.Irfft_fast.apply(torch.sum(wv_, dim=1))[..., :n]
+            ans = cf.Irfft.apply(torch.sum(wv_, dim=1))[..., :n]
             return ans
 
 
