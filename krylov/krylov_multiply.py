@@ -8,7 +8,7 @@ import pytorch_fft.fft as fft
 import cupy as cp
 from cupy.cuda import cufft
 
-CUPY_MEM = cp.ndarray((1, ), dtype='float32').data.mem
+CUPY_MEM = cp.ndarray(1, dtype='float32').data.mem
 
 from triextrafat import krylov_construct
 # from triXXF import KrylovTransposeMultiply
@@ -43,6 +43,29 @@ def cufft_plan1d(n, fft_type, batch_size):
     # Put in a separate function so we can cache the plans.
     # Actually this only saves about 2ms, from 65.5ms to 63.4ms, for n=4096, batchsize=512, and rank=3.
     return cufft.Plan1d(n, fft_type, batch_size)
+
+def fft(X):
+    assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
+    assert X.is_contiguous(), 'Input must be contiguous'
+    fft_type = cufft.CUFFT_C2C
+    direction = cufft.CUFFT_FORWARD
+    plan = cufft_plan1d(X.shape[-1] // 2, fft_type, X.numel() // X.shape[-1])
+    out_shape = X.shape
+    out = torch.cuda.FloatTensor(*out_shape)
+    cufft.execC2C(plan.plan, X.data_ptr(), out.data_ptr(), direction)
+    return out
+
+def ifft(X):
+    assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
+    assert X.is_contiguous(), 'Input must be contiguous'
+    fft_type = cufft.CUFFT_C2C
+    direction = cufft.CUFFT_INVERSE
+    plan = cufft_plan1d(X.shape[-1] // 2, fft_type, X.numel() // X.shape[-1])
+    out_shape = X.shape
+    out = torch.cuda.FloatTensor(*out_shape)
+    cufft.execC2C(plan.plan, X.data_ptr(), out.data_ptr(), direction)
+    out /= X.shape[-1] // 2
+    return out
 
 def rfft(X):
     assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
@@ -103,7 +126,7 @@ def conjugate_cupy(X):
 
 def complex_mult_slow(X, Y):
     # I'm writing in this inefficient way because writing autodiff for complex mult is really hard
-    # thanks for broadcasting. I'm just using Pytorch's functions here.
+    # due to broadcasting. I'm just using Pytorch's functions here.
     real = X[..., ::2] * Y[..., ::2] - X[..., 1::2] * Y[..., 1::2]
     imag = X[..., ::2] * Y[..., 1::2] + X[..., 1::2] * Y[..., 0::2]
     result = torch.cat((real.view(-1, 1), imag.view(-1, 1)), dim=-1)
@@ -118,6 +141,28 @@ class Conjugate(torch.autograd.Function):
 
     def backward(ctx, grad):
         return Conjugate.apply(grad)
+
+class Fft(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X):
+        return fft(X.contiguous())
+
+    @staticmethod
+    def backward(ctx, grad):
+        grad = grad.data.contiguous()
+        return FFt.apply(grad)
+
+class Ifft(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, X):
+        return ifft(X.contiguous())
+
+    @staticmethod
+    def backward(ctx, grad):
+        grad = grad.data.contiguous()
+        return Ifft.apply(grad)
 
 class Rfft_fast(torch.autograd.Function):
 
