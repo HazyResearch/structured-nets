@@ -1,17 +1,19 @@
 import numpy as np
 import os
+#os.environ["CUDA_VISIBLE_DEVICES"]="-1" 
 import tensorflow as tf
 from utils import *
 from reconstruction import *
+from visualize import visualize
 from model import *
 import time
 import logging
 
 def optimize_tf(dataset, params):
 	# Create model
-	x = tf.placeholder(tf.float64, [None, params.input_size])
+	x = tf.placeholder(tf.float64, [None, params.input_size],name='x')
 	y, model = forward(x, params)
-	y_ = tf.placeholder(tf.float64, [None, params.out_size])
+	y_ = tf.placeholder(tf.float64, [None, params.out_size],name='y_')
 	loss, accuracy = compute_loss_and_accuracy(y, y_, params)
 	
 	train_loss_summary = tf.summary.scalar('train_loss', loss)
@@ -35,7 +37,7 @@ def optimize_tf(dataset, params):
 	saver = tf.train.Saver()
 
 	losses = {'train': [], 'val': [], 'DR': [], 'ratio': []}
-	accuracies = {'train': [], 'val': []}
+	accuracies = {'train': [], 'val': [], 'best_val': 0.0}
 
 	t1 = time.time()
 
@@ -71,13 +73,20 @@ def optimize_tf(dataset, params):
 			
 			logging.debug('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss, train_accuracy))
 			logging.debug('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss, val_accuracy))
+			logging.debug("Best validation accuracy so far: %f" % accuracies['best_val'])
 
-		if this_step > 0 and this_step % params.checkpoint_freq == 0:
-			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(this_step)))
+		# Update checkpoint if better validation accuracy
+		if val_accuracy > accuracies['best_val']:
+			accuracies['best_val'] = val_accuracy
+			#if this_step > 0 and this_step % params.checkpoint_freq == 0:
+			#save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(this_step)))
+			save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(this_step) + '_' + str(accuracies['best_val'])))
+			logging.debug("Updating validation accuracy so far: %f" % accuracies['best_val'])
 			logging.debug("Model saved in file: %s" % save_path)
+		
 
-		if this_step > 0 and this_step % params.viz_freq == 0:
-			visualize(params,sess,model,batch_xs,batch_ys,y_pred,this_step)
+		if this_step > 0 and params.viz_freq > 0 and this_step % params.viz_freq == 0:
+			visualize(params,sess,model,x,y_,batch_xs,batch_ys,y_pred,this_step)
 
 	# Test trained model
 	if params.test:

@@ -57,6 +57,6 @@ for method in methods:
 			for decay_rate in decay_rates: 
 				for mom in moms:
 					command = create_command(args,method,rank,lr,decay_rate,mom)
-					print 'Starting new thread:\n', command
+					print('Starting new thread:\n', command)
 					#os.system(command)
 					thread.start_new_thread(os.system, (command,))

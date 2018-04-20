@@ -29,7 +29,8 @@ def compare(args, method, rank, lr, decay_rate, mom):
 			method, learn_corner, n_diag_learned, init_stddev, fix_G, 
 			check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose, 
 			decay_rate, args.decay_freq, learn_diagonal, fix_A_identity, 
-			stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model)
+			stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model,
+			viz_freq, num_pred_plot, viz_powers)
 
 	# Save params + git commit ID
 	this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) 
@@ -40,11 +41,18 @@ def compare(args, method, rank, lr, decay_rate, mom):
 		this_iter_name = this_id + '_' + str(test_iter)
 		params.log_path = os.path.join(log_path, this_iter_name)
 		params.checkpoint_path = os.path.join(checkpoint_path, this_iter_name)
+		params.vis_path = os.path.join(vis_path, this_iter_name)
 
 		logging.debug('Tensorboard log path: ' + params.log_path)
 		logging.debug('Tensorboard checkpoint path: ' + params.checkpoint_path)
+		logging.debug('Tensorboard vis path: ' + params.vis_path)
+
 		if not os.path.exists(params.checkpoint_path):
 			os.makedirs(params.checkpoint_path)
+
+
+		if not os.path.exists(params.vis_path):
+			os.makedirs(params.vis_path)
 
 		losses, accuracies = optimize(dataset, params)
 		tf.reset_default_graph()
@@ -83,11 +91,11 @@ lrs = [float(lr) for lr in args.lr.split(',')]
 decay_rates = [float(dr) for dr in args.decay_rate.split(',')]
 moms = [float(mom) for mom in args.mom.split(',')]
 
-logging.debug('Testing methods: ', methods)
-logging.debug('Testing ranks: ', ranks)
-logging.debug('Testing lrs: ', lrs)
-logging.debug('Testing decay rates: ', decay_rates)
-logging.debug('Testing moms: ', moms)
+logging.debug('Testing methods: ' + str(methods))
+logging.debug('Testing ranks: ' + str(ranks))
+logging.debug('Testing lrs: ' + str(lrs))
+logging.debug('Testing decay rates: ' + str(decay_rates))
+logging.debug('Testing moms: ' + str(moms))
 
 # Fixed params
 num_layers = 1
@@ -103,6 +111,9 @@ flip_K_B = False
 init_type = 'toeplitz'
 init_stddev = 0.01 # Random initializations
 test_freq = 100
+viz_freq = -1#1000
+num_pred_plot = 5
+viz_powers = [1,5,10]
 learn_corner = True
 learn_diagonal = False
 stochastic_train = False
@@ -112,6 +123,7 @@ n_trials = 3
 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
 results_dir = os.path.join(out_dir, 'results', args.result_dir) 
 checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
+vis_path = os.path.join(out_dir, 'vis', args.result_dir)
 
 dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform, 
 	stochastic_train, test_size, train_size, args.test)

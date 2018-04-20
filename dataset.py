@@ -175,6 +175,8 @@ class Dataset:
 		elif self.name == 'mnist':
 			data_dir = '/tmp/tensorflow/mnist/input_data'
 			self.mnist = input_data.read_data_sets(data_dir, one_hot=True)
+			self.val_X = self.mnist.validation.images
+			self.val_Y = self.mnist.validation.labels
 			self.test_X = self.mnist.test.images
 			self.test_Y = self.mnist.test.labels
 		elif self.name == 'mnist_rot':
@@ -363,7 +365,7 @@ class Dataset:
 			assert 0
 
 	def get_input_size(self):
-		if 'mnist' in self.name:
+		if 'mnist' in self.name or 'convex' in self.name:
 			return 784
 		elif self.name == 'smallnorb':
 			return 576

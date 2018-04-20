@@ -8,7 +8,7 @@ class ModelParams:
 			init_stddev, fix_G, check_disp, checkpoint_freq, checkpoint_path, 
 			test_freq, verbose, decay_rate, decay_freq, learn_diagonal, 
 			fix_A_identity, stochastic_train, flip_K_B, num_conv_layers, 
-			torch, model):
+			torch, model, viz_freq, num_pred_plot, viz_powers):
 		if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner']:
 			print('Class type ' + class_type + ' not supported')
 			assert 0
@@ -50,6 +50,9 @@ class ModelParams:
 		self.num_conv_layers = num_conv_layers
 		self.torch = torch
 		self.model = model
+		self.viz_freq = viz_freq
+		self.num_pred_plot = num_pred_plot
+		self.viz_powers = viz_powers
 		# c1_filters, c1_ksize, p1_size, p1_strides, c2_filters, c2_ksize, p2_size, p2_strides 
 		self.set_cnn_params()
 
@@ -83,7 +86,7 @@ class ModelParams:
 		elif self.dataset_name.startswith('true'):
 			self.cnn_params = cnn_params
 
-		elif self.dataset_name in ['copy', 'iwslt', 'mnist_bg_rot']:
+		elif self.dataset_name in ['copy', 'iwslt', 'mnist_bg_rot', 'mnist', 'convex']:
 			return
 		#elif self.dataset_name.startswith('norb'):
 		#	cnn_params['c1_filters'] = 9
