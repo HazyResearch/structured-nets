@@ -51,7 +51,8 @@ class ModelParams:
 		self.torch = torch
 		self.model = model
 		# c1_filters, c1_ksize, p1_size, p1_strides, c2_filters, c2_ksize, p2_size, p2_strides
-		self.set_cnn_params()
+		if self.model == 'CNN':
+			self.set_cnn_params()
 
 
 	def set_cnn_params(self):

@@ -36,7 +36,7 @@ def compare(args, method, rank, lr, decay_rate, mom):
 	this_results_dir = params.save(results_dir, this_id, commit_id)
 	logging.debug('this_results_dir: ' + this_results_dir)
 
-	for test_iter in range(n_trials):
+	for test_iter in range(trials):
 		this_iter_name = this_id + '_' + str(test_iter)
 		params.log_path = os.path.join(log_path, this_iter_name)
 		params.checkpoint_path = os.path.join(checkpoint_path, this_iter_name)
@@ -63,17 +63,18 @@ parser.add_argument("--dataset") # Which dataset
 parser.add_argument("--result_dir") # Where to save results
 parser.add_argument("--r") # Rank / displacement ranks
 parser.add_argument('--lr') # Learning rates
-parser.add_argument('--decay_rate') # Decay rates of learning rate
+parser.add_argument('--decay_rate', default=1.0) # Decay rates of learning rate
 parser.add_argument('--decay_freq', type=float) # Decay steps
 parser.add_argument('--mom') # Momentums
 parser.add_argument('--steps', type=int) # Steps
 parser.add_argument('--batch_size', type=int) # Batch size
-parser.add_argument('--test', type=int) # Test on test set
+parser.add_argument('--test', type=int, default=1) # Test on test set
 parser.add_argument('--layer_size', type=int) # Size of hidden layer
-parser.add_argument('--transform') # Any transform of dataset, e.g. grayscale
-parser.add_argument('--torch', type=int) # Pytorch or TF
+parser.add_argument('--transform', default='none') # Any transform of dataset, e.g. grayscale
+parser.add_argument('--torch') # Pytorch or TF
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 parser.add_argument('--parallel') #
+parser.add_argument('--trials', default=3) #
 args = parser.parse_args()
 
 
@@ -108,7 +109,7 @@ learn_diagonal = False
 stochastic_train = False
 checkpoint_freq = 1000
 num_conv_layers = 2
-n_trials = 3
+trials = 3
 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
 results_dir = os.path.join(out_dir, 'results', args.result_dir)
 checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
