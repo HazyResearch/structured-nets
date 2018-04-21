@@ -55,17 +55,17 @@ def get_std_opt(model):
             torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
 def get_loss(params, generator=None, model_opt=None):
-	if params.dataset_name.startswith('true'):
-		assert params.loss == 'mse'
-		return nn.MSELoss()
-	elif params.dataset_name.startswith('copy'):
-		assert params.loss == 'label_smoothing'
-		ls = LabelSmoothing(params.ls_size, params.ls_padding_idx, params.ls_smoothing)
-		return SimpleLossCompute(generator, ls, model_opt)
+    if params.dataset_name.startswith('true'):
+        assert params.loss == 'mse'
+        return nn.MSELoss()
+    elif params.dataset_name.startswith('copy'):
+        assert params.loss == 'label_smoothing'
+        ls = LabelSmoothing(params.ls_size, params.ls_padding_idx, params.ls_smoothing)
+        return SimpleLossCompute(generator, ls, model_opt)
 
-	else:
-		assert params.loss == 'cross_entropy'
-		return nn.CrossEntropyLoss()
+    else:
+        assert params.loss == 'cross_entropy'
+        return nn.CrossEntropyLoss()
 
 
 class SimpleLossCompute:
@@ -110,26 +110,26 @@ class LabelSmoothing(nn.Module):
 
 # y_: One hot. y: vector of predicted class probabilities.
 def compute_loss_and_accuracy(pred, true, params, loss_fn, ntokens=None):
-	if params.loss == 'mse':
-		mse = loss_fn(pred, true)
-		accuracy = torch.FloatTensor([0])
+    if params.loss == 'mse':
+        mse = loss_fn(pred, true)
+        accuracy = torch.FloatTensor([0])
 
-		return mse, accuracy
-	elif params.loss == 'cross_entropy':
-		_, true_argmax = torch.max(true, 1)
-		cross_entropy = loss_fn(pred, true_argmax)
+        return mse, accuracy
+    elif params.loss == 'cross_entropy':
+        _, true_argmax = torch.max(true, 1)
+        cross_entropy = loss_fn(pred, true_argmax)
 
-		_, pred_argmax = torch.max(pred, 1)
-		correct_prediction = torch.eq(true_argmax, pred_argmax)
-		accuracy = torch.mean(correct_prediction.float())
+        _, pred_argmax = torch.max(pred, 1)
+        correct_prediction = torch.eq(true_argmax, pred_argmax)
+        accuracy = torch.mean(correct_prediction.float())
 
-		return cross_entropy, accuracy
+        return cross_entropy, accuracy
 
-	elif params.loss == 'label_smoothing':
-		loss = loss_fn(pred, true, ntokens)
-		accuracy = torch.FloatTensor([0])
-		return loss, accuracy
+    elif params.loss == 'label_smoothing':
+        loss = loss_fn(pred, true, ntokens)
+        accuracy = torch.FloatTensor([0])
+        return loss, accuracy
 
-	else:
-		print(('Not supported: ', params.loss))
-		assert 0
+    else:
+        print(('Not supported: ', params.loss))
+        assert 0

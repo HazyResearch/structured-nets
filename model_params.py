@@ -112,7 +112,7 @@ class ModelParams:
         # Make new dir with timestamp
         this_results_dir = os.path.join(results_dir, name + '_' + str(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))
         if not os.path.exists(this_results_dir):
-          os.makedirs(this_results_dir)
+            os.makedirs(this_results_dir)
 
         text_file = open(os.path.join(this_results_dir, 'params.txt'), "w")
         text_file.write(param_str)
