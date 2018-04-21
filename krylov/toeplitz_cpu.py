@@ -42,12 +42,13 @@ class KT_Toeplitz():
             v_ = np.fft.fft(self.eta * v)
             uv_ = u_.reshape(batch_size, 1, n) * v_.reshape(1, rank, n)
             ans = self.eta * np.fft.fft(uv_)
+            return np.real(ans)
         else:
-            u_ = np.fft.fft(np.concatenate((u[...,::-1], np.zeros_like(u)), axis=-1))
-            v_ = np.fft.fft(np.concatenate((v, np.zeros_like(v)), axis=-1))
-            uv_ = u_.reshape(batch_size, 1, 2*n) * v_.reshape(1, rank, 2*n)
-            ans = np.fft.ifft(uv_)[..., n-1::-1]
-        return np.real(ans)
+            u_ = np.fft.rfft(np.concatenate((u[...,::-1], np.zeros_like(u)), axis=-1))
+            v_ = np.fft.rfft(np.concatenate((v, np.zeros_like(v)), axis=-1))
+            uv_ = u_.reshape(batch_size, 1, -1) * v_.reshape(1, rank, -1)
+            ans = np.fft.irfft(uv_)[..., n-1::-1]
+            return ans
 
 
 class K_Toeplitz():
@@ -86,12 +87,13 @@ class K_Toeplitz():
             v_ = np.fft.fft(self.eta * v)
             wv_ =  w_ * v_.reshape((1, rank, n))
             ans = 1/self.eta * np.fft.ifft(np.sum(wv_, axis=1))
+            ans = np.real(ans)
         else:
             w_ = np.fft.rfft(np.concatenate((w, np.zeros_like(w)), axis=-1))
             v_ = np.fft.rfft(np.concatenate((v, np.zeros_like(v)), axis=-1))
             wv_ =  w_ * v_.reshape((1, rank, -1))
             ans = np.fft.irfft(np.sum(wv_, axis=1))[..., :n]
-        return np.real(ans)
+        return ans
 
 
 def toeplitz_mult(G, H, x, cycle=True):
@@ -100,7 +102,7 @@ def toeplitz_mult(G, H, x, cycle=True):
     f = (1,-1) if cycle else (0,0)
     transpose_out = KT_Toeplitz(n, f[1], batch_size, rank)(H, x)
     krylov_out = K_Toeplitz(n, f[0], batch_size, rank)(G, transpose_out)
-    return krylov_out
+    return krylov_out/2 if cycle else krylov_out
 
 
 ##### Slow mult

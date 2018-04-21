@@ -43,7 +43,7 @@ class KT_Toeplitz():
             v_ = cf.Fft.apply((self.eta.view(n,2) * v.view(rank,n,1)).view(rank,2*n))
             uv_ = cf.complex_mult_slow(u_.view(batch_size, 1, 2*n), v_.view(1, rank, 2*n))
             ans = cf.complex_mult_slow(self.eta, cf.Fft.apply(uv_))
-            return ans[..., ::2].contiguous()
+            ans = ans[..., ::2].contiguous()
         else:
             rev_idx_n = torch.arange(n-1, -1, -1, out=torch.cuda.LongTensor())
             # output of rfft has size (2n/2)+1 = n+1 complex numbers, so 2n+2 real comps
@@ -53,7 +53,7 @@ class KT_Toeplitz():
             v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
             uv_ = cf.complex_mult_slow(u_.view(batch_size, 1, -1), v_.view(1, rank, -1))
             ans = cf.Irfft.apply(uv_)[..., rev_idx_n]
-            return ans
+        return ans
     # TODO can this be done with rfft
 
 
@@ -94,13 +94,14 @@ class K_Toeplitz():
             v_ = cf.Fft.apply(veta.view(rank, -1))
             wv_ = cf.complex_mult_slow(w_, v_)
             ans = cf.complex_mult_slow(self.ieta, cf.Ifft.apply(torch.sum(wv_, dim=1)))
-            return ans[..., ::2].contiguous()
+
+            ans = ans[..., ::2].contiguous()
         else:
             w_ = cf.Rfft.apply(torch.cat((w, torch.zeros_like(w)), dim=-1))
             v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
             wv_ = cf.complex_mult_slow(w_, v_.view((1, rank, -1)))
             ans = cf.Irfft.apply(torch.sum(wv_, dim=1))[..., :n]
-            return ans
+        return ans
 
 
 def toeplitz_mult(G, H, x, cycle=True):
@@ -109,7 +110,8 @@ def toeplitz_mult(G, H, x, cycle=True):
     f = (1,-1) if cycle else (0,0)
     transpose_out = KT_Toeplitz(n, f[1], batch_size, rank)(H, x)
     krylov_out = K_Toeplitz(n, f[0], batch_size, rank)(G, transpose_out)
-    return krylov_out
+    scaled = krylov_out/2 if cycle else krylov_out
+    return scaled
 
 ##### AD mult
 
@@ -177,7 +179,3 @@ if __name__ == '__main__':
     # output:
     # array([[ 0.,  6., 16., 26.],
     #        [ 0., 12., 38., 66.]])
-
-n=4
-a = Variable(torch.Tensor([[1, 1, 1, 1], [0, 1, 2, 3]])).cuda()
-ans = KT_Toeplitz(n,1,2,2)(a,a)
