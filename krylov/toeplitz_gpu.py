@@ -10,10 +10,10 @@ class KT_Toeplitz():
     """
 
     def __init__(self, n, f=0, batch_size=1, rank=1):
-        m = int(np.log2(n))
-        assert n == 1 << m, 'n must be a power of 2'
+        # m = int(np.log2(n))
+        # assert n == 1 << m, 'n must be a power of 2'
         self.n = n
-        self.m = m
+        # self.m = m
         self.batch_size = batch_size
         self.rank = rank
 
@@ -36,7 +36,7 @@ class KT_Toeplitz():
         u: (batch, n)
         out: (batch, rank, n)
         """
-        n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
+        n, batch_size, rank = self.n, self.batch_size, self.rank
 
         if self.eta is not None: # cycle version
             u_ = cf.Ifft.apply((self.ieta.view(n,2) * u.view(batch_size,n,1)).view(batch_size,2*n))
@@ -62,10 +62,10 @@ class K_Toeplitz():
     """
 
     def __init__(self, n, f, batch_size=1, rank=1):
-        m = int(np.log2(n))
-        assert n == 1 << m, 'n must be a power of 2'
+        # m = int(np.log2(n))
+        # assert n == 1 << m, 'n must be a power of 2'
         self.n = n
-        self.m = m
+        # self.m = m
         self.batch_size = batch_size
         self.rank = rank
 
@@ -86,7 +86,7 @@ class K_Toeplitz():
         w: (batch_size, rank, n)
         out: (batch_size, n)
         """
-        n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
+        n, batch_size, rank = self.n, self.batch_size, self.rank
         if self.eta is not None:
             weta = self.eta.view(n,2) * w.contiguous().view(batch_size, rank, n, 1)
             veta = self.eta.view(n,2) * v.contiguous().view(rank, n, 1)
