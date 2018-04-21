@@ -52,7 +52,7 @@ def fft(X):
     cufft.execC2C(plan.plan, X.data_ptr(), out.data_ptr(), direction)
     return out
 
-def ifft(X):
+def ifft(X, norm=True):
     assert isinstance(X, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
     assert X.is_contiguous(), 'Input must be contiguous'
     fft_type = cufft.CUFFT_C2C
@@ -61,7 +61,8 @@ def ifft(X):
     out_shape = X.shape
     out = torch.cuda.FloatTensor(*out_shape)
     cufft.execC2C(plan.plan, X.data_ptr(), out.data_ptr(), direction)
-    out /= X.shape[-1] // 2
+    if norm:
+        out /= X.shape[-1] // 2
     return out
 
 def rfft(X):
@@ -154,8 +155,7 @@ class Fft(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad):
-        grad = grad.data.contiguous()
-        return Variable(swap_real_imag(fft(swap_real_imag(grad))))
+        return Variable(ifft(grad.data.contiguous(), norm=False))
 
 class Ifft(torch.autograd.Function):
 
@@ -165,8 +165,8 @@ class Ifft(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad):
-        grad = grad.data.contiguous()
-        return Variable(swap_real_imag(ifft(swap_real_imag(grad))))
+        n = grad.shape[-1] // 2
+        return Variable(fft(grad.data.contiguous()) / n)
 
 class Rfft(torch.autograd.Function):
 
