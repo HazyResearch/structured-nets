@@ -16,7 +16,7 @@ def circ_diag_transpose_mult_fn(v_f, d, x, n):
 
     # Circular shift x to the left
     y = tf.concat([x[1:], [x[0]]], axis=0)
-    
+
     # Scale by [v f]
     return tf.multiply(y, v_f) + tf.multiply(d, x)
 
@@ -29,14 +29,14 @@ def circ_transpose_mult_fn(v_f, x, n):
 
     # Circular shift x to the left
     y = tf.concat([x[1:], [x[0]]], axis=0)
-    
+
     # Scale by [v f]
     return tf.multiply(y, v_f)
 
 def circ_mult_fn(f_v, x, n):
     # Circular shift x to the right
     y = tf.concat([x[n-1:], x[:n-1]], axis=0)
-    
+
     # Scale by [f v]
     return tf.multiply(y, f_v)
 
@@ -45,7 +45,7 @@ def symm_tridiag_mult_fn(diag, off_diag, x, n):
     sup_result = tf.multiply(x[:n-1], off_diag)
 
     sup_result = tf.concat([[0], sup_result], axis=0)
-    sub_result = tf.concat([sub_result, [0]], axis=0)    
+    sub_result = tf.concat([sub_result, [0]], axis=0)
 
     return sup_result + sub_result + tf.multiply(x, diag)
 
@@ -75,12 +75,12 @@ def tridiag_corner_transpose_mult_fn(subdiag,diag,supdiag,f,x,n):
     sup_result = tf.multiply(x[:n-1], supdiag)
     sup_result = tf.concat([[0], sup_result], axis=0)
     sub_result = tf.concat([sub_result, [0]], axis=0)
-    #sess = tf.InteractiveSession()   
+    #sess = tf.InteractiveSession()
     #tf.initialize_all_variables().run()
     z = tf.zeros(n-1, dtype=tf.float64)
-    scaled_f = tf.multiply(f, x[0])     
-    f_result = tf.concat([z, scaled_f], axis=0)     
-    return sup_result + sub_result + tf.multiply(x, diag) + f_result 
+    scaled_f = tf.multiply(f, x[0])
+    f_result = tf.concat([z, scaled_f], axis=0)
+    return sup_result + sub_result + tf.multiply(x, diag) + f_result
 
 # subdiag, diag, supdiag of the transposed operator
 # f: bottom left
@@ -141,7 +141,7 @@ def test_circ_sparsity():
     diag = np.zeros(n)
     # Subdiag corresponds to Z_f, we multiply by Z_f^T
     A = diags([subdiag, diag, supdiag], [-1, 0, 1], (n,n)).toarray().T
-   
+
     f = 5.0
     A[-1,0] = f
 
@@ -156,7 +156,7 @@ def test_circ_sparsity():
 
     print('x: ', x)
     print('Ax: ', np.dot(A,x))
-    
+
     x = tf.constant(x, dtype=tf.float64)
     result = fn(x,n)
 
@@ -165,7 +165,7 @@ def test_circ_sparsity():
     sess = tf.InteractiveSession()
     tf.initialize_all_variables().run()
 
-    print(sess.run(result)) 
+    print(sess.run(result))
 
 def test_tridiag_corner():
     n = 4
@@ -186,11 +186,11 @@ def test_tridiag_corner():
 
     x = np.array([1,2,3,4])
 
-    print('A: ', A) 
+    print('A: ', A)
 
     print('Ax: ', np.dot(A,x))
 
-    fn = functools.partial(tridiag_corner_transpose_mult_fn, tf.constant(subdiag, dtype=tf.float64), 
+    fn = functools.partial(tridiag_corner_transpose_mult_fn, tf.constant(subdiag, dtype=tf.float64),
         tf.constant(diag, dtype=tf.float64), tf.constant(supdiag, dtype=tf.float64), tf.constant(f, dtype=tf.float64))
 
     print('x: ', x)
@@ -202,7 +202,7 @@ def test_tridiag_corner():
     sess = tf.InteractiveSession()
     tf.initialize_all_variables().run()
 
-    print(sess.run(result)) 
+    print(sess.run(result))
 
 def test_symm_tridiag():
     n = 4
@@ -219,7 +219,7 @@ def test_symm_tridiag():
 
     print(np.dot(np.linalg.matrix_power(A, 3), x))
 
-    fn = functools.partial(symm_tridiag_mult_fn, tf.constant(diag, dtype=tf.float64), 
+    fn = functools.partial(symm_tridiag_mult_fn, tf.constant(diag, dtype=tf.float64),
         tf.constant(off_diag, dtype=tf.float64))
 
     x = tf.constant(x, dtype=tf.float64)
@@ -228,10 +228,9 @@ def test_symm_tridiag():
     sess = tf.InteractiveSession()
     tf.initialize_all_variables().run()
 
-    print(sess.run(result)) 
+    print(sess.run(result))
 
 if __name__ == '__main__':
     test_circ_sparsity()
     #test_tridiag_corner()
     #test_symm_tridiag()
-
