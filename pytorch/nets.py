@@ -3,15 +3,18 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
-from torch_krylov import *
-from torch_reconstruction import *
+import copy
 import sys
 sys.path.insert(0, '../../krylov/')
 sys.path.insert(0, '../../pytorch/attention/')
+
+from torch_krylov import *
+from torch_reconstruction import *
 from attention import *
+import toeplitz_gpu as toep
 #from krylov_multiply import *
 # import structured_layer # this is already in attention
-import copy
+# TODO fix the 'import *'s
 
 def construct_net(params):
     if params.model == 'LeNet':
@@ -32,6 +35,8 @@ def structured_layer(net, x):
 	elif net.params.class_type == 'low_rank':
 		xH = torch.matmul(x, net.H)
 		return torch.matmul(xH, net.G.t())
+	elif net.params.class_type in ['toep_corner', 'toep_nocorn']:
+		return toep.toeplitz_mult(net.G.t(), net.H.t(), x, net.cycle)
 	elif net.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
 		#print('krylov fast')
@@ -43,24 +48,31 @@ def structured_layer(net, x):
 		# NORMALIZE W
 		return torch.matmul(x, W)
 	else:
-		print(('Not supported: ', params.class_type))
+		print(('Not supported: ', net.params.class_type))
 		assert 0
 
 def set_structured_W(net, params):
     if params.class_type == 'unconstrained':
         net.W = Parameter(torch.Tensor(params.layer_size, params.layer_size))
         torch.nn.init.normal(net.W, std=params.init_stddev)
-    elif params.class_type in ['low_rank', 'toeplitz_like', 'vandermonde_like', 'hankel_like',
+    elif params.class_type in ['low_rank', 'toeplitz_like', 'toep_corner', 'toep_nocorn', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
         net.G = Parameter(torch.Tensor(params.layer_size, params.r))
         net.H = Parameter(torch.Tensor(params.layer_size, params.r))
         torch.nn.init.normal(net.G, std=params.init_stddev)
         torch.nn.init.normal(net.H, std=params.init_stddev)
 
-        if params.class_type != 'low_rank':
+        if params.class_type == 'low_rank':
+            pass
+        elif params.class_type == 'toep_corner':
+            net.cycle = True
+        elif params.class_type == 'toep_nocorn':
+            net.cycle = False
+        else:
             fn_A, fn_B_T = StructuredLinear.set_mult_fns(net, params)
             net.fn_A = fn_A
             net.fn_B_T = fn_B_T
+
     else:
         print(('Not supported: ', params.class_type))
         assert 0

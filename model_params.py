@@ -2,14 +2,14 @@ from utils import *
 import datetime, os
 
 class ModelParams:
-	def __init__(self, dataset_name, transform, test, log_path, input_size, 
-			layer_size, out_size, num_layers, loss, r, steps, batch_size, 
-			lr, mom, init_type, class_type, learn_corner, n_diag_learned, 
-			init_stddev, fix_G, check_disp, checkpoint_freq, checkpoint_path, 
-			test_freq, verbose, decay_rate, decay_freq, learn_diagonal, 
-			fix_A_identity, stochastic_train, flip_K_B, num_conv_layers, 
+	def __init__(self, dataset_name, transform, test, log_path, input_size,
+			layer_size, out_size, num_layers, loss, r, steps, batch_size,
+			lr, mom, init_type, class_type, learn_corner, n_diag_learned,
+			init_stddev, fix_G, check_disp, checkpoint_freq, checkpoint_path,
+			test_freq, verbose, decay_rate, decay_freq, learn_diagonal,
+			fix_A_identity, stochastic_train, flip_K_B, num_conv_layers,
 			torch, model, viz_freq, num_pred_plot, viz_powers):
-		if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner']:
+		if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'toep_corner', 'toep_nocorn', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner']:
 			print('Class type ' + class_type + ' not supported')
 			assert 0
 		self.dataset_name = dataset_name
