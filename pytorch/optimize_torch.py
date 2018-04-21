@@ -73,13 +73,13 @@ def optimize_torch(dataset, params):
 
 			losses['val'].append(val_loss)
 			accuracies['val'].append(val_accuracy)
-			
+
 			print(('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss, train_accuracy)))
 			print(('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss, val_accuracy)))
 
 		if step % params.checkpoint_freq == 0:
 			save_path = os.path.join(params.checkpoint_path, str(step))
-			with open(save_path, 'wb') as f: 
+			with open(save_path, 'wb') as f:
 				torch.save(net.state_dict(), f)
 			print(("Model saved in file: %s" % save_path))
 

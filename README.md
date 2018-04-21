@@ -12,6 +12,6 @@ broken.
 
 `pip install git+git://github.com/locuslab/pytorch_fft.git@c03132a`
 
-cupy: For some reason `pip install cupy` installs the old version 2.5.0 for me,
-so you might need `pip install cupy==4.0.0rc1`
+cupy>=4.0.0
+
 

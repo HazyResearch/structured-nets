@@ -53,7 +53,7 @@ class ModelParams:
 		self.viz_freq = viz_freq
 		self.num_pred_plot = num_pred_plot
 		self.viz_powers = viz_powers
-		# c1_filters, c1_ksize, p1_size, p1_strides, c2_filters, c2_ksize, p2_size, p2_strides 
+		# c1_filters, c1_ksize, p1_size, p1_strides, c2_filters, c2_ksize, p2_size, p2_strides
 		self.set_cnn_params()
 
 
@@ -62,7 +62,7 @@ class ModelParams:
 		if self.dataset_name.startswith('mnist_noise') or self.dataset_name == 'norb':
 			cnn_params['c1_ksize'] = 5
 			cnn_params['p1_size'] = 2
-			cnn_params['p1_strides'] = 2 
+			cnn_params['p1_strides'] = 2
 			cnn_params['c2_ksize'] = 5
 			cnn_params['p2_size'] = 2
 			cnn_params['p2_strides'] = 2
@@ -70,11 +70,11 @@ class ModelParams:
 			cnn_params['c2_filters'] = 16
 			cnn_params['p2_flat_size'] = 7 * 7 * cnn_params['c2_filters']
 			self.cnn_params = cnn_params
-			
+
 		elif self.dataset_name == 'cifar10':
 			cnn_params['c1_ksize'] = 5
 			cnn_params['p1_size'] = 2
-			cnn_params['p1_strides'] = 2 
+			cnn_params['p1_strides'] = 2
 			cnn_params['c2_ksize'] = 5
 			cnn_params['p2_size'] = 2
 			cnn_params['p2_strides'] = 2
@@ -82,7 +82,7 @@ class ModelParams:
 			cnn_params['c2_filters'] = 16
 			cnn_params['p2_flat_size'] = 8 * 8 * cnn_params['c2_filters']
 			self.cnn_params = cnn_params
-		
+
 		elif self.dataset_name.startswith('true'):
 			self.cnn_params = cnn_params
 

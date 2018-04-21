@@ -23,17 +23,16 @@ def diag_mult_fn(diag, x):
 def circ_transpose_mult_fn(subdiag_f, x):
 	# Circular shift
 	y = torch.cat((x[1:], x[0]))
-	
+
 	# Scale by [v f]
 	return y * subdiag_f
 
 # Tridiagonal + corner operators
 def tridiag_transpose_mult_fn(subdiag_f, diag, supdiag, x):
 	y = torch.cat((x[1:], x[0]))
-	sub_result = y * subdiag_f	
+	sub_result = y * subdiag_f
 	z = Variable(torch.zeros(1).cuda())
 	sup_result = torch.cat((z, x[:-1] * supdiag))
 	diag_result = x*diag
 
 	return sup_result + sub_result + diag_result
-
