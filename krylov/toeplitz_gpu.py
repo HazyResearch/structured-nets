@@ -43,7 +43,7 @@ class KT_Toeplitz():
             v_ = cf.Fft.apply((self.eta.view(n,2) * v.view(rank,n,1)).view(rank,2*n))
             uv_ = cf.complex_mult_slow(u_.view(batch_size, 1, 2*n), v_.view(1, rank, 2*n))
             ans = cf.complex_mult_slow(self.eta, cf.Fft.apply(uv_))
-            return ans[..., ::2]
+            return ans[..., ::2].contiguous()
         else:
             rev_idx_n = torch.arange(n-1, -1, -1, out=torch.cuda.LongTensor())
             # output of rfft has size (2n/2)+1 = n+1 complex numbers, so 2n+2 real comps
@@ -88,13 +88,13 @@ class K_Toeplitz():
         """
         n, batch_size, rank = self.n, self.batch_size, self.rank
         if self.eta is not None:
-            weta = self.eta.view(n,2) * w.contiguous().view(batch_size, rank, n, 1)
-            veta = self.eta.view(n,2) * v.contiguous().view(rank, n, 1)
+            weta = self.eta.view(n,2) * w.view(batch_size, rank, n, 1)
+            veta = self.eta.view(n,2) * v.view(rank, n, 1)
             w_ = cf.Fft.apply(weta.view(batch_size, rank, -1))
             v_ = cf.Fft.apply(veta.view(rank, -1))
             wv_ = cf.complex_mult_slow(w_, v_)
             ans = cf.complex_mult_slow(self.ieta, cf.Ifft.apply(torch.sum(wv_, dim=1)))
-            return ans[..., ::2]
+            return ans[..., ::2].contiguous()
         else:
             w_ = cf.Rfft.apply(torch.cat((w, torch.zeros_like(w)), dim=-1))
             v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
@@ -110,6 +110,29 @@ def toeplitz_mult(G, H, x, cycle=True):
     transpose_out = KT_Toeplitz(n, f[1], batch_size, rank)(H, x)
     krylov_out = K_Toeplitz(n, f[0], batch_size, rank)(G, transpose_out)
     return krylov_out
+
+##### AD mult
+
+def multiply_by_autodiff(v, w, f=1):
+    """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal, using Pytorch's autodiff.
+    Parameters:
+        subdiag: Tensor of shape (n - 1, )
+        v: Tensor of shape (rank, n)
+        w: Tensor of shape (batch_size, rank, n)
+    Returns:
+        product: Tensor of shape (batch_size, n)
+    """
+    batch_size, rank, n = w.shape
+    rank_, n_ = v.shape
+    assert n == n_, 'w and v must have the same last dimension'
+    assert rank == rank_, 'w and v must have the same rank'
+
+    # u = Variable(torch.zeros((batch_size, n)).cuda(), requires_grad=True)
+    u = Variable(torch.cuda.FloatTensor(batch_size, n).fill_(0.0), requires_grad=True)
+    prod = KT_Toeplitz(n,f,batch_size,rank)(v, u)
+    result, = torch.autograd.grad(prod, u, grad_outputs=w, retain_graph=True)
+    return result
+
 
 
 ##### Slow mult
