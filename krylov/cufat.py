@@ -129,6 +129,13 @@ def complex_mult_slow(X, Y):
     result = torch.cat((real.view(-1, 1), imag.view(-1, 1)), dim=-1)
     return result.view(*(real.shape[:-1] + (2 * real.shape[-1], )))
 
+def swap_real_imag(X):
+    assert X.shape[-1] % 2 == 0, 'Last dimension must be even'
+    X_swapped = torch.cuda.FloatTensor(*X.shape)
+    X_swapped[..., ::2], X_swapped[..., 1::2] = X[..., 1::2], X[..., ::2]
+    return X_swapped
+
+
 class Conjugate(torch.autograd.Function):
 
     @staticmethod
@@ -148,8 +155,7 @@ class Fft(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         grad = grad.data.contiguous()
-        # return Fft.apply(grad)
-        return Variable(fft(grad))
+        return Variable(swap_real_imag(fft(swap_real_imag(grad))))
 
 class Ifft(torch.autograd.Function):
 
@@ -160,8 +166,7 @@ class Ifft(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         grad = grad.data.contiguous()
-        # return Ifft.apply(grad)
-        return Variable(ifft(grad))
+        return Variable(swap_real_imag(ifft(swap_real_imag(grad))))
 
 class Rfft(torch.autograd.Function):
 
