@@ -33,27 +33,27 @@ def structured_layer(net, x):
     if net.params.class_type == 'unconstrained':
         return torch.matmul(x, net.W)
     elif net.params.class_type == 'low_rank':
-        xH = torch.matmul(x, net.H)
-        return torch.matmul(xH, net.G.t())
+        xH = torch.matmul(x, net.H.t())
+        return torch.matmul(xH, net.G)
     elif net.params.class_type in ['toep_corner', 'toep_nocorn']:
         # test that it matches slow version
         # W = krylov_recon(net.params.r, net.params.layer_size, net.G, net.H, net.fn_A, net.fn_B_T)
-        # ans = toep.toeplitz_mult(net.G.t(), net.H.t(), x, net.cycle)
+        # ans = toep.toeplitz_mult(net.G, net.H, x, net.cycle)
         # print(torch.norm(ans-torch.matmul(x, W.t())))
-        # K = toep.krylov_construct(1, net.G[:,0].squeeze(), net.params.layer_size)
-        # KT = toep.krylov_construct(-1, net.H[:,0].squeeze(), net.params.layer_size)
+        # K = toep.krylov_construct(1, net.G[0].squeeze(), net.params.layer_size)
+        # KT = toep.krylov_construct(-1, net.H[0].squeeze(), net.params.layer_size)
         # W1 = torch.matmul(K, KT.t())
-        # ans2 = toep.toeplitz_mult_slow(net.G.t(), net.H.t(), x, net.cycle)
+        # ans2 = toep.toeplitz_mult_slow(net.G, net.H, x, net.cycle)
         # print(torch.norm(ans-torch.matmul(x, W1.t())))
-        return toep.toeplitz_mult(net.G.t(), net.H.t(), x, net.cycle)
+        return toep.toeplitz_mult(net.G, net.H, x, net.cycle)
         # return toep.toeplitz_mult(net.G.t(), net.H.t(), x, net.cycle)
     elif net.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
         #print('krylov fast')
-        #print('net.H: ', net.H.t())
+        #print('net.H: ', net.H)
         #print('x: ', x)
         #print(KB)
-        #return krylov_multiply_fast(net.subdiag_f_A[1:], net.G.t(), krylov_transpose_multiply_fast(net.subdiag_f_B[1:], net.H.t(), x))
+        #return krylov_multiply_fast(net.subdiag_f_A[1:], net.G, krylov_transpose_multiply_fast(net.subdiag_f_B[1:], net.H, x))
         W = krylov_recon(net.params.r, net.params.layer_size, net.G, net.H, net.fn_A, net.fn_B_T)
         # NORMALIZE W
         return torch.matmul(x, W.t())
@@ -67,8 +67,8 @@ def set_structured_W(net, params):
         torch.nn.init.normal(net.W, std=params.init_stddev)
     elif params.class_type in ['low_rank', 'toeplitz_like', 'toep_corner', 'toep_nocorn', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
-        net.G = Parameter(torch.Tensor(params.layer_size, params.r))
-        net.H = Parameter(torch.Tensor(params.layer_size, params.r))
+        net.G = Parameter(torch.Tensor(params.r, params.layer_size))
+        net.H = Parameter(torch.Tensor(params.r, params.layer_size))
         torch.nn.init.normal(net.G, std=params.init_stddev)
         torch.nn.init.normal(net.H, std=params.init_stddev)
 

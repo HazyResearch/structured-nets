@@ -15,12 +15,13 @@ def krylov(fn, v, n):
     return torch.stack(cols, dim=-1)
 
 def krylov_recon(r, n, G, H, fn_A, fn_B_T):
+    "G, H: (r, n)"
     W1 = Variable(torch.zeros(n, n).cuda())
 
     for i in range(r):
-        K_A = krylov(fn_A, G[:, i], n)
+        K_A = krylov(fn_A, G[i], n)
 
-        K_B = krylov(fn_B_T, H[:, i], n).t()
+        K_B = krylov(fn_B_T, H[i], n).t()
 
         prod = torch.matmul(K_A, K_B).cuda()
         #print('W1: ', W1)
