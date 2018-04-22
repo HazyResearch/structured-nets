@@ -2,6 +2,7 @@ import numpy as np
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 import tensorflow as tf
+import pickle as pkl
 from utils import *
 from reconstruction import *
 from visualize import visualize
@@ -36,7 +37,8 @@ def optimize_tf(dataset, params):
 
     saver = tf.train.Saver()
 
-    losses = {'train': [], 'val': [], 'DR': [], 'ratio': []}
+    eigvals = {'E': [], 'W': [], 'A': [], 'B': []}
+    losses = {'train': [], 'val': [], 'DR': [], 'ratio': [], 'eigvals': eigvals}
     accuracies = {'train': [], 'val': [], 'best_val': 0.0}
 
     t1 = time.time()
@@ -52,9 +54,13 @@ def optimize_tf(dataset, params):
             logging.debug('Training step: ' + str(this_step))
             # Verify displacement rank
             if params.check_disp:
-                dr, ratio = check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
+                dr, ratio, E_ev, W_ev, A_ev, B_ev = check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
                 losses['DR'].append(dr)
                 losses['ratio'].append(ratio)
+                losses['eigvals']['E'].append(E_ev)
+                losses['eigvals']['W'].append(W_ev)
+                losses['eigvals']['A'].append(A_ev)
+                losses['eigvals']['B'].append(B_ev)
 
             train_loss, train_accuracy, train_loss_summ, train_acc_summ, y_pred = sess.run([loss, accuracy, train_loss_summary,
                 train_acc_summary, y], feed_dict={x: batch_xs, y_: batch_ys})
@@ -71,6 +77,11 @@ def optimize_tf(dataset, params):
             losses['val'].append(val_loss)
             accuracies['val'].append(val_accuracy)
 
+            # Save
+            pkl.dump(losses, open(params.result_path + '_losses.p', 'wb'), protocol=2)
+            pkl.dump(accuracies, open(params.result_path + '_accuracies.p', 'wb'), protocol=2)
+
+            logging.debug('Saved losses, accuracies to: %s' % (params.result_path))
             logging.debug('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss, train_accuracy))
             logging.debug('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss, val_accuracy))
             logging.debug("Best validation accuracy so far: %f" % accuracies['best_val'])

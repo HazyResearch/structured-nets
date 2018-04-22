@@ -20,48 +20,48 @@ logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadNa
 # python compare.py --name=test --methods=tridiagonal_corner,toeplitz_like --dataset=true_toeplitz --result_dir=2_25_18 --r=1 --lr=1e-3 --decay_rate=1.0 --decay_steps=0.1 --mom=0.9 --steps=50000 --batch_size=1024 --test=0 --layer_size=50 --transform=none --torch=1 --model=Attention
 
 method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'low_rank': 'lr', 'unconstrained': 'u',
-	          'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'hankel_like': 'h', 'vandermonde_like': 'v'}
+         'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'hankel_like': 'h', 'vandermonde_like': 'v'}
 
 def compare(args, method, rank, lr, decay_rate, mom):
-	params = ModelParams(args.dataset, args.transform, args.test, log_path, 
-			dataset.input_size, args.layer_size, dataset.out_size(), num_layers, 
-			loss, rank, args.steps, args.batch_size, lr, mom, init_type, 
-			method, learn_corner, n_diag_learned, init_stddev, fix_G, 
-			check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose, 
-			decay_rate, args.decay_freq, learn_diagonal, fix_A_identity, 
-			stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model,
-			viz_freq, num_pred_plot, viz_powers)
+    params = ModelParams(args.dataset, args.transform, args.test, log_path, 
+            dataset.input_size, args.layer_size, dataset.out_size(), num_layers, 
+            loss, rank, args.steps, args.batch_size, lr, mom, init_type, 
+            method, learn_corner, n_diag_learned, init_stddev, fix_G, 
+            check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose, 
+            decay_rate, args.decay_freq, learn_diagonal, fix_A_identity, 
+            stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model,
+            viz_freq, num_pred_plot, viz_powers)
 
-	# Save params + git commit ID
-	this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom)
-	this_results_dir = params.save(results_dir, this_id, commit_id)
-	logging.debug('this_results_dir: ' + this_results_dir)
+    # Save params + git commit ID
+    this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom)
+    this_results_dir = params.save(results_dir, this_id, commit_id)
 
-	for test_iter in range(args.trials):
-		this_iter_name = this_id + '_' + str(test_iter)
-		params.log_path = os.path.join(log_path, this_iter_name)
-		params.checkpoint_path = os.path.join(checkpoint_path, this_iter_name)
-		params.vis_path = os.path.join(vis_path, this_iter_name)
+    for test_iter in range(args.trials):
+        this_iter_name = this_id + '_' + str(test_iter)
+        params.log_path = os.path.join(log_path, this_iter_name)
+        params.checkpoint_path = os.path.join(checkpoint_path, this_iter_name)
+        params.vis_path = os.path.join(vis_path, this_iter_name)
+        params.result_path = os.path.join(this_results_dir,this_iter_name)
 
-		logging.debug('Tensorboard log path: ' + params.log_path)
-		logging.debug('Tensorboard checkpoint path: ' + params.checkpoint_path)
-		logging.debug('Tensorboard vis path: ' + params.vis_path)
+        logging.debug('Tensorboard log path: ' + params.log_path)
+        logging.debug('Tensorboard checkpoint path: ' + params.checkpoint_path)
+        logging.debug('Tensorboard vis path: ' + params.vis_path)
+        logging.debug('Results dir: ' + params.result_path)
 
-		if not os.path.exists(params.checkpoint_path):
-			os.makedirs(params.checkpoint_path)
+        if not os.path.exists(params.checkpoint_path):
+            os.makedirs(params.checkpoint_path)
 
 
-		if not os.path.exists(params.vis_path):
-			os.makedirs(params.vis_path)
+        if not os.path.exists(params.vis_path):
+            os.makedirs(params.vis_path)
 
-		losses, accuracies = optimize(dataset, params)
-		tf.reset_default_graph()
+        losses, accuracies = optimize(dataset, params)
+        tf.reset_default_graph()
 
-		out_loc = os.path.join(this_results_dir, this_iter_name)
-		pkl.dump(losses, open(out_loc + '_losses.p', 'wb'), protocol=2)
-		pkl.dump(accuracies, open(out_loc + '_accuracies.p', 'wb'), protocol=2)
+        pkl.dump(losses, open(params.result_path + '_losses.p', 'wb'), protocol=2)
+        pkl.dump(accuracies, open(params.result_path + '_accuracies.p', 'wb'), protocol=2)
 
-		logging.debug('Saved losses and accuracies for ' + method + ' to: ' + out_loc)
+        logging.debug('Saved losses and accuracies for ' + method + ' to: ' + params.result_path)
 
 # Command line params
 parser = argparse.ArgumentParser()
@@ -79,7 +79,7 @@ parser.add_argument('--batch_size', type=int) # Batch size
 parser.add_argument('--test', type=int, default=1) # Test on test set
 parser.add_argument('--layer_size', type=int) # Size of hidden layer
 parser.add_argument('--transform', default='none') # Any transform of dataset, e.g. grayscale
-parser.add_argument('--torch') # Pytorch or TF
+parser.add_argument('--torch', type=int) # Pytorch or TF
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 parser.add_argument('--parallel') #
 parser.add_argument('--trials', type=int, default=3) #
@@ -100,12 +100,12 @@ logging.debug('Testing moms: ' + str(moms))
 
 # Fixed params
 num_layers = 1
-out_dir = '../../'
+out_dir = '/dfs/scratch1/thomasat/'
 loss = 'cross_entropy'
 test_size = 1000
 train_size = 10000
 verbose = False
-check_disp = False
+check_disp = True # If true, checks rank of error matrix every test_freq iters
 fix_G = False
 fix_A_identity = False
 flip_K_B = False
@@ -127,17 +127,17 @@ checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
 vis_path = os.path.join(out_dir, 'vis', args.result_dir)
 
 dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform,
-	stochastic_train, test_size, train_size, args.test)
+    stochastic_train, test_size, train_size, args.test)
 n_diag_learned = dataset.input_size - 1
 commit_id = get_commit_id()
 
 for method in methods:
-	for rank in ranks:
-		for lr in lrs:
-			for decay_rate in decay_rates:
-				for mom in moms:
-					if args.parallel:
-						logging.debug('Starting thread')
-						threading.Thread(target=compare,args=(args, method, rank, lr, decay_rate, mom),).start()
-					else:
-						compare(args, method, rank, lr, decay_rate, mom)
+    for rank in ranks:
+        for lr in lrs:
+            for decay_rate in decay_rates:
+                for mom in moms:
+                    if args.parallel:
+                        logging.debug('Starting thread')
+                        threading.Thread(target=compare,args=(args, method, rank, lr, decay_rate, mom),).start()
+                    else:
+                        compare(args, method, rank, lr, decay_rate, mom)

@@ -38,17 +38,20 @@ def general_recon(G, H, A, B):
 
   return W
 
-def krylov_recon(params, G, H, fn_A, fn_B):
-  W1 = tf.zeros([params.layer_size, params.layer_size], dtype=tf.float64)
-  for i in range(params.r):
-    K_A = krylov(fn_A, G[:, i], params.layer_size)
-    K_B = tf.transpose(krylov(fn_B, H[:, i], params.layer_size))
-    if params.flip_K_B:
-      K_B = tf.reverse(K_B, [0])
-    prod = tf.matmul(K_A, K_B)
-    W1 = tf.add(W1, prod)
+def krylov_recon_params(layer_size, r, flip_K_B, G,H,fn_A,fn_B):
+	W1 = tf.zeros([layer_size, layer_size], dtype=tf.float64)
+	for i in range(r):
+		K_A = krylov(fn_A, G[:, i], layer_size)
+		K_B = tf.transpose(krylov(fn_B, H[:, i], layer_size))
+		if flip_K_B:
+			K_B = tf.reverse(K_B, [0])
+		prod = tf.matmul(K_A, K_B)
+		W1 = tf.add(W1, prod)
 
-  return W1
+	return W1
+
+def krylov_recon(params, G, H, fn_A, fn_B):
+	return krylov_recon_params(params.layer_size, params.r, params.flip_K_B, G,H,fn_A,fn_B)
 
 def circ_sparsity_recon_hadamard(G, H, n, r, learn_corner, n_diag_learned, init_type, stddev):
   if learn_corner:

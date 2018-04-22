@@ -14,6 +14,8 @@ def kth_diag_indices(A, k):
     else:
         return rows, cols
 
+
+
 def symm_tridiag_corner_mask(n):
 	mask = np.zeros((n,n))
 	mask[0, -1] = 1
@@ -41,6 +43,11 @@ def compute_disp(disp_type, M, A, B):
 	else:
 		print('disp_type not supported: ', disp_type)
 		assert 0 		
+
+def gen_tridiag_corner_transpose(subdiag,supdiag,diag,f):
+	T = diags([subdiag, diag, supdiag], [-1, 0, 1]).toarray()
+	T[-1, 0] = f
+	return T
 
 def gen_tridiag_corner(subdiag, supdiag, diag, f):
 	T = diags([subdiag, diag, supdiag], [-1, 0, 1]).toarray()
@@ -76,23 +83,31 @@ def get_subdiag(n_diag_learned, init_type, stddev):
       assert 0 
   return x
 
-# Produce tf.Variable for corner + subdiagonal depending on params (initialization, num learned entries, etc.)
-def get_f_x(n, init_type, learn_corner, n_diag_learned, stddev=0.01):
+# Produce tf.Variable for subdiagonal + corner depending on params (initialization, num learned entries, etc.)
+def get_x_f(n, init_type, learn_corner, n_diag_learned, stddev=0.01):
 	f_A, f_B = get_f(learn_corner, init_type, stddev)
 	x_A =  get_subdiag(n_diag_learned, init_type, stddev)
 	x_B =  get_subdiag(n_diag_learned, init_type, stddev)
 
-	# Concatenate
-	f_x_A = tf.concat([f_A, x_A], axis=0)
-	f_x_B = tf.concat([f_B, x_B], axis=0)
-
 	# Pad
 	if n_diag_learned < (n-1):
 		ones = tf.ones(n-1-n_diag_learned, dtype=tf.float64)
-		f_x_A = tf.concat([f_x_A, ones], axis=0)
-		f_x_B = tf.concat([f_x_B, ones], axis=0)
+		x_A = tf.concat([x_A, ones], axis=0)
+		x_B = tf.concat([x_B, ones], axis=0)
 
-	return f_x_A, f_x_B
+	# Concatenate
+	x_f_A = tf.concat([x_A, f_A], axis=0)
+	x_f_B = tf.concat([x_B, f_B], axis=0)
+
+	"""
+	f_x_A = np.ones(n_diag_learned+1)
+	f_x_A = tf.convert_to_tensor(f_x_A,dtype=tf.float64)
+	f_x_B = np.ones(n_diag_learned+1)
+	f_x_B[0] = -1
+	f_x_B = tf.convert_to_tensor(f_x_B, dtype=tf.float64)
+	"""
+
+	return x_f_A, x_f_B
 
 def get_symm_tridiag_vars(n):
 	return 0
