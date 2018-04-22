@@ -364,6 +364,17 @@ class Dataset:
             print('Not supported: ', self.name)
             assert 0
 
+        # post-processing transforms
+        if 'mnist' in self.name:
+            self.process_mnist()
+            # print("size", self.train_X.shape, self.test_X.shape)
+            # x = self.train_X[0]
+            # print("range: ", np.max(x), np.min(x))
+            # print(self.train_X[0].reshape((32,32)))
+            # plt.imshow(self.train_X[0].reshape((32,32)))
+            # plt.show()
+
+
         #Randomly shuffle training set
         idx = np.arange(0, self.train_X.shape[0])
         np.random.shuffle(idx)
@@ -375,7 +386,10 @@ class Dataset:
 
     def get_input_size(self):
         if 'mnist' in self.name or 'convex' in self.name:
-            return 784
+            if 'pad' in self.transform:
+                return 1024
+            else:
+                return 784
         elif self.name == 'smallnorb':
             return 576
         elif self.name == 'norb':
@@ -391,6 +405,12 @@ class Dataset:
         else:
             print('Name not recognized: ', name)
             assert 0
+
+    def process_mnist(self):
+        if 'pad' in self.transform:
+            self.train_X = np.pad(self.train_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
+            self.val_X = np.pad(self.val_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
+            self.test_X = np.pad(self.test_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
 
     def process_cifar10(self, data):
         if 'grayscale' in self.transform:
