@@ -30,9 +30,9 @@ class StructuredLinear(nn.Module):
     # Assumes Stein displacement.
     def set_mult_fns(self, params):
         assert params.disp_type == 'stein'
-        if params.class_type == 'toeplitz_like':
-            fn_A = functools.partial(Z_transpose_mult_fn, 1)
-            fn_B_T = functools.partial(Z_transpose_mult_fn, -1)
+        if params.class_type in ['toeplitz_like', 'toep_corner', 'toep_nocorn']:
+            fn_A = functools.partial(Z_mult_fn, 1)
+            fn_B_T = functools.partial(Z_mult_fn, -1)
         elif params.class_type == 'hankel_like':
             fn_A = functools.partial(Z_transpose_mult_fn, 1)
             fn_B_T = functools.partial(Z_mult_fn, 0)
@@ -48,8 +48,8 @@ class StructuredLinear(nn.Module):
             torch.nn.init.normal(self.subdiag_f_A,std=params.init_stddev)
             torch.nn.init.normal(self.subdiag_f_B,std=params.init_stddev)
 
-            fn_A = functools.partial(circ_transpose_mult_fn, self.subdiag_f_A)
-            fn_B_T = functools.partial(circ_transpose_mult_fn, self.subdiag_f_B)
+            fn_A = functools.partial(circ_mult_fn, self.subdiag_f_A)
+            fn_B_T = functools.partial(circ_mult_fn, self.subdiag_f_B)
 
         elif params.class_type == 'tridiagonal_corner':
             self.subdiag_f_A = Parameter(torch.Tensor(params.layer_size))
@@ -66,8 +66,8 @@ class StructuredLinear(nn.Module):
             torch.nn.init.normal(self.supdiag_A,std=params.init_stddev)
             torch.nn.init.normal(self.supdiag_B,std=params.init_stddev)
 
-            fn_A = functools.partial(tridiag_transpose_mult_fn, self.subdiag_f_A, self.diag_A, self.supdiag_A)
-            fn_B_T = functools.partial(tridiag_transpose_mult_fn, self.subdiag_f_B, self.diag_B, self.supdiag_B)
+            fn_A = functools.partial(tridiag_mult_fn, self.subdiag_f_A, self.diag_A, self.supdiag_A)
+            fn_B_T = functools.partial(tridiag_mult_fn, self.subdiag_f_B, self.diag_B, self.supdiag_B)
 
         else:
             print(('Not supported: ', params.class_type))

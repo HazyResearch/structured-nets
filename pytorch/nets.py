@@ -36,7 +36,17 @@ def structured_layer(net, x):
         xH = torch.matmul(x, net.H)
         return torch.matmul(xH, net.G.t())
     elif net.params.class_type in ['toep_corner', 'toep_nocorn']:
+        # test that it matches slow version
+        # W = krylov_recon(net.params.r, net.params.layer_size, net.G, net.H, net.fn_A, net.fn_B_T)
+        # ans = toep.toeplitz_mult(net.G.t(), net.H.t(), x, net.cycle)
+        # print(torch.norm(ans-torch.matmul(x, W.t())))
+        # K = toep.krylov_construct(1, net.G[:,0].squeeze(), net.params.layer_size)
+        # KT = toep.krylov_construct(-1, net.H[:,0].squeeze(), net.params.layer_size)
+        # W1 = torch.matmul(K, KT.t())
+        # ans2 = toep.toeplitz_mult_slow(net.G.t(), net.H.t(), x, net.cycle)
+        # print(torch.norm(ans-torch.matmul(x, W1.t())))
         return toep.toeplitz_mult(net.G.t(), net.H.t(), x, net.cycle)
+        # return toep.toeplitz_mult(net.G.t(), net.H.t(), x, net.cycle)
     elif net.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
         #print('krylov fast')
@@ -46,7 +56,7 @@ def structured_layer(net, x):
         #return krylov_multiply_fast(net.subdiag_f_A[1:], net.G.t(), krylov_transpose_multiply_fast(net.subdiag_f_B[1:], net.H.t(), x))
         W = krylov_recon(net.params.r, net.params.layer_size, net.G, net.H, net.fn_A, net.fn_B_T)
         # NORMALIZE W
-        return torch.matmul(x, W)
+        return torch.matmul(x, W.t())
     else:
         print(('Not supported: ', net.params.class_type))
         assert 0
@@ -66,6 +76,9 @@ def set_structured_W(net, params):
             pass
         elif params.class_type == 'toep_corner':
             net.cycle = True
+            fn_A, fn_B_T = StructuredLinear.set_mult_fns(net, params)
+            net.fn_A = fn_A
+            net.fn_B_T = fn_B_T
         elif params.class_type == 'toep_nocorn':
             net.cycle = False
         else:
