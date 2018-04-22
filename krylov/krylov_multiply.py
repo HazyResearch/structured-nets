@@ -39,7 +39,7 @@ def krylov_transpose_multiply(subdiag, v, u):
         S = torch.cat((S0_10, S0_11[np.newaxis], S1_01, S1_11[np.newaxis]))
 
         # polynomial multiplications
-        S_f_re, S_f_im = cf.Rfft()(S)
+        S_f_re, S_f_im = cf.Rfft_slow()(S)
         S0_10_f_re, S0_11_f_re, S1_01_f_re, S1_11_f_re = S_f_re[:rank], S_f_re[rank], S_f_re[rank+1:rank+1+batch_size], S_f_re[-1]
         S0_10_f_im, S0_11_f_im, S1_01_f_im, S1_11_f_im = S_f_im[:rank], S_f_im[rank], S_f_im[rank+1:rank+1+batch_size], S_f_im[-1]
         S1_01_f = (S1_01_f_re, S1_01_f_im)
@@ -57,7 +57,7 @@ def krylov_transpose_multiply(subdiag, v, u):
         T_f_im = torch.cat((torch.cat((T_00_f_im, T_01_f_im[:, np.newaxis]), dim=1),
                             torch.cat((T_10_f_im[np.newaxis], T_11_f_im[np.newaxis, np.newaxis]), dim=1)))
 
-        T = cf.Irfft()(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T = cf.Irfft_slow()(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
 
         # polynomial additions
@@ -103,7 +103,7 @@ def krylov_transpose_multiply_fast(subdiag, v, u):
         S = torch.cat((S0_10, S0_11[np.newaxis], S1_01, S1_11[np.newaxis]))
 
         # polynomial multiplications
-        S_f = cf.Rfft_fast.apply(S)
+        S_f = cf.Rfft.apply(S)
         S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
         # T_00_f = cf.ComplexMult.apply(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
         # T_01_f = cf.ComplexMult.apply(S1_01_f, S0_11_f)
@@ -117,7 +117,7 @@ def krylov_transpose_multiply_fast(subdiag, v, u):
         T_f = torch.cat((torch.cat((T_00_f, T_01_f[:, np.newaxis]), dim=1),
                          torch.cat((T_10_f[np.newaxis], T_11_f[np.newaxis, np.newaxis]), dim=1)))
 
-        T = cf.Irfft_fast.apply(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T = cf.Irfft.apply(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
 
         # polynomial additions
@@ -173,7 +173,7 @@ def krylov_multiply_forward(subdiag, v):
         S = torch.cat((S0_10, S0_11[np.newaxis], S1_11[np.newaxis]))
 
         # polynomial multiplications
-        S_f_re, S_f_im = cf.Rfft()(S)
+        S_f_re, S_f_im = cf.Rfft_slow()(S)
         S0_10_f_re, S0_11_f_re, S1_11_f_re = S_f_re[:rank], S_f_re[-2], S_f_re[-1]
         S0_10_f_im, S0_11_f_im, S1_11_f_im = S_f_im[:rank], S_f_im[-2], S_f_im[-1]
         S0_10_f = (S0_10_f_re, S0_10_f_im)
@@ -187,7 +187,7 @@ def krylov_multiply_forward(subdiag, v):
         T_f_re = torch.cat((T_10_f_re, T_11_f_re[np.newaxis]))
         T_f_im = torch.cat((T_10_f_im, T_11_f_im[np.newaxis]))
 
-        T = cf.Irfft()(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T = cf.Irfft_slow()(T_f_re, T_f_im) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_10, T_11 = T[:rank], T[-1]
 
         # polynomial additions
@@ -213,7 +213,7 @@ def krylov_multiply_forward_fast(subdiag, v):
         S = torch.cat((S0_10, S0_11[np.newaxis], S1_11[np.newaxis]))
 
         # polynomial multiplications
-        S_f = cf.Rfft_fast.apply(S)
+        S_f = cf.Rfft.apply(S)
         S0_10_f, S0_11_f, S1_11_f = S_f[:rank], S_f[-2], S_f[-1]
         save_for_backward[d] = (S0_10_f, S0_11_f)
 
@@ -224,7 +224,7 @@ def krylov_multiply_forward_fast(subdiag, v):
 
         T_f = torch.cat((T_10_f, T_11_f[np.newaxis]))
 
-        T = cf.Irfft_fast.apply(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T = cf.Irfft.apply(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         T_10, T_11 = T[:rank], T[-1]
 
         # polynomial additions
@@ -266,7 +266,7 @@ def krylov_multiply(subdiag, v, w):
         dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
         dT = dT * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
-        dT_f_re, dT_f_im = cf.Ihfft(dT)
+        dT_f_re, dT_f_im = cf.Ihfft_slow(dT)
         dT_00_f_re, dT_01_f_re = dT_f_re[:, :rank], dT_f_re[:, -1]
         dT_00_f_im, dT_01_f_im = dT_f_im[:, :rank], dT_f_im[:, -1]
         dT_00_f = (dT_00_f_re, dT_00_f_im)
@@ -280,7 +280,7 @@ def krylov_multiply(subdiag, v, w):
         dS1_01_f_re = dS1_01_f_re.sum(dim=1) + prod_re
         dS1_01_f_im = dS1_01_f_im.sum(dim=1) + prod_im
 
-        dS1_01 = cf.Hfft(dS1_01_f_re, dS1_01_f_im)
+        dS1_01 = cf.Hfft_slow(dS1_01_f_re, dS1_01_f_im)
         dS_01[:, 1::2] = dS1_01[:, :, :n2]
 
         dT_00, dT_01 = dS_00, dS_01
@@ -323,16 +323,16 @@ def krylov_multiply_fast(subdiag, v, w):
         dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
         dT = dT * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
-        # dT_f = cf.Ihfft_fast.apply(dT)
-        dT_f = cf.Ihfft_fast(dT)
+        # dT_f = cf.Ihfft.apply(dT)
+        dT_f = cf.Ihfft(dT)
         dT_00_f, dT_01_f = dT_f[:, :rank], dT_f[:, -1]
 
         S0_10_f, S0_11_f = save_for_backward[d]
         # dS1_01_f = cf.ComplexMult.apply(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + cf.ComplexMult.apply(S0_11_f, dT_01_f)
         dS1_01_f = cf.complex_mult_slow(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + cf.complex_mult_slow(S0_11_f, dT_01_f)
 
-        # dS1_01 = cf.Hfft_fast.apply(dS1_01_f)
-        dS1_01 = cf.Hfft_fast(dS1_01_f)
+        # dS1_01 = cf.Hfft.apply(dS1_01_f)
+        dS1_01 = cf.Hfft(dS1_01_f)
         dS_01[:, 1::2] = dS1_01[:, :, :n2]
 
         dT_00, dT_01 = dS_00, dS_01
@@ -441,14 +441,14 @@ def test_misc():
     g = autograd.grad(s, a)
 
     u = Variable(torch.rand((1, 8)), requires_grad=True).cuda()
-    re, im = cf.Rfft(u)
-    t = cf.Irfft(re, im)
-    t1_re, t1_im = cf.Rfft(t)
+    re, im = cf.Rfft_slow(u)
+    t = cf.Irfft_slow(re, im)
+    t1_re, t1_im = cf.Rfft_slow(t)
 
     grad, = torch.autograd.grad(torch.sum(re), u, retain_graph=True)
     w = Variable(torch.rand((1, 5)), requires_grad=True).cuda()
     ggrad = torch.autograd.grad(torch.sum(grad), u)
-    torch.autograd.gradcheck(cf.Rfft, (u, ))
+    torch.autograd.gradcheck(cf.Rfft_slow, (u, ))
 
     analytic_grad = fft.irfft(torch.ones_like(re).data, -torch.ones_like(im).data, normalize=False)
 
@@ -458,7 +458,7 @@ def test_misc():
         one_hot[0, i] = epsilon
         u_new = u + one_hot
         u_new_minus = u - one_hot
-        print((torch.sum(cf.Rfft(u_new)[0]) - torch.sum(cf.Rfft(u_new_minus)[0])) / (2 * epsilon))
+        print((torch.sum(cf.Rfft_slow(u_new)[0]) - torch.sum(cf.Rfft_slow(u_new_minus)[0])) / (2 * epsilon))
 
 def shift(v, f=1):
     return torch.cat((f * v[[v.size(0) - 1]], v[:-1]))
@@ -477,5 +477,5 @@ def Krylov(linear_map, v, n=None):
 
 
 if __name__ == "__main__":
-    test_tranpose_multiply()
+    test_transpose_multiply()
     test_multiply()
