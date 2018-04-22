@@ -182,3 +182,12 @@ if __name__ == '__main__':
     # output:
     # array([[ 0.,  6., 16., 26.],
     #        [ 0., 12., 38., 66.]])
+
+def mem_test():
+    for _ in range(10000):
+        a = Variable(torch.cuda.FloatTensor((2,4096)), requires_grad=True)
+        b = Variable(torch.cuda.FloatTensor((2,4096)), requires_grad=True)
+        c = toeplitz_mult(a,a,b)
+        g, = torch.autograd.grad(torch.sum(c), a, retain_graph=True)
+        # a_ = cf.Rfft.apply(a)
+        # g, = torch.autograd.grad(torch.sum(a_), a, retain_graph=True)

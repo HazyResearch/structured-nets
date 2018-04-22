@@ -57,10 +57,10 @@ def optimize_torch(dataset, params):
         if step % params.test_freq == 0:
             print(('Time: ', time.time() - t1))
             t1 = time.time()
-            losses['train'].append(train_loss)
-            accuracies['train'].append(train_accuracy)
-            writer.add_scalar('Train/Loss', train_loss, step)
-            writer.add_scalar('Train/Accuracy', train_accuracy, step)
+            losses['train'].append(train_loss.data)
+            accuracies['train'].append(train_accuracy.data)
+            writer.add_scalar('Train/Loss', train_loss.data, step)
+            writer.add_scalar('Train/Accuracy', train_accuracy.data, step)
 
             print(('Training step: ', step))
 
@@ -68,14 +68,14 @@ def optimize_torch(dataset, params):
             output = net.forward(val_X)
             val_loss, val_accuracy = compute_loss_and_accuracy(output, val_Y, params, loss_fn)
 
-            writer.add_scalar('Val/Loss', val_loss, step)
-            writer.add_scalar('Val/Accuracy', val_accuracy, step)
+            writer.add_scalar('Val/Loss', val_loss.data, step)
+            writer.add_scalar('Val/Accuracy', val_accuracy.data, step)
 
-            losses['val'].append(val_loss)
-            accuracies['val'].append(val_accuracy)
+            losses['val'].append(val_loss.data)
+            accuracies['val'].append(val_accuracy.data)
 
-            print(('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss, train_accuracy)))
-            print(('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss, val_accuracy)))
+            print(('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss.data, train_accuracy.data)))
+            print(('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss.data, val_accuracy.data)))
 
         if step % params.checkpoint_freq == 0:
             save_path = os.path.join(params.checkpoint_path, str(step))
@@ -92,14 +92,14 @@ def optimize_torch(dataset, params):
         output = net.forward(test_X)
         test_loss, test_accuracy = compute_loss_and_accuracy(output, test_Y, params, loss_fn)
 
-        writer.add_scalar('Test/Loss', test_loss)
-        writer.add_scalar('Test/Accuracy', test_accuracy)
+        writer.add_scalar('Test/Loss', test_loss.data)
+        writer.add_scalar('Test/Accuracy', test_accuracy.data)
 
-        print(('Test loss, %s: %f' % (params.class_type, test_loss)))
-        print(('Test accuracy, %s: %f ' % (params.class_type, test_accuracy)))
+        print(('Test loss, %s: %f' % (params.class_type, test_loss.data)))
+        print(('Test accuracy, %s: %f ' % (params.class_type, test_accuracy.data)))
 
-        losses['test'] = test_loss
-        accuracies['test'] = test_accuracy
+        losses['test'] = test_loss.data
+        accuracies['test'] = test_accuracy.data
 
 
     writer.export_scalars_to_json(os.path.join(params.log_path, "all_scalars.json"))
