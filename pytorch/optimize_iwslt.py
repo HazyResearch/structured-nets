@@ -6,7 +6,7 @@ from torch_utils import *
 from torch.autograd import Variable
 import torch.optim as optim
 from torchtext import data, datasets
-import spacy
+#import spacy
 from tensorboardX import SummaryWriter
 sys.path.insert(0, '../../pytorch/attention/')
 from attention import *

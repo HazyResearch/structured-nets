@@ -7,7 +7,7 @@ from scipy.ndimage.interpolation import zoom
 from sklearn.preprocessing import OneHotEncoder
 sys.path.insert(0, '../../../../')
 from utils import *
-import torch 
+import torch
 from torch.autograd import Variable
 sys.path.insert(0, '../../pytorch/')
 from torch_utils import *
@@ -24,7 +24,7 @@ class MyIterator(data.Iterator):
                     for b in random_shuffler(list(p_batch)):
                         yield b
             self.batches = pool(self.data(), self.random_shuffler)
-            
+
         else:
             self.batches = []
             for b in data.batch(self.data(), self.batch_size,
@@ -56,7 +56,7 @@ class Batch:
             self.trg_mask = \
                 self.make_std_mask(self.trg, pad)
             self.ntokens = (self.trg_y != pad).data.sum()
-    
+
     @staticmethod
     def make_std_mask(tgt, pad):
         "Create a mask to hide padding and future words."
@@ -98,7 +98,7 @@ class Dataset:
 		print(('input size: ', self.input_size))
 		self.train_loc = ''
 		self.test_loc = ''
-		
+
 		if self.name in ['iwslt', 'copy']:
 			return
 		elif self.name == 'cifar10':
@@ -139,7 +139,7 @@ class Dataset:
 			self.train_Y = train_Y[train_idx, :]
 
 
-			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape) 
+			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape)
 		elif self.name == 'smallnorb':
 			data_loc = '/dfs/scratch1/thomasat/datasets/smallnorb/processed_py2.pkl'
 			# Load
@@ -169,7 +169,7 @@ class Dataset:
 			self.train_Y = train_Y[train_idx, :]
 
 
-			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape) 
+			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape)
 
 
 		elif self.name == 'mnist':
@@ -212,7 +212,7 @@ class Dataset:
 			self.val_X = X[val_idx, :]
 			self.val_Y = Y[val_idx, :]
 
-			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape) 
+			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape)
 
 
 		elif self.name == 'mnist_rand_bg':
@@ -253,7 +253,7 @@ class Dataset:
 			self.train_X = X[train_idx, :]
 			self.train_Y = Y[train_idx, :]
 
-			print(self.val_X.shape, self.val_Y.shape, self.test_X.shape, self.test_Y.shape, self.train_X.shape, self.train_Y.shape) 
+			print(self.val_X.shape, self.val_Y.shape, self.test_X.shape, self.test_Y.shape, self.train_X.shape, self.train_Y.shape)
 
 		elif self.name == 'convex':
 			self.train_loc = '/dfs/scratch1/thomasat/datasets/convex/convex_train.amat'
@@ -319,7 +319,7 @@ class Dataset:
 			self.val_X = X[val_idx, :]
 			self.val_Y = Y[val_idx, :]
 
-			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape) 
+			print(self.val_X.shape, self.val_Y.shape, self.train_X.shape, self.train_Y.shape)
 
 		elif self.name == 'true_pert_circ_T':
 			# Generate matrix which satisfies M - MB = Q, for a circulant sparsity transpose pattern B
@@ -342,7 +342,7 @@ class Dataset:
 			self.pert = B
 			test_X, test_Y = gen_batch(self.true_transform, self.test_size, self.pert)
 			val_X, val_Y = gen_batch(self.true_transform, self.test_size, self.pert)
-			self.test_X = test_X	
+			self.test_X = test_X
 			self.test_Y = test_Y
 			self.val_X = val_X
 			self.val_Y = val_Y
@@ -351,14 +351,14 @@ class Dataset:
 			self.true_transform = gen_matrix(self.input_size, self.name.split("true_",1)[1] )
 			test_X, test_Y = gen_batch(self.true_transform, self.test_size)
 			val_X, val_Y = gen_batch(self.true_transform, self.test_size)
-			self.test_X = test_X	
+			self.test_X = test_X
 			self.test_Y = test_Y
 			self.val_X = val_X
 			self.val_Y = val_Y
 
 			if not self.stochastic_train:
-				train_X, train_Y = gen_batch(self.true_transform, self.train_size)				
-				self.train_X = train_X	
+				train_X, train_Y = gen_batch(self.true_transform, self.train_size)
+				self.train_X = train_X
 				self.train_Y = train_Y
 		else:
 			print('Not supported: ', self.name)
@@ -378,7 +378,7 @@ class Dataset:
 				return 768
 			return 3072
 		elif self.name.startswith('true_') or self.name in ['iwslt', 'copy']:
-			return self.layer_size	
+			return self.layer_size
 		else:
 			print('Name not recognized: ', name)
 			assert 0
@@ -406,9 +406,9 @@ class Dataset:
 			img = np.stack((im_r, im_g, im_b), axis=-1)
 			data = img.reshape((n, 16*16*3))
 
-					
+
 		return data / 255.0
-	
+
 	def load_train_cifar10(self, batch_num):
 		# 0-indexing of batch_num
 		loc = '/dfs/scratch1/thomasat/datasets/cifar10/data_batch_' + str(batch_num+1)
@@ -425,7 +425,7 @@ class Dataset:
 
 		# Y must be one-hot
 		enc = OneHotEncoder()
-		self.train_Y = enc.fit_transform(self.train_Y).todense()			
+		self.train_Y = enc.fit_transform(self.train_Y).todense()
 
 		print('batch, train_X.shape, train_Y.shape: ', batch_num, self.train_X.shape, self.train_Y.shape)
 
@@ -444,7 +444,7 @@ class Dataset:
 
 	def load_test_data(self):
 		if self.name.startswith('mnist_noise') or self.name == 'smallnorb' or self.name == 'norb':
-			return 
+			return
 
 		if self.name == 'cifar10':
 			test_dict = pkl.load(open(self.test_loc, 'rb'))
@@ -458,7 +458,7 @@ class Dataset:
 
 			# Y must be one-hot
 			enc = OneHotEncoder()
-			self.test_Y = enc.fit_transform(self.test_Y).todense()		
+			self.test_Y = enc.fit_transform(self.test_Y).todense()
 
 
 		elif self.test_loc:
@@ -469,7 +469,7 @@ class Dataset:
 
 			# Y must be one-hot
 			enc = OneHotEncoder()
-			self.test_Y = enc.fit_transform(self.test_Y).todense()		
+			self.test_Y = enc.fit_transform(self.test_Y).todense()
 
 	def load_train_data(self):
 		train_data = np.genfromtxt(self.train_loc)
@@ -513,7 +513,7 @@ class Dataset:
 				# Load new data
 				self.current_batch = this_batch
 			idx = np.random.randint(self.train_X.shape[0], size=batch_size)
-			return self.train_X[idx, :], self.train_Y[idx, :]			
+			return self.train_X[idx, :], self.train_Y[idx, :]
 		elif self.name.startswith('true'):
 			if self.stochastic_train:
 				return gen_batch(self.true_transform, batch_size, self.pert)
