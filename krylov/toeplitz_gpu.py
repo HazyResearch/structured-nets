@@ -110,7 +110,7 @@ def toeplitz_mult(G, H, x, cycle=True):
     f = (1,-1) if cycle else (0,0)
     transpose_out = KT_Toeplitz(n, f[1], batch_size, rank)(H, x)
     krylov_out = K_Toeplitz(n, f[0], batch_size, rank)(G, transpose_out)
-    scaled = krylov_out/2 if cycle else krylov_out
+    scaled = krylov_out if cycle else krylov_out
     return scaled
 
 ##### AD mult
@@ -139,22 +139,25 @@ def multiply_by_autodiff(v, w, f=1):
 
 ##### Slow mult
 
-def krylov_construct(f, v, m):
+def krylov_construct(f, v, m=None):
+    """input: v - Variable"""
     n = v.shape[0]
-    K = np.zeros(shape=(m,n))
-    K[0,:] = v
-    for i in range(1,m):
-        K[i,1:] = K[i-1,:-1]
-        K[i,0] = f*K[i-1,-1]
-    return K.T
+    if m is None:
+        m = n
+
+    cols = [v]
+    for _ in range(m-1):
+        v = torch.cat((f*v[-1], v[:-1]))
+        cols.append(v)
+    return torch.stack(cols, dim=-1)
 
 def toeplitz_mult_slow(G, H, x, cycle=True):
     assert G.shape == H.shape
     rank, n = G.shape
     f = (1,-1) if cycle else (0,0)
-    krylovs = [(krylov_construct(f[0], G[i], n), krylov_construct(f[1], H[i], n).T) for i in range(rank)]
-    prods = [K[0] @ K[1] @ x.T for K in krylovs]
-    return np.sum(np.array(prods), axis=0).T
+    krylovs = [(krylov_construct(f[0], G[i], n), krylov_construct(f[1], H[i], n).t()) for i in range(rank)]
+    prods = [torch.matmul(K[0] , torch.matmul(K[1] , x.t())) for K in krylovs]
+    return sum(prods).t()
 
 if __name__ == '__main__':
     v = Variable(torch.Tensor([[0,1,0,-1],[0,1,2,3]])).cuda()
@@ -169,13 +172,13 @@ if __name__ == '__main__':
     #   [ 14 8 0 -8]]]
 
     toeplitz_mult(v, v, u)
-    # toeplitz_mult_slow(v, v, u)
+    toeplitz_mult_slow(v, v, u)
     # output:
     # array([[-16., -20.,  -4.,  16.],
     #        [ 16.,  -8.,  12.,  64.]])
 
     toeplitz_mult(v, v, u, cycle=False)
-    # toeplitz_mult_slow(v, v, u, cycle=False)
+    toeplitz_mult_slow(v, v, u, cycle=False)
     # output:
     # array([[ 0.,  6., 16., 26.],
     #        [ 0., 12., 38., 66.]])
