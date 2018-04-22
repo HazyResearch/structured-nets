@@ -141,8 +141,8 @@ class Conjugate(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X):
-        # return conjugate(X)
-        return conjugate_cupy(X)
+        return conjugate(X.contiguous())
+        # return conjugate_cupy(X)
 
     def backward(ctx, grad):
         return Conjugate.apply(grad)
