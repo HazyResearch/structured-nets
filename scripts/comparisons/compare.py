@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadNa
 # python compare.py --name=test --methods=tridiagonal_corner,toeplitz_like --dataset=true_toeplitz --result_dir=2_25_18 --r=1 --lr=1e-3 --decay_rate=1.0 --decay_steps=0.1 --mom=0.9 --steps=50000 --batch_size=1024 --test=0 --layer_size=50 --transform=none --torch=1 --model=Attention
 
 method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'low_rank': 'lr', 'unconstrained': 'u',
-              'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'hankel_like': 'h', 'vandermonde_like': 'v'}
+              'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'subdiagonal': 'sd', 'hankel_like': 'h', 'vandermonde_like': 'v'}
 
 def compare(args, method, rank, lr, decay_rate, mom):
     params = ModelParams(args.dataset, args.transform, args.test, log_path, 

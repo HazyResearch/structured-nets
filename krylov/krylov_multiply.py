@@ -340,6 +340,14 @@ def krylov_multiply_fast(subdiag, v, w):
     du = ((dT_00 * v[np.newaxis, :, :, np.newaxis]).sum(dim=1) + dT_01).squeeze(dim=-1)
     return du
 
+def subd_mult(subd_A, subd_B, G, H, x):
+    rank, n = G.shape
+    batch_size = x.shape[0]
+    KT_out = krylov_transpose_multiply_fast(subd_B, H, x)
+    K_out = krylov_multiply_fast(subd_A, G, KT_out)
+    return K_out
+
+
 
 def test_transpose_multiply():
     m = 12

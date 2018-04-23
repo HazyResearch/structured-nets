@@ -12,6 +12,7 @@ from torch_krylov import *
 from torch_reconstruction import *
 from attention import *
 import toeplitz_gpu as toep
+import krylov_multiply as subd
 #from krylov_multiply import *
 # import structured_layer # this is already in attention
 # TODO fix the 'import *'s
@@ -47,6 +48,8 @@ def structured_layer(net, x):
         # print(torch.norm(ans-torch.matmul(x, W1.t())))
         return toep.toeplitz_mult(net.G, net.H, x, net.cycle)
         # return toep.toeplitz_mult(net.G.t(), net.H.t(), x, net.cycle)
+    elif net.params.class_type == 'subdiagonal':
+        return subd.subd_mult(net.subd_A, net.subd_B, net.G, net.H, x)
     elif net.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
         #print('krylov fast')
@@ -65,7 +68,7 @@ def set_structured_W(net, params):
     if params.class_type == 'unconstrained':
         net.W = Parameter(torch.Tensor(params.layer_size, params.layer_size))
         torch.nn.init.normal(net.W, std=params.init_stddev)
-    elif params.class_type in ['low_rank', 'toeplitz_like', 'toep_corner', 'toep_nocorn', 'vandermonde_like', 'hankel_like',
+    elif params.class_type in ['low_rank', 'toeplitz_like', 'toep_corner', 'toep_nocorn', 'subdiagonal', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
         net.G = Parameter(torch.Tensor(params.r, params.layer_size))
         net.H = Parameter(torch.Tensor(params.r, params.layer_size))
@@ -81,6 +84,9 @@ def set_structured_W(net, params):
             net.fn_B_T = fn_B_T
         elif params.class_type == 'toep_nocorn':
             net.cycle = False
+        elif params.class_type == 'subdiagonal':
+            net.subd_A = Parameter(torch.ones(params.layer_size))
+            net.subd_B = Parameter(torch.ones(params.layer_size))
         else:
             fn_A, fn_B_T = StructuredLinear.set_mult_fns(net, params)
             net.fn_A = fn_A
