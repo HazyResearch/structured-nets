@@ -364,6 +364,15 @@ class Dataset:
 			print('Not supported: ', self.name)
 			assert 0
 
+		#Randomly shuffle training set
+		idx = np.arange(0, self.train_X.shape[0])
+		np.random.shuffle(idx)
+		self.train_X = self.train_X[idx,:]
+		self.train_Y = self.train_Y[idx,:]
+
+		#For batching
+		self.current_idx = 0
+
 	def get_input_size(self):
 		if 'mnist' in self.name or 'convex' in self.name:
 			return 784
@@ -498,28 +507,41 @@ class Dataset:
 			self.test_Y = enc.fit_transform(self.test_Y).todense()
 		"""
 
+	def update_batch_idx(self, batch_size):
+		self.current_idx += batch_size
+		if self.current_idx >= self.train_X.shape[0]:
+			self.current_idx = 0
+		print('Current training data index: ', self.current_idx)
+
+	def next_batch(self, batch_size):
+		batch_X = self.train_X[self.current_idx:self.current_idx+batch_size,:]
+		batch_Y = self.train_Y[self.current_idx:self.current_idx+batch_size,:]
+		assert batch_X.shape[0] == batch_size
+		assert batch_Y.shape[0] == batch_size
+		self.update_batch_idx(batch_size)
+		return batch_X, batch_Y
+
 	def batch(self, batch_size, step):
 		if self.name == 'mnist':
 			batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
 			return batch_xs, batch_ys
 		elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb']:
-			# Randomly sample batch_size from train_X and train_Y
-			idx = np.random.randint(self.train_X.shape[0], size=batch_size)
-			return self.train_X[idx, :], self.train_Y[idx, :]
+			return self.next_batch(batch_size)
 		elif self.name == 'cifar10':
 			this_batch = int(step/self.iters_per_batch)
 			if this_batch != self.current_batch:
 				self.load_train_cifar10(this_batch)
 				# Load new data
 				self.current_batch = this_batch
-			idx = np.random.randint(self.train_X.shape[0], size=batch_size)
-			return self.train_X[idx, :], self.train_Y[idx, :]
+				self.current_idx = 0 #Index within the batch
+			return self.next_batch(batch_size)
 		elif self.name.startswith('true'):
 			if self.stochastic_train:
 				return gen_batch(self.true_transform, batch_size, self.pert)
 			else:
-				idx = np.random.randint(self.train_X.shape[0], size=batch_size)
-				return self.train_X[idx, :], self.train_Y[idx, :]
+				return self.next_batch(batch_size)
+
+
 		else:
 			print('Not supported: ', name)
 			assert 0
