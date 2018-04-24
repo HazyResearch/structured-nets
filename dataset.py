@@ -441,7 +441,7 @@ class Dataset:
     def load_train_cifar10(self, batch_num):
         # 0-indexing of batch_num
         loc = '/dfs/scratch1/thomasat/datasets/cifar10/data_batch_' + str(batch_num+1)
-        dict = pkl.load(open(loc, 'rb'))
+        dict = pkl.load(open(loc, 'rb'),encoding='latin1')
         data = dict['data']
         labels = np.array(dict['labels'])
 
@@ -476,7 +476,7 @@ class Dataset:
             return
 
         if self.name == 'cifar10':
-            test_dict = pkl.load(open(self.test_loc, 'rb'))
+            test_dict = pkl.load(open(self.test_loc, 'rb'),encoding='latin1')
             test_data = test_dict['data']
             test_labels = np.array(test_dict['labels'])
 
