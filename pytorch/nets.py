@@ -50,6 +50,7 @@ def structured_layer(net, x):
         # return toep.toeplitz_mult(net.G.t(), net.H.t(), x, net.cycle)
     elif net.params.class_type == 'subdiagonal':
         return subd.subd_mult(net.subd_A, net.subd_B, net.G, net.H, x)
+        # return subd.krylov_multiply_fast(net.subd_A, net.G, subd.krylov_transpose_multiply_fast(net.subd_B, net.H, x))
     elif net.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
         #print('krylov fast')

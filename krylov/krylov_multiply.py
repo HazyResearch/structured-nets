@@ -109,10 +109,10 @@ def krylov_transpose_multiply_fast(subdiag, v, u):
         # T_01_f = cf.ComplexMult.apply(S1_01_f, S0_11_f)
         # T_10_f = cf.ComplexMult.apply(S1_11_f, S0_10_f)
         # T_11_f = cf.ComplexMult.apply(S1_11_f, S0_11_f)
-        T_00_f = cf.complex_mult_slow(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        T_01_f = cf.complex_mult_slow(S1_01_f, S0_11_f)
-        T_10_f = cf.complex_mult_slow(S1_11_f, S0_10_f)
-        T_11_f = cf.complex_mult_slow(S1_11_f, S0_11_f)
+        T_00_f = cf.complex_mult_(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        T_01_f = cf.complex_mult_(S1_01_f, S0_11_f)
+        T_10_f = cf.complex_mult_(S1_11_f, S0_10_f)
+        T_11_f = cf.complex_mult_(S1_11_f, S0_11_f)
 
         T_f = torch.cat((torch.cat((T_00_f, T_01_f[:, np.newaxis]), dim=1),
                          torch.cat((T_10_f[np.newaxis], T_11_f[np.newaxis, np.newaxis]), dim=1)))
@@ -219,8 +219,8 @@ def krylov_multiply_forward_fast(subdiag, v):
 
         # T_10_f = cf.ComplexMult.apply(S1_11_f, S0_10_f)
         # T_11_f = cf.ComplexMult.apply(S1_11_f, S0_11_f)
-        T_10_f = cf.complex_mult_slow(S1_11_f, S0_10_f)
-        T_11_f = cf.complex_mult_slow(S1_11_f, S0_11_f)
+        T_10_f = cf.complex_mult_(S1_11_f, S0_10_f)
+        T_11_f = cf.complex_mult_(S1_11_f, S0_11_f)
 
         T_f = torch.cat((T_10_f, T_11_f[np.newaxis]))
 
@@ -329,7 +329,7 @@ def krylov_multiply_fast(subdiag, v, w):
 
         S0_10_f, S0_11_f = save_for_backward[d]
         # dS1_01_f = cf.ComplexMult.apply(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + cf.ComplexMult.apply(S0_11_f, dT_01_f)
-        dS1_01_f = cf.complex_mult_slow(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + cf.complex_mult_slow(S0_11_f, dT_01_f)
+        dS1_01_f = cf.complex_mult_(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + cf.complex_mult_(S0_11_f, dT_01_f)
 
         # dS1_01 = cf.Hfft.apply(dS1_01_f)
         dS1_01 = cf.Hfft(dS1_01_f)

@@ -41,8 +41,8 @@ class KT_Toeplitz():
         if self.eta is not None: # cycle version
             u_ = cf.Ifft.apply((self.ieta.view(n,2) * u.view(batch_size,n,1)).view(batch_size,2*n))
             v_ = cf.Fft.apply((self.eta.view(n,2) * v.view(rank,n,1)).view(rank,2*n))
-            uv_ = cf.complex_mult_slow(u_.view(batch_size, 1, 2*n), v_.view(1, rank, 2*n))
-            ans = cf.complex_mult_slow(self.eta, cf.Fft.apply(uv_))
+            uv_ = cf.complex_mult_(u_.view(batch_size, 1, 2*n), v_.view(1, rank, 2*n))
+            ans = cf.complex_mult_(self.eta, cf.Fft.apply(uv_))
             ans = ans[..., ::2].contiguous()
         else:
             rev_idx_n = torch.arange(n-1, -1, -1, out=torch.cuda.LongTensor())
@@ -51,7 +51,7 @@ class KT_Toeplitz():
 
             u_ = cf.Rfft.apply(torch.cat((u[...,rev_idx_n], torch.zeros_like(u)), dim=-1))
             v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
-            uv_ = cf.complex_mult_slow(u_.view(batch_size, 1, -1), v_.view(1, rank, -1))
+            uv_ = cf.complex_mult_(u_.view(batch_size, 1, -1), v_.view(1, rank, -1))
             ans = cf.Irfft.apply(uv_)[..., rev_idx_n]
         return ans
     # TODO can this be done with rfft
@@ -92,14 +92,14 @@ class K_Toeplitz():
             veta = self.eta.view(n,2) * v.view(rank, n, 1)
             w_ = cf.Fft.apply(weta.view(batch_size, rank, -1))
             v_ = cf.Fft.apply(veta.view(rank, -1))
-            wv_ = cf.complex_mult_slow(w_, v_)
-            ans = cf.complex_mult_slow(self.ieta, cf.Ifft.apply(torch.sum(wv_, dim=1)))
+            wv_ = cf.complex_mult_(w_, v_)
+            ans = cf.complex_mult_(self.ieta, cf.Ifft.apply(torch.sum(wv_, dim=1)))
 
             ans = ans[..., ::2].contiguous()
         else:
             w_ = cf.Rfft.apply(torch.cat((w, torch.zeros_like(w)), dim=-1))
             v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
-            wv_ = cf.complex_mult_slow(w_, v_.view((1, rank, -1)))
+            wv_ = cf.complex_mult_(w_, v_.view((1, rank, -1)))
             ans = cf.Irfft.apply(torch.sum(wv_, dim=1))[..., :n]
         return ans
 

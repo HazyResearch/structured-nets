@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadNa
 # python compare.py --name=test --methods=tridiagonal_corner,toeplitz_like --dataset=true_toeplitz --result_dir=2_25_18 --r=1 --lr=1e-3 --decay_rate=1.0 --decay_steps=0.1 --mom=0.9 --steps=50000 --batch_size=1024 --test=0 --layer_size=50 --transform=none --torch=1 --model=Attention
 
 method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'tridiagonal_corners': 'tcs', 'low_rank': 'lr', 'unconstrained': 'u',
-         'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'hankel_like': 'h', 'vandermonde_like': 'v'}
+              'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'subdiagonal': 'sd', 'hankel_like': 'h', 'vandermonde_like': 'v'}
 
 def compare(args, method, rank, lr, decay_rate, mom):
     params = ModelParams(args.dataset, args.transform, args.test, log_path, 
@@ -83,6 +83,7 @@ parser.add_argument('--torch', type=int) # Pytorch or TF
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 parser.add_argument('--parallel') #
 parser.add_argument('--trials', type=int, default=3) #
+parser.add_argument('--cupy', action="store_true") #
 args = parser.parse_args()
 
 
@@ -132,6 +133,8 @@ dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform,
     stochastic_train, test_size, train_size, args.test)
 n_diag_learned = dataset.input_size - 1
 commit_id = get_commit_id()
+
+# setattr(cf, 'use_cupy', True)
 
 # TODO use itertools.product to do this
 for method in methods:

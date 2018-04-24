@@ -7,6 +7,8 @@ import pytorch_fft.fft as pyfft
 import cupy as cp
 from cupy.cuda import cufft
 
+use_cupy = True
+
 CUPY_MEM = cp.ndarray(1, dtype='float32').data.mem
 
 
@@ -130,6 +132,7 @@ def complex_mult_slow(X, Y):
     result = torch.cat((real.view(-1, 1), imag.view(-1, 1)), dim=-1)
     return result.view(*(real.shape[:-1] + (2 * real.shape[-1], )))
 
+
 def swap_real_imag(X):
     assert X.shape[-1] % 2 == 0, 'Last dimension must be even'
     X_swapped = torch.cuda.FloatTensor(*X.shape)
@@ -141,8 +144,10 @@ class Conjugate(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, X):
-        return conjugate(X.contiguous())
-        # return conjugate_cupy(X)
+        if use_cupy:
+            return conjugate_cupy(X)
+        else:
+            return conjugate(X.contiguous())
 
     def backward(ctx, grad):
         return Conjugate.apply(grad)
@@ -317,3 +322,5 @@ def complex_mult(X, Y):
     X_re, X_im = X
     Y_re, Y_im = Y
     return X_re * Y_re - X_im * Y_im, X_re * Y_im + X_im * Y_re
+
+complex_mult_ = ComplexMult.apply if use_cupy else complex_mult_slow
