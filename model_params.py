@@ -10,7 +10,7 @@ class ModelParams:
             test_freq, verbose, decay_rate, decay_freq, learn_diagonal,
             fix_A_identity, stochastic_train, flip_K_B, num_conv_layers,
             torch, model, viz_freq, num_pred_plot, viz_powers,early_stop_steps):
-        if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'toep_corner', 'toep_nocorn', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner', 'tridiagonal_corners']:
+        if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'toep_corner', 'subdiagonal', 'toep_nocorn', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner', 'tridiagonal_corners']:
             print('Class type ' + class_type + ' not supported')
             assert 0
         self.dataset_name = dataset_name
