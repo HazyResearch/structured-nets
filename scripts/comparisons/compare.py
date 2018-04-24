@@ -23,17 +23,17 @@ method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'low_rank'
               'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'subdiagonal': 'sd', 'hankel_like': 'h', 'vandermonde_like': 'v'}
 
 def compare(args, method, rank, lr, decay_rate, mom):
-    params = ModelParams(args.dataset, args.transform, args.test, log_path, 
-            dataset.input_size, args.layer_size, dataset.out_size(), num_layers, 
-            loss, rank, args.steps, args.batch_size, lr, mom, init_type, 
-            method, learn_corner, n_diag_learned, init_stddev, fix_G, 
-            check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose, 
-            decay_rate, args.decay_freq, learn_diagonal, fix_A_identity, 
+    params = ModelParams(args.dataset, args.transform, args.test, log_path,
+            dataset.input_size, args.layer_size, dataset.out_size(), num_layers,
+            loss, rank, args.steps, args.batch_size, lr, mom, init_type,
+            method, learn_corner, n_diag_learned, init_stddev, fix_G,
+            check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose,
+            decay_rate, args.decay_freq, learn_diagonal, fix_A_identity,
             stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model,
             viz_freq, num_pred_plot, viz_powers)
 
     # Save params + git commit ID
-    this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom)
+    this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size)
     this_results_dir = params.save(results_dir, this_id, commit_id)
 
     for test_iter in range(args.trials):
@@ -131,6 +131,7 @@ dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform,
 n_diag_learned = dataset.input_size - 1
 commit_id = get_commit_id()
 
+# TODO use itertools.product to do this
 for method in methods:
     for rank in ranks:
         for lr in lrs:
