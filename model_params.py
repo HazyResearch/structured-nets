@@ -6,17 +6,18 @@ class ModelParams:
     def __init__(self, dataset_name, transform, test, log_path, input_size,
             layer_size, out_size, num_layers, loss, r, steps, batch_size,
             lr, mom, init_type, class_type, learn_corner, n_diag_learned,
-            init_stddev, fix_G, check_disp, checkpoint_freq, checkpoint_path,
+            init_stddev, fix_G, check_disp, check_disp_freq, checkpoint_freq, checkpoint_path,
             test_freq, verbose, decay_rate, decay_freq, learn_diagonal,
             fix_A_identity, stochastic_train, flip_K_B, num_conv_layers,
-            torch, model, viz_freq, num_pred_plot, viz_powers):
-        if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'toep_corner', 'toep_nocorn', 'subdiagonal', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner']:
+            torch, model, viz_freq, num_pred_plot, viz_powers,early_stop_steps):
+        if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'toep_corner', 'toep_nocorn', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner', 'tridiagonal_corners']:
             print('Class type ' + class_type + ' not supported')
             assert 0
         self.dataset_name = dataset_name
         # grayscale
         self.transform = transform
         self.test = test
+        self.early_stop_steps = early_stop_steps
         self.log_path = log_path
         self.input_size = input_size
         self.layer_size = layer_size
@@ -38,6 +39,7 @@ class ModelParams:
         self.n_diag_learned = n_diag_learned
         self.init_stddev = init_stddev
         self.check_disp = check_disp
+        self.check_disp_freq = check_disp_freq
         self.checkpoint_freq = checkpoint_freq
         self.checkpoint_path = checkpoint_path
         self.test_freq = test_freq
@@ -55,7 +57,7 @@ class ModelParams:
         self.num_pred_plot = num_pred_plot
         self.viz_powers = viz_powers
         # c1_filters, c1_ksize, p1_size, p1_strides, c2_filters, c2_ksize, p2_size, p2_strides
-        if self.model == 'CNN':
+        if self.model == 'CNN' or 'cnn' in self.transform:
             self.set_cnn_params()
 
 
