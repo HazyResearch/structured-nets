@@ -39,10 +39,9 @@ def optimize_tf(dataset, params):
 
     eigvals = {'E': [], 'W': [], 'A': [], 'B': []}
     losses = {'train': [], 'val': [], 'DR': [], 'ratio': [], 'eigvals': eigvals}
-    accuracies = {'train': [], 'val': [], 'best_val': 0.0}
-
+    accuracies = {'train': [], 'val': [], 'best_val': 0.0, 'best_val_iter': 0}
     t1 = time.time()
-
+    
     for _ in range(params.steps):
         this_step, lr = sess.run([global_step, learning_rate])
         batch_xs, batch_ys = dataset.batch(params.batch_size, this_step)
@@ -53,7 +52,7 @@ def optimize_tf(dataset, params):
             t1 = time.time()
             logging.debug('Training step: ' + str(this_step))
             # Verify displacement rank
-            if params.check_disp:
+            if params.check_disp and this_step % params.check_disp_freq == 0:
                 dr, ratio, E_ev, W_ev, A_ev, B_ev = check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
                 losses['DR'].append(dr)
                 losses['ratio'].append(ratio)
@@ -89,12 +88,17 @@ def optimize_tf(dataset, params):
         # Update checkpoint if better validation accuracy
         if val_accuracy > accuracies['best_val']:
             accuracies['best_val'] = val_accuracy
+            accuracies['best_val_iter'] = this_step
             #if this_step > 0 and this_step % params.checkpoint_freq == 0:
             #save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(this_step)))
             save_path = saver.save(sess, os.path.join(params.checkpoint_path, str(this_step) + '_' + str(accuracies['best_val'])))
             logging.debug("Updating validation accuracy so far: %f" % accuracies['best_val'])
             logging.debug("Model saved in file: %s" % save_path)
 
+
+        elif accuracies['best_val_iter'] <= this_step - params.early_stop_steps:
+            logging.debug('Early stopping: best val iter at %d, current step %d' %(accuracies['best_val_iter'], this_step))
+            break
 
         if this_step > 0 and params.viz_freq > 0 and this_step % params.viz_freq == 0:
             visualize(params,sess,model,x,y_,batch_xs,batch_ys,y_pred,this_step)

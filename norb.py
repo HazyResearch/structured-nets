@@ -8,7 +8,7 @@ from os.path import join
 from os.path import exists
 from itertools import groupby
 
-names = ['train1', 'train2', 'train3', 'train4', 'train5']#, 'train6', 'train7', 'train8', 'train9','train10']
+#names = ['train1', 'train2', 'train3', 'train4', 'train5']#, 'train6', 'train7', 'train8', 'train9','train10']
 #names = ['test1', 'test2']
 
 class NORBExample:
@@ -47,7 +47,7 @@ class NORBDataset:
     # Categories present in small NORB dataset
     categories = ['animal', 'human', 'airplane', 'truck', 'car']
 
-    def __init__(self, dataset_root):
+    def __init__(self, dataset_root, names):
         """
         Initialize small NORB dataset wrapper
         
@@ -56,7 +56,7 @@ class NORBDataset:
         dataset_root: str
             Path to directory where small NORB archives have been extracted.
         """
-
+        self.names = names
         self.dataset_root = dataset_root
         self.initialized  = False
 
@@ -114,24 +114,25 @@ class NORBDataset:
             },
             'test1':  {
                 'cat':  join(self.dataset_root, 'norb-5x01235x9x18x6x2x108x108-testing-01-cat.mat'),
-                'info': join(self.dataset_root, 'norb-5x01235x9x18x6x2x108x108-testing-01-cat.mat'),
-                'dat':  join(self.dataset_root, 'norb-5x01235x9x18x6x2x108x108-testing-01-cat.mat')
+                'info': join(self.dataset_root, 'norb-5x01235x9x18x6x2x108x108-testing-01-info.mat'),
+                'dat':  join(self.dataset_root, 'norb-5x01235x9x18x6x2x108x108-testing-01-dat.mat')
             },
             'test2':  {
                 'cat':  join(self.dataset_root, 'norb-5x01235x9x18x6x2x108x108-testing-02-cat.mat'),
-                'info': join(self.dataset_root, 'norb-5x01235x9x18x6x2x108x108-testing-02-cat.mat'),
-                'dat':  join(self.dataset_root, 'norb-5x01235x9x18x6x2x108x108-testing-02-cat.mat')
+                'info': join(self.dataset_root, 'norb-5x01235x9x18x6x2x108x108-testing-02-info.mat'),
+                'dat':  join(self.dataset_root, 'norb-5x01235x9x18x6x2x108x108-testing-02-dat.mat')
             }
         }
 
         # Initialize both train and test data structures
         self.data = {}
 
-        for name in names:
+        for name in self.names:
             self.data[name] = [NORBExample() for _ in range(NORBDataset.n_examples)]
 
         # Fill data structures parsing dataset binary files
-        for data_split in names:
+        for data_split in self.names:
+            print('filling for data split: ', data_split)
             self._fill_data_structures(data_split)
 
         self.initialized = True
@@ -204,7 +205,7 @@ class NORBDataset:
             List of 25 groups of 972 elements each. All examples of each group are
             from the same category and instance
         """
-        if dataset_split not in names:
+        if dataset_split not in self.names:
             raise ValueError('Dataset split "{}" not allowed.'.format(dataset_split))
 
         groups = []
@@ -342,10 +343,11 @@ class NORBDataset:
             Ndarray of shape (48600, 96, 96) containing images couples. Each image couple
             is stored in position [i, :, :] and [i+1, :, :]
         """
+        print('norb file path: ', file_path)
         with open(file_path, mode='rb') as f:
 
             header = NORBDataset._parse_small_NORB_header(f)
-
+            print('header: ', header)
             num_examples, channels, height, width = header['dimensions']
 
             examples = np.zeros(shape=(num_examples * channels, height, width), dtype=np.uint8)

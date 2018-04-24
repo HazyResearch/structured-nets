@@ -161,8 +161,11 @@ class MultiHeadedAttention(nn.Module):
         print(('d_model, h, d_k: ', d_model, h, self.d_k))
         #self.struct = StructuredLinear(yo)
         #quit()
-        self.linears = clones(StructuredLinear(params), 4)
+        #self.linears = clones(StructuredLinear(params), 4)
         #self.linears = clones(nn.Linear(d_model, d_model), 4)
+        # Final layer in MultiHeadedAttention is structured
+        self.linears = clones(nn.Linear(d_model, d_model), 3)
+        self.linears.append(StructuredLinear(params))
         self.attn = None
         self.dropout = nn.Dropout(p=dropout)
         

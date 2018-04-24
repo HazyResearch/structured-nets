@@ -9,13 +9,13 @@ from scipy.misc import imresize
 MAX_VAL = 255.0
 DS_SIZE = (28, 28)
 N_CATEGORIES = 6
-TRAIN = True#False
+TRAIN = True
 
-names = ['train' + str(i+1) for i in range(5)]
-OUT_LOC = '/dfs/scratch1/thomasat/datasets/norb/processed_py2_train_' + str(DS_SIZE[0]) + '.pkl'
+names = ['train' + str(i+1) for i in np.arange(10)]
+OUT_LOC = '/dfs/scratch1/thomasat/datasets/norb_full/processed_py2_train_' + str(DS_SIZE[0]) + '.pkl'
 if not TRAIN:
 	names = ['test' + str(i+1) for i in range(2)]
-	OUT_LOC = '/dfs/scratch1/thomasat/datasets/norb/processed_py2_test' + str(DS_SIZE[0]) + '.pkl'
+	OUT_LOC = '/dfs/scratch1/thomasat/datasets/norb_full/processed_py2_test' + str(DS_SIZE[0]) + '.pkl'
 
 
 """
@@ -54,11 +54,12 @@ def process_data(data):
 	return X,Y
 
 print('Names: ', names)
-dataset = NORBDataset(dataset_root='/dfs/scratch1/thomasat/datasets/norb')
+dataset = NORBDataset(dataset_root='/dfs/scratch1/thomasat/datasets/norb', names=names)
 
 Xs = []
 Ys = []
 
+print('Dataset names: ', dataset.data.keys())
 
 for name in names:
 	X, Y = process_data(dataset.data[name])

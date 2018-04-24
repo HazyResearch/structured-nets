@@ -114,7 +114,8 @@ class Dataset:
             self.val_X = self.test_X
             self.val_Y = self.test_Y
         elif self.name == 'norb':
-            data_loc = '/dfs/scratch1/thomasat/datasets/norb/processed_py2_train_28.pkl'
+            data_loc = '/dfs/scratch1/thomasat/datasets/norb_full/processed_py2_train_28.pkl'
+            self.test_loc = '/dfs/scratch1/thomasat/datasets/norb_full/processed_py2_test_28.pkl'
             data = pkl.load(open(data_loc, 'rb'))
             train_X = data['X']
             train_Y = data['Y']
@@ -472,7 +473,7 @@ class Dataset:
             return self.input_size
 
     def load_test_data(self):
-        if self.name.startswith('mnist_noise') or self.name == 'smallnorb' or self.name == 'norb':
+        if self.name.startswith('mnist_noise') or self.name == 'smallnorb':
             return
 
         if self.name == 'cifar10':
@@ -489,6 +490,10 @@ class Dataset:
             enc = OneHotEncoder()
             self.test_Y = enc.fit_transform(self.test_Y).todense()
 
+        elif self.name == 'norb':
+            data = pkl.load(open(self.test_loc, 'rb'))
+            self.test_X = data['X']
+            self.test_Y = data['Y']
 
         elif self.test_loc:
             test_data = np.genfromtxt(self.test_loc)
