@@ -19,18 +19,18 @@ logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadNa
 # Example command:
 # python compare.py --name=test --methods=tridiagonal_corner,toeplitz_like --dataset=true_toeplitz --result_dir=2_25_18 --r=1 --lr=1e-3 --decay_rate=1.0 --decay_steps=0.1 --mom=0.9 --steps=50000 --batch_size=1024 --test=0 --layer_size=50 --transform=none --torch=1 --model=Attention
 
-method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'low_rank': 'lr', 'unconstrained': 'u',
-              'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'subdiagonal': 'sd', 'hankel_like': 'h', 'vandermonde_like': 'v'}
+method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'tridiagonal_corners': 'tcs', 'low_rank': 'lr', 'unconstrained': 'u',
+         'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'hankel_like': 'h', 'vandermonde_like': 'v'}
 
 def compare(args, method, rank, lr, decay_rate, mom):
-    params = ModelParams(args.dataset, args.transform, args.test, log_path,
-            dataset.input_size, args.layer_size, dataset.out_size(), num_layers,
-            loss, rank, args.steps, args.batch_size, lr, mom, init_type,
-            method, learn_corner, n_diag_learned, init_stddev, fix_G,
-            check_disp, checkpoint_freq, checkpoint_path, test_freq, verbose,
-            decay_rate, args.decay_freq, learn_diagonal, fix_A_identity,
+    params = ModelParams(args.dataset, args.transform, args.test, log_path, 
+            dataset.input_size, args.layer_size, dataset.out_size(), num_layers, 
+            loss, rank, args.steps, args.batch_size, lr, mom, init_type, 
+            method, learn_corner, n_diag_learned, init_stddev, fix_G, 
+            check_disp, check_disp_freq, checkpoint_freq, checkpoint_path, test_freq, verbose, 
+            decay_rate, args.decay_freq, learn_diagonal, fix_A_identity, 
             stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model,
-            viz_freq, num_pred_plot, viz_powers)
+            viz_freq, num_pred_plot, viz_powers, early_stop_steps)
 
     # Save params + git commit ID
     this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size)
@@ -105,8 +105,10 @@ loss = 'cross_entropy'
 test_size = 1000
 train_size = 10000
 verbose = False
-check_disp = True # If true, checks rank of error matrix every test_freq iters
+check_disp = False # If true, checks rank of error matrix every check_disp_freq iters
+check_disp_freq = 5000 
 fix_G = False
+early_stop_steps = 500000
 fix_A_identity = False
 flip_K_B = False
 init_type = 'toeplitz'
