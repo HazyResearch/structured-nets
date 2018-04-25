@@ -9,13 +9,14 @@ class ModelParams:
             init_stddev, fix_G, check_disp, check_disp_freq, checkpoint_freq, checkpoint_path,
             test_freq, verbose, decay_rate, decay_freq, learn_diagonal,
             fix_A_identity, stochastic_train, flip_K_B, num_conv_layers,
-            torch, model, viz_freq, num_pred_plot, viz_powers,early_stop_steps):
+            torch, model, viz_freq, num_pred_plot, viz_powers,early_stop_steps,replacement):
         if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'toep_corner', 'subdiagonal', 'toep_nocorn', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner', 'tridiagonal_corners']:
             print('Class type ' + class_type + ' not supported')
             assert 0
         self.dataset_name = dataset_name
         # grayscale
         self.transform = transform
+        self.replacement = replacement
         self.test = test
         self.early_stop_steps = early_stop_steps
         self.log_path = log_path

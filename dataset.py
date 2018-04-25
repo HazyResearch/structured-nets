@@ -81,10 +81,11 @@ def batch_size_fn(new, count, sofar):
 class Dataset:
     # here n is the input size.
     # true_test: if True, we test on test set. Otherwise, split training set into train/validation.
-    def __init__(self, name, layer_size, num_iters, transform, stochastic_train, test_size=1000, train_size=10000, true_test=False):
+    def __init__(self, name, layer_size, num_iters, transform, stochastic_train, replacement, test_size=1000, train_size=10000, true_test=False):
         self.name = name
         self.mnist = None
         self.transform = transform
+        self.replacement = replacement
         self.stochastic_train = stochastic_train
         self.num_iters = num_iters
         self.layer_size = layer_size
@@ -376,14 +377,15 @@ class Dataset:
             # plt.show()
 
 
-        #Randomly shuffle training set
-        idx = np.arange(0, self.train_X.shape[0])
-        np.random.shuffle(idx)
-        self.train_X = self.train_X[idx,:]
-        self.train_Y = self.train_Y[idx,:]
+        #Randomly shuffle training set if sampling without replacement
+        if not self.replacement:
+            idx = np.arange(0, self.train_X.shape[0])
+            np.random.shuffle(idx)
+            self.train_X = self.train_X[idx,:]
+            self.train_Y = self.train_Y[idx,:]
 
-        #For batching
-        self.current_idx = 0
+            #For batching
+            self.current_idx = 0
 
     def get_input_size(self):
         if 'mnist' in self.name or 'convex' in self.name:
@@ -541,12 +543,43 @@ class Dataset:
     def next_batch(self, batch_size):
         batch_X = self.train_X[self.current_idx:self.current_idx+batch_size,:]
         batch_Y = self.train_Y[self.current_idx:self.current_idx+batch_size,:]
-        assert batch_X.shape[0] == batch_size
-        assert batch_Y.shape[0] == batch_size
+        #assert batch_X.shape[0] == batch_size
+        #assert batch_Y.shape[0] == batch_size
         self.update_batch_idx(batch_size)
         return batch_X, batch_Y
 
     def batch(self, batch_size, step):
+        if self.replacement:
+            return self.sample_with_replacement(batch_size, step)
+        else:
+            return self.sample_without_replacement(batch_size, step)
+
+    def sample_with_replacement(self, batch_size, step):
+        if self.name == 'mnist':
+            batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
+            return batch_xs, batch_ys
+        elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb']:
+            #Randomly sample batch_size from train_X and train_Y
+            idx = np.random.randint(self.train_X.shape[0], size=batch_size)
+            return self.train_X[idx, :], self.train_Y[idx, :]
+        elif self.name == 'cifar10':
+            this_batch = int(step/self.iters_per_batch)
+            if this_batch != self.current_batch:
+                self.load_train_cifar10(this_batch)
+                # Load new data
+                self.current_batch = this_batch
+            idx = np.random.randint(self.train_X.shape[0], size=batch_size)
+            return self.train_X[idx, :], self.train_Y[idx, :]
+        elif self.name.startswith('true'):
+            if self.stochastic_train:
+                return gen_batch(self.true_transform, batch_size, self.pert)
+            else:
+                return self.next_batch(batch_size)
+        else:
+            print('Not supported: ', name)
+            assert 0
+
+    def sample_without_replacement(self, batch_size, step):
         if self.name == 'mnist':
             batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
             return batch_xs, batch_ys
@@ -565,8 +598,6 @@ class Dataset:
                 return gen_batch(self.true_transform, batch_size, self.pert)
             else:
                 return self.next_batch(batch_size)
-
-
         else:
             print('Not supported: ', name)
             assert 0

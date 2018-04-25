@@ -30,7 +30,7 @@ def compare(args, method, rank, lr, decay_rate, mom):
             check_disp, check_disp_freq, checkpoint_freq, checkpoint_path, test_freq, verbose, 
             decay_rate, args.decay_freq, learn_diagonal, fix_A_identity, 
             stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model,
-            viz_freq, num_pred_plot, viz_powers, early_stop_steps)
+            viz_freq, num_pred_plot, viz_powers, early_stop_steps, replacement)
 
     # Save params + git commit ID
     this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size)
@@ -101,11 +101,12 @@ logging.debug('Testing moms: ' + str(moms))
 
 # Fixed params
 num_layers = 1
-out_dir = '../..'
+out_dir = '/dfs/scratch1/thomasat/'#'../..'
 loss = 'cross_entropy'
 test_size = 1000
 train_size = 10000
 verbose = False
+replacement = True # If true, sample with replacement when batching
 check_disp = False # If true, checks rank of error matrix every check_disp_freq iters
 check_disp_freq = 5000 
 fix_G = False
@@ -130,7 +131,7 @@ checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
 vis_path = os.path.join(out_dir, 'vis', args.result_dir)
 
 dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform,
-    stochastic_train, test_size, train_size, args.test)
+    stochastic_train, replacement, test_size, train_size, args.test)
 n_diag_learned = dataset.input_size - 1
 commit_id = get_commit_id()
 
