@@ -13,6 +13,7 @@ from torch_reconstruction import *
 from attention import *
 import toeplitz_gpu as toep
 import krylov_multiply as subd
+import LDR as ldr
 #from krylov_multiply import *
 # import structured_layer # this is already in attention
 # TODO fix the 'import *'s
@@ -22,6 +23,8 @@ def construct_net(params):
         return LeNet(params)
     elif params.model == 'MLP':
         return MLP(params)
+    elif params.model == 'LDR':
+        return LDRNet(params)
     elif params.model == 'RNN':
         return RNN(params)
     elif params.model == 'Attention':
@@ -117,6 +120,28 @@ class LeNet(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+class LDRNet(nn.Module):
+    def __init__(self, params):
+        super(LDRNet, self).__init__()
+        self.n = params.layer_size
+
+        self.W1 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
+        self.b1 = Parameter(torch.Tensor(params.layer_size))
+        self.W2 = Parameter(torch.Tensor(params.layer_size, params.out_size))
+        self.b2 = Parameter(torch.Tensor(params.out_size))
+        torch.nn.init.normal(self.b1,std=params.init_stddev)
+        torch.nn.init.normal(self.b2,std=params.init_stddev)
+        torch.nn.init.normal(self.W2,std=params.init_stddev)
+
+    def forward(self, x):
+        print("x has type", type(x))
+        x_ = x.view(1, *x.shape)
+        l1 = self.W1(x_)
+        l1 = l1.view(-1, self.n)
+        l1 = F.relu(l1 + self.b1)
+        y = torch.matmul(l1, self.W2) + self.b2
+        return y
 
 class MLP(nn.Module):
     def __init__(self, params):

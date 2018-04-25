@@ -30,6 +30,7 @@ def optimize_torch(dataset, params):
             print(('Parameter name, shape: ', name, param.data.shape))
 
     optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
+    # optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
 
     losses = {'train': [], 'val': [], 'DR': [], 'ratio': []}
     accuracies = {'train': [], 'val': []}

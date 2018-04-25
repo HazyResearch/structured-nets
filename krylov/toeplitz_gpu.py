@@ -43,7 +43,7 @@ class KT_Toeplitz():
             v_ = cf.Fft.apply((self.eta.view(n,2) * v.view(rank,n,1)).view(rank,2*n))
             uv_ = cf.complex_mult_(u_.view(batch_size, 1, 2*n), v_.view(1, rank, 2*n))
             ans = cf.complex_mult_(self.eta, cf.Fft.apply(uv_))
-            ans = ans[..., ::2].contiguous()
+            ans = ans[..., ::2]
         else:
             rev_idx_n = torch.arange(n-1, -1, -1, out=torch.cuda.LongTensor())
             # output of rfft has size (2n/2)+1 = n+1 complex numbers, so 2n+2 real comps
@@ -53,7 +53,7 @@ class KT_Toeplitz():
             v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
             uv_ = cf.complex_mult_(u_.view(batch_size, 1, -1), v_.view(1, rank, -1))
             ans = cf.Irfft.apply(uv_)[..., rev_idx_n]
-        return ans
+        return ans.contiguous()
     # TODO can this be done with rfft
 
 
@@ -95,13 +95,13 @@ class K_Toeplitz():
             wv_ = cf.complex_mult_(w_, v_)
             ans = cf.complex_mult_(self.ieta, cf.Ifft.apply(torch.sum(wv_, dim=1)))
 
-            ans = ans[..., ::2].contiguous()
+            ans = ans[..., ::2]
         else:
             w_ = cf.Rfft.apply(torch.cat((w, torch.zeros_like(w)), dim=-1))
             v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
             wv_ = cf.complex_mult_(w_, v_.view((1, rank, -1)))
             ans = cf.Irfft.apply(torch.sum(wv_, dim=1))[..., :n]
-        return ans
+        return ans.contiguous()
 
 
 def toeplitz_mult(G, H, x, cycle=True):

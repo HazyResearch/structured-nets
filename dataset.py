@@ -538,7 +538,7 @@ class Dataset:
         self.current_idx += batch_size
         if self.current_idx >= self.train_X.shape[0]:
             self.current_idx = 0
-        print('Current training data index: ', self.current_idx)
+        # print('Current training data index: ', self.current_idx)
 
     def next_batch(self, batch_size):
         batch_X = self.train_X[self.current_idx:self.current_idx+batch_size,:]
