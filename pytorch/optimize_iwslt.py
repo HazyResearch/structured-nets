@@ -72,18 +72,29 @@ def run_epoch(data_iter, model, loss_compute):
             losses.append(loss/batch.ntokens)
     return total_loss / total_tokens, losses
 
+def compute_bleu(model):
+    for i, batch in enumerate(valid_iter):
+        src = batch.src.transpose(0, 1)[:1]
+        src_mask = (src != SRC.vocab.stoi["<blank>"]).unsqueeze(-2)
+        out = greedy_decode(model, src, src_mask,max_len=60, start_symbol=TGT.vocab.stoi["<s>"])
+        print("Translation:", end="\t")
+        for i in range(1, out.size(1)):
+            sym = TGT.vocab.itos[out[0, i]]
+            if sym == "</s>": break
+            print(sym, end =" ")
+        print()
+        print("Target:", end="\t")
+        for i in range(1, batch.trg.size(0)):
+            sym = TGT.vocab.itos[batch.trg.data[i, 0]]
+            if sym == "</s>": break
+                print(sym, end =" ")
+        print()
+        break
+
 def optimize_iwslt(dataset, params):
 	SRC, TGT, train, val, test = create_src_tgt()
-	#print(len(SRC.vocab), len(TGT.vocab))
-	#pkl.dump(SRC, open('/dfs/scratch1/thomasat/datasets/iwslt/src.p', 'wb'), protocol=2)	
-	#pkl.dump(TGT, open('/dfs/scratch1/thomasat/datasets/iwslt/tgt.p', 'wb'), protocol=2)
-	#pkl.dump(train, open('/dfs/scratch1/thomasat/datasets/iwslt/train.p', 'wb'), protocol=2)   
-	#pkl.dump(val, open('/dfs/scratch1/thomasat/datasets/iwslt/val.p', 'wb'), protocol=2)   
-	#pkl.dump(test, open('/dfs/scratch1/thomasat/datasets/iwslt/test.p', 'wb'), protocol=2)   
-	#SRC = pkl.load(open('/dfs/scratch1/thomasat/datasets/iwslt/src.p', 'rb'))
-	#TGT = pkl.load(open('/dfs/scratch1/thomasat/datasets/iwslt/tgt.p', 'rb'))
 	pad_idx = TGT.vocab.stoi["<blank>"]
-	model = make_model(params, len(SRC.vocab), len(TGT.vocab), N=6)
+	model = make_model(params, len(SRC.vocab), len(TGT.vocab), N=1)
 	model.cuda()
 
 	print((torch.cuda.get_device_name(0)))
@@ -97,11 +108,10 @@ def optimize_iwslt(dataset, params):
 	accuracies = {'train': [], 'val': []}	
 	criterion = LabelSmoothing(size=len(TGT.vocab), padding_idx=pad_idx, smoothing=0.1)
 	criterion.cuda()
-	BATCH_SIZE = 1024#1200#0
-	train_iter = MyIterator(train, batch_size=BATCH_SIZE, device=0,
+	train_iter = MyIterator(train, batch_size=params.batch_size, device=0,
                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                             batch_size_fn=batch_size_fn, train=True)
-	valid_iter = MyIterator(val, batch_size=BATCH_SIZE, device=0,
+	valid_iter = MyIterator(val, batch_size=params.batch_size, device=0,
                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                             batch_size_fn=batch_size_fn, train=False)
 

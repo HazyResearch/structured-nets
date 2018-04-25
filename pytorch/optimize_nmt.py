@@ -47,7 +47,7 @@ def optimize_nmt(dataset, params):
 	accuracies = {'train': [], 'val': []}	
 
 	criterion = LabelSmoothing(size=V, padding_idx=0, smoothing=0.0)
-	model = make_model(params, V, V, N=2)
+	model = make_model(params, V, V, N=1)
 	for name, param in model.named_parameters():
 	    if param.requires_grad:
 	        print(('Parameter name, shape: ', name, param.data.shape))

@@ -122,6 +122,8 @@ class DecoderLayer(nn.Module):
         self.size = size
         self.self_attn = self_attn
         self.src_attn = src_attn
+        print('self_atten: ', self_attn)
+        print('src_attn:', src_attn)
         self.feed_forward = feed_forward
         self.sublayer = clones(SublayerConnection(size, dropout), 3)
  
@@ -151,7 +153,7 @@ def attention(query, key, value, mask=None, dropout=None):
     return torch.matmul(p_attn, value), p_attn
 
 class MultiHeadedAttention(nn.Module):
-    def __init__(self, params, h, d_model, dropout=0.1):
+    def __init__(self, params, h, d_model, structured, dropout=0.1):
         "Take in model size and number of heads."
         super(MultiHeadedAttention, self).__init__()
         assert d_model % h == 0
@@ -159,13 +161,11 @@ class MultiHeadedAttention(nn.Module):
         self.d_k = d_model // h
         self.h = h
         print(('d_model, h, d_k: ', d_model, h, self.d_k))
-        #self.struct = StructuredLinear(yo)
-        #quit()
-        #self.linears = clones(StructuredLinear(params), 4)
-        #self.linears = clones(nn.Linear(d_model, d_model), 4)
-        # Final layer in MultiHeadedAttention is structured
-        self.linears = clones(nn.Linear(d_model, d_model), 3)
-        self.linears.append(StructuredLinear(params))
+        if structured:
+            self.linears = clones(nn.Linear(d_model, d_model), 3)
+            self.linears.append(StructuredLinear(params))
+        else:
+            self.linears = clones(nn.Linear(d_model, d_model), 4)
         self.attn = None
         self.dropout = nn.Dropout(p=dropout)
         
@@ -235,11 +235,12 @@ def make_model(params, src_vocab, tgt_vocab, N=6,
                d_model=512, d_ff=2048, h=8, dropout=0.1):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
-    attn = MultiHeadedAttention(params, h, d_model)
+    attn = MultiHeadedAttention(params, h, d_model, False)
+    structured_attn = MultiHeadedAttention(params, h, d_model, True)
     ff = PositionwiseFeedForward(d_model, d_ff, dropout)
     position = PositionalEncoding(d_model, dropout)
     model = EncoderDecoder(
-        Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
+        Encoder(EncoderLayer(d_model, c(structured_attn), c(ff), dropout), N),
         Decoder(DecoderLayer(d_model, c(attn), c(attn), 
                              c(ff), dropout), N),
         nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
