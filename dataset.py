@@ -100,15 +100,12 @@ class Dataset:
 
         if self.name in ['iwslt', 'copy']:
             return
-        elif self.name in ['norb', 'cifar10']:
+        elif self.name.startswith('mnist_noise') or self.name in ['norb', 'cifar10']:
             data = pkl.load(open(self.train_loc, 'rb'))
             train_X = data['X']
             train_Y = data['Y']
             val_size = 2000
             train_size = train_X.shape[0] - val_size
-
-            print(('Train size, Val size: ', train_size, val_size))
-
             # Shuffle X
             idx = np.arange(0, train_X.shape[0])
             np.random.shuffle(idx)
@@ -186,39 +183,6 @@ class Dataset:
             self.val_Y = Y[val_idx, :]
         elif self.name == 'mnist_rand_bg':
             self.load_train_data()
-        elif self.name.startswith('mnist_noise'):
-            idx = self.name[-1]
-            data_loc = '/dfs/scratch1/thomasat/datasets/mnist_noise/mnist_noise_variations_all_' + idx + '.amat'
-            train_size = 11000
-            val_size = 1000
-            test_size = 2000 # As specified in http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/DeepVsShallowComparisonICML2007#Downloadable_datasets
-
-            data = np.genfromtxt(data_loc)
-            X = data[:, :-1]
-            Y = np.expand_dims(data[:, -1], 1)
-
-            # Y must be one-hot
-            enc = OneHotEncoder()
-            Y = enc.fit_transform(Y).todense()
-            # Split into train, val, test
-            # Shuffle the data
-            idx = np.arange(0, X.shape[0])
-            np.random.shuffle(idx)
-
-            train_idx = idx[0:train_size]
-            val_idx = idx[train_size:train_size+val_size]
-            test_idx = idx[-test_size:]
-
-            assert train_idx.size == train_size
-            assert val_idx.size == val_size
-            assert test_idx.size == test_size
-
-            self.val_X = X[val_idx, :]
-            self.val_Y = Y[val_idx, :]
-            self.test_X = X[test_idx, :]
-            self.test_Y = Y[test_idx, :]
-            self.train_X = X[train_idx, :]
-            self.train_Y = Y[train_idx, :]
         elif self.name == 'convex':
             self.load_train_data()
         elif self.name == 'rect':
@@ -315,6 +279,10 @@ class Dataset:
             test_name = 'test_grayscale' if 'grayscale' in self.transform else 'test'
             self.train_loc = os.path.join(data_dir, train_name)
             self.test_loc = os.path.join(data_dir, test_name)
+        elif self.name.startswith('mnist_noise'):
+            idx = self.name[-1]
+            self.train_loc = os.path.join(prefix,'mnist_noise/train_' + str(idx))
+            self.test_loc = os.path.join(prefix,'mnist_noise/test_' + str(idx))
         elif self.name == 'norb':
             self.train_loc = os.path.join(prefix,'norb_full/processed_py2_train_28.pkl')
             self.test_loc = os.path.join(prefix,'norb_full/processed_py2_test_28.pkl')
@@ -375,9 +343,9 @@ class Dataset:
             return self.input_size
 
     def load_test_data(self):
-        if self.name.startswith('mnist_noise') or self.name == 'smallnorb':
+        if self.name == 'smallnorb':
             return
-        elif self.name in ['norb', 'cifar10']:
+        elif self.name.startswith('mnist_noise') or self.name in ['norb', 'cifar10']:
             data = pkl.load(open(self.test_loc, 'rb'))
             self.test_X = data['X']
             self.test_Y = data['Y']
