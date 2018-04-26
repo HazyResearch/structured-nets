@@ -34,7 +34,7 @@ def compare(args, method, rank, lr, decay_rate, mom):
 
     # Save params + git commit ID
     this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size)
-    this_results_dir = params.save(results_dir, this_id, commit_id)
+    this_results_dir = params.save(results_dir, this_id, commit_id, command)
 
     for test_iter in range(args.trials):
         this_iter_name = this_id + '_' + str(test_iter)
@@ -62,6 +62,7 @@ def compare(args, method, rank, lr, decay_rate, mom):
         pkl.dump(accuracies, open(params.result_path + '_accuracies.p', 'wb'), protocol=2)
 
         logging.debug('Saved losses and accuracies for ' + method + ' to: ' + params.result_path)
+
 
 # Command line params
 parser = argparse.ArgumentParser()
@@ -106,7 +107,7 @@ loss = 'cross_entropy'
 test_size = 1000
 train_size = 10000
 verbose = False
-replacement = False # If true, sample with replacement when batching
+replacement = True # If true, sample with replacement when batching
 check_disp = False # If true, checks rank of error matrix every check_disp_freq iters
 check_disp_freq = 5000 
 fix_G = False
@@ -134,6 +135,7 @@ dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform,
     stochastic_train, replacement, test_size, train_size, args.test)
 n_diag_learned = dataset.input_size - 1
 commit_id = get_commit_id()
+command = ' '.join(sys.argv)
 
 # setattr(cf, 'use_cupy', True)
 

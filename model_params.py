@@ -107,9 +107,9 @@ class ModelParams:
 
 
 
-    def save(self, results_dir, name, commit_id):
-        # Append git commit ID
-        param_str = str(commit_id) + '\n' + str(self)
+    def save(self, results_dir, name, commit_id, command):
+        # Append git commit ID and command
+        param_str = str(commit_id) + '\n' + command + '\n' + str(self)
         print(param_str)
 
         # Make new dir with timestamp
