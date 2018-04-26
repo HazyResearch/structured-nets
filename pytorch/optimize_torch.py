@@ -7,6 +7,7 @@ import torch
 from torch_utils import *
 from torch.autograd import Variable
 import torch.optim as optim
+from torch.optim.lr_scheduler import StepLR
 from tensorboardX import SummaryWriter
 from optimize_nmt import optimize_nmt
 from optimize_iwslt import optimize_iwslt
@@ -30,7 +31,10 @@ def optimize_torch(dataset, params):
             print(('Parameter name, shape: ', name, param.data.shape))
 
     optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
+    # optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom, weight_decay=1e-5)
     # optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
+    steps_in_epoch = int(np.ceil(dataset.train_X.shape[0] / params.batch_size))
+    lr_scheduler = StepLR(optimizer, step_size=50, gamma=0.5)
 
     losses = {'train': [], 'val': [], 'DR': [], 'ratio': []}
     accuracies = {'train': [], 'val': []}
@@ -41,6 +45,7 @@ def optimize_torch(dataset, params):
     loss_fn = get_loss(params)
 
     t1 = time.time()
+    epochs = 0
     for step in range(params.steps):
         batch_xs, batch_ys = dataset.batch(params.batch_size, step)
         batch_xs, batch_ys = Variable(torch.FloatTensor(batch_xs).cuda()), Variable(torch.FloatTensor(batch_ys).cuda())
@@ -56,7 +61,11 @@ def optimize_torch(dataset, params):
 
         optimizer.step()
 
-        if step % params.test_freq == 0:
+        if step % steps_in_epoch == 0:
+            epochs += 1
+            # lr_scheduler.step()
+
+        # if step % params.test_freq == 0:
             print(('Time: ', time.time() - t1))
             t1 = time.time()
             losses['train'].append(train_loss.data)

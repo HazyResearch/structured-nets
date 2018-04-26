@@ -377,13 +377,7 @@ class Dataset:
             # plt.show()
 
 
-        #Randomly shuffle training set if sampling without replacement
         if not self.replacement:
-            idx = np.arange(0, self.train_X.shape[0])
-            np.random.shuffle(idx)
-            self.train_X = self.train_X[idx,:]
-            self.train_Y = self.train_Y[idx,:]
-
             #For batching
             self.current_idx = 0
 
@@ -541,8 +535,16 @@ class Dataset:
         # print('Current training data index: ', self.current_idx)
 
     def next_batch(self, batch_size):
-        batch_X = self.train_X[self.current_idx:self.current_idx+batch_size,:]
-        batch_Y = self.train_Y[self.current_idx:self.current_idx+batch_size,:]
+        #Randomly shuffle training set if sampling without replacement
+        if self.current_idx == 0:
+            idx = np.arange(0, self.train_X.shape[0])
+            np.random.shuffle(idx)
+            self.train_X = self.train_X[idx,:]
+            self.train_Y = self.train_Y[idx,:]
+
+        idx_end = min(self.train_X.shape[0], self.current_idx+batch_size)
+        batch_X = self.train_X[self.current_idx:idx_end,:]
+        batch_Y = self.train_Y[self.current_idx:idx_end,:]
         #assert batch_X.shape[0] == batch_size
         #assert batch_Y.shape[0] == batch_size
         self.update_batch_idx(batch_size)
