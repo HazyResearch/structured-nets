@@ -6,6 +6,7 @@ from torch.nn.parameter import Parameter
 import toeplitz_gpu as toep
 import krylov_multiply as subd
 
+# TODO: subclass with each DR type
 class LDR(nn.Module):
     # TODO: support non-square multiplications
     def __init__(self, displacement, in_channels, out_channels, rank, layer_size, bias=False):
@@ -54,3 +55,8 @@ class LDR(nn.Module):
                     comps[i,j] = subd.subd_mult(self.subd_A[i,j], self.subd_B[i,j], self.G[i,j], self.H[i,j], x[i])
         # return Variable(torch.sum(comps, dim=0))
         return torch.sum(comps, dim=0)
+
+    def loss(self):
+        lamb = 0.00001
+        # lamb = 0
+        return lamb*torch.sum(torch.abs(self.G)) + lamb*torch.sum(torch.abs(self.H))

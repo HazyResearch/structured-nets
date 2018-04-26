@@ -50,6 +50,7 @@ def optimize_torch(dataset, params):
 
 
         train_loss, train_accuracy = compute_loss_and_accuracy(output, batch_ys, params, loss_fn)
+        train_loss += net.loss()
 
         train_loss.backward()
 
