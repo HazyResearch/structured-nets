@@ -4,9 +4,12 @@ import os
 from sklearn.preprocessing import OneHotEncoder                                                                
 import matplotlib.pyplot as plt
 
+def normalize_range(data, max_val=255.0):
+    return data/max_val
+
 # Assumes 3 input channels
-# Converts to grayscale and normalizes images
-def convert_grayscale_and_normalize(data, img_size=32, max_val=255.0):
+# Converts to grayscale
+def convert_grayscale(data, img_size=32):
     n = data.shape[0]
     channel_size = int(data.shape[1]/3)
     print('channel_size:', channel_size)
@@ -16,13 +19,17 @@ def convert_grayscale_and_normalize(data, img_size=32, max_val=255.0):
     img = np.stack((im_r, im_g, im_b), axis=-1)
     avg_img = np.mean(img, axis=-1)
     data = avg_img.reshape((n, img_size*img_size))
-    return data/max_val
+    return data
 
 def load_and_preprocess_data(loc):
     data_dict = pkl.load(open(loc, 'rb'),encoding='latin1')
     X = data_dict['data']
     if grayscale:
-        X = convert_grayscale_and_normalize(X)
+        print('Converting to grayscale')
+        X = convert_grayscale(X)
+    if normalize:
+        print('Normalizing to [0,1.0] range')
+        X = normalize_range(X)
     Y = np.array(data_dict['labels'])
     Y = np.expand_dims(Y,1)
     Y = enc.fit_transform(Y).todense()
@@ -31,6 +38,7 @@ def load_and_preprocess_data(loc):
     return X,Y
 
 grayscale = True
+normalize = True
 train_batches = 5
 data_dir = '/dfs/scratch1/thomasat/datasets/cifar10'
 test_loc = os.path.join(data_dir,'test_batch')
