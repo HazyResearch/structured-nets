@@ -101,12 +101,12 @@ logging.debug('Testing moms: ' + str(moms))
 
 # Fixed params
 num_layers = 1
-out_dir = '/dfs/scratch1/thomasat/'#'../..'
+out_dir = '../..'
 loss = 'cross_entropy'
 test_size = 1000
 train_size = 10000
 verbose = False
-replacement = True # If true, sample with replacement when batching
+replacement = False # If true, sample with replacement when batching
 check_disp = False # If true, checks rank of error matrix every check_disp_freq iters
 check_disp_freq = 5000 
 fix_G = False

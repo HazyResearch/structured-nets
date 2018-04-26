@@ -87,7 +87,7 @@ def compute_bleu(model):
         for i in range(1, batch.trg.size(0)):
             sym = TGT.vocab.itos[batch.trg.data[i, 0]]
             if sym == "</s>": break
-                print(sym, end =" ")
+            print(sym, end =" ")
         print()
         break
 
