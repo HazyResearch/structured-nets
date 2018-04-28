@@ -14,6 +14,26 @@ from optimize_iwslt import optimize_iwslt
 from optimize_vae import optimize_vae
 
 
+def test_split(net, data_X, data_Y, params, loss_fn, batch_size=None):
+    assert data_X.shape[0] == data_Y.shape[0]
+    n = data_X.shape[0]
+    if batch_size is None:
+        batch_size = n
+
+    total_loss = 0.0
+    total_acc = 0.0
+    for b in range(0, n, batch_size):
+        b_ = min(b+batch_size, n)
+        batch_X = data_X[b:b_, ...]
+        batch_Y = data_Y[b:b_, ...]
+
+        output = net.forward(batch_X)
+        loss_batch, acc_batch = compute_loss_and_accuracy(output, batch_Y, params, loss_fn)
+        total_loss += (b_-b)*loss_batch
+        total_acc += (b_-b)*acc_batch
+    return total_loss/n, total_acc/n
+
+
 def optimize_torch(dataset, params, seed=None):
     if seed is not None:
         torch.manual_seed(seed)
@@ -84,7 +104,8 @@ def optimize_torch(dataset, params, seed=None):
 
             # Test on validation set
             output = net.forward(val_X)
-            val_loss, val_accuracy = compute_loss_and_accuracy(output, val_Y, params, loss_fn, batch=params.batch_size)
+            val_loss, val_accuracy = test_split(net, val_X, val_Y, params, loss_fn, batch_size=params.batch_size)
+            # val_loss, val_accuracy = compute_loss_and_accuracy(output, val_Y, params, loss_fn, batch=params.batch_size)
 
             writer.add_scalar('Val/Loss', val_loss.data, step)
             writer.add_scalar('Val/Accuracy', val_accuracy.data, step)
@@ -108,7 +129,8 @@ def optimize_torch(dataset, params, seed=None):
         test_X, test_Y = Variable(torch.FloatTensor(dataset.test_X).cuda()), Variable(torch.FloatTensor(dataset.test_Y).cuda())
 
         output = net.forward(test_X)
-        test_loss, test_accuracy = compute_loss_and_accuracy(output, test_Y, params, loss_fn, batch=params.batch_size)
+        test_loss, test_accuracy = test_split(net, test_X, test_Y, params, loss_fn, batch_size=params.batch_size)
+        # test_loss, test_accuracy = compute_loss_and_accuracy(output, test_Y, params, loss_fn, batch=params.batch_size)
 
         writer.add_scalar('Test/Loss', test_loss.data)
         writer.add_scalar('Test/Accuracy', test_accuracy.data)
