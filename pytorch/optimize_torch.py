@@ -29,8 +29,8 @@ def test_split(net, data_X, data_Y, params, loss_fn, batch_size=None):
 
         output = net.forward(batch_X)
         loss_batch, acc_batch = compute_loss_and_accuracy(output, batch_Y, params, loss_fn)
-        total_loss += (b_-b)*loss_batch
-        total_acc += (b_-b)*acc_batch
+        total_loss += (b_-b)*loss_batch.data
+        total_acc += (b_-b)*acc_batch.data
     return total_loss/n, total_acc/n
 
 
@@ -67,9 +67,11 @@ def optimize_torch(dataset, params, seed=None):
     accuracies = {'train': [], 'val': []}
 
     val_X, val_Y = Variable(torch.FloatTensor(dataset.val_X).cuda()), Variable(torch.FloatTensor(dataset.val_Y).cuda())
-
+    best_val_acc = 0.0
+    best_val_save = None
 
     loss_fn = get_loss(params)
+
 
     t1 = time.time()
     epochs = 0
@@ -103,24 +105,33 @@ def optimize_torch(dataset, params, seed=None):
             print(('Training step: ', step))
 
             # Test on validation set
-            output = net.forward(val_X)
-            val_loss, val_accuracy = test_split(net, val_X, val_Y, params, loss_fn, batch_size=params.batch_size)
+            # output = net.forward(val_X)
             # val_loss, val_accuracy = compute_loss_and_accuracy(output, val_Y, params, loss_fn, batch=params.batch_size)
+            val_loss, val_accuracy = test_split(net, val_X, val_Y, params, loss_fn, batch_size=params.batch_size)
 
-            writer.add_scalar('Val/Loss', val_loss.data, step)
-            writer.add_scalar('Val/Accuracy', val_accuracy.data, step)
+            writer.add_scalar('Val/Loss', val_loss, step)
+            writer.add_scalar('Val/Accuracy', val_accuracy, step)
 
-            losses['val'].append(val_loss.data)
-            accuracies['val'].append(val_accuracy.data)
+            losses['val'].append(val_loss)
+            accuracies['val'].append(val_accuracy)
 
             print(('Train loss, accuracy for class %s: %f, %f' % (params.class_type, train_loss.data, train_accuracy.data)))
-            print(('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss.data, val_accuracy.data)))
+            print(('Validation loss, accuracy %s: %f, %f' % (params.class_type, val_loss, val_accuracy)))
 
-        if step % params.checkpoint_freq == 0:
+        # if step % params.checkpoint_freq == 0:
+        # checkpoint by epoch
+        if step % steps_in_epoch == 0:
             save_path = os.path.join(params.checkpoint_path, str(step))
             with open(save_path, 'wb') as f:
                 torch.save(net.state_dict(), f)
             print(("Model saved in file: %s" % save_path))
+
+            # record best model
+            print(val_accuracy.shape)
+            # TODO these shapes will have to be changed in 0.4.0
+            if val_accuracy[0] > best_val_acc:
+                best_val_acc = val_accuracy[0]
+                best_val_save = save_path
 
     # Test trained model
     if params.test:
@@ -128,18 +139,22 @@ def optimize_torch(dataset, params, seed=None):
         dataset.load_test_data()
         test_X, test_Y = Variable(torch.FloatTensor(dataset.test_X).cuda()), Variable(torch.FloatTensor(dataset.test_Y).cuda())
 
-        output = net.forward(test_X)
-        test_loss, test_accuracy = test_split(net, test_X, test_Y, params, loss_fn, batch_size=params.batch_size)
+        # Load net from best validation
+        if best_val_save is not None: net.load_state_dict(torch.load(best_val_save))
+        print(f'Loaded best validation checkpoint from: {best_val_save}')
+
+        # output = net.forward(test_X)
         # test_loss, test_accuracy = compute_loss_and_accuracy(output, test_Y, params, loss_fn, batch=params.batch_size)
+        test_loss, test_accuracy = test_split(net, test_X, test_Y, params, loss_fn, batch_size=params.batch_size)
 
-        writer.add_scalar('Test/Loss', test_loss.data)
-        writer.add_scalar('Test/Accuracy', test_accuracy.data)
+        writer.add_scalar('Test/Loss', test_loss)
+        writer.add_scalar('Test/Accuracy', test_accuracy)
 
-        print(('Test loss, %s: %f' % (params.class_type, test_loss.data)))
-        print(('Test accuracy, %s: %f ' % (params.class_type, test_accuracy.data)))
+        print(('Test loss, %s: %f' % (params.class_type, test_loss)))
+        print(('Test accuracy, %s: %f ' % (params.class_type, test_accuracy)))
 
-        losses['test'] = test_loss.data
-        accuracies['test'] = test_accuracy.data
+        losses['test'] = test_loss
+        accuracies['test'] = test_accuracy
 
 
     writer.export_scalars_to_json(os.path.join(params.log_path, "all_scalars.json"))
