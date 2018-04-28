@@ -73,13 +73,13 @@ def structured_layer(net, x):
 def set_structured_W(net, params):
     if params.class_type == 'unconstrained':
         net.W = Parameter(torch.Tensor(params.layer_size, params.layer_size))
-        torch.nn.init.normal(net.W, std=params.init_stddev)
+        torch.nn.init.normal_(net.W, std=params.init_stddev)
     elif params.class_type in ['low_rank', 'toeplitz_like', 'toep_corner', 'toep_nocorn', 'subdiagonal', 'vandermonde_like', 'hankel_like',
         'circulant_sparsity', 'tridiagonal_corner']:
         net.G = Parameter(torch.Tensor(params.r, params.layer_size))
         net.H = Parameter(torch.Tensor(params.r, params.layer_size))
-        torch.nn.init.normal(net.G, std=params.init_stddev)
-        torch.nn.init.normal(net.H, std=params.init_stddev)
+        torch.nn.init.normal_(net.G, std=params.init_stddev)
+        torch.nn.init.normal_(net.H, std=params.init_stddev)
 
         if params.class_type == 'low_rank':
             pass
@@ -155,7 +155,7 @@ class LDRNet(nn.Module):
         # self.LDR3 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
         # self.LDR4 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
         # self.b1 = Parameter(torch.Tensor(params.layer_size))
-        # torch.nn.init.normal(self.b1,std=params.init_stddev)
+        # torch.nn.init.normal_(self.b1,std=params.init_stddev)
         # self.W1 = Parameter(torch.Tensor(3*1024, 84))
         self.fc = nn.Linear(3*self.n, 84)
         self.fc3 = nn.Linear(84, 10)
@@ -195,9 +195,9 @@ class MLP(nn.Module):
             self.W2 = Parameter(torch.Tensor(params.layer_size, params.out_size))
             self.b2 = Parameter(torch.Tensor(params.out_size))
             # Note in TF it used to be truncated normal
-            torch.nn.init.normal(self.b1,std=params.init_stddev)
-            torch.nn.init.normal(self.b2,std=params.init_stddev)
-            torch.nn.init.normal(self.W2,std=params.init_stddev)
+            torch.nn.init.normal_(self.b1,std=params.init_stddev)
+            torch.nn.init.normal_(self.b2,std=params.init_stddev)
+            torch.nn.init.normal_(self.W2,std=params.init_stddev)
 
     def forward(self, x):
         xW = structured_layer(self, x)

@@ -20,11 +20,11 @@ class LDR(nn.Module):
 
         self.G = Parameter(torch.Tensor(self.in_channels, self.out_channels, self.r, self.n))
         self.H = Parameter(torch.Tensor(self.in_channels, self.out_channels, self.r, self.n))
-        torch.nn.init.normal(self.G, std=0.01) #TODO maybe set stddev to 0.1 or something?
-        torch.nn.init.normal(self.H, std=0.01)
+        torch.nn.init.normal_(self.G, std=0.01) #TODO maybe set stddev to 0.1 or something?
+        torch.nn.init.normal_(self.H, std=0.01)
         if bias:
             self.bias = Parameter(torch.Tensor(self.out_channels, 1, self.n))
-            torch.nn.init.normal(self.bias, std=0.1)
+            torch.nn.init.normal_(self.bias, std=0.1)
         if self.displacement == 'toep_corner':
             self.corner = True
         elif self.displacement == 'toep_nocorn':

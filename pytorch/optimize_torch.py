@@ -83,7 +83,7 @@ def optimize_torch(dataset, params, seed=None):
     # compute initial stats
     t1 = time.time()
     init_loss, init_accuracy = test_split(net, val_X, val_Y, params, loss_fn, batch_size=params.batch_size)
-    log_stats('Initial', 'Val', init_loss[0], init_accuracy[0], 0)
+    log_stats('Initial', 'Val', init_loss.item(), init_accuracy.item(), 0)
 
     epochs = 0
     for step in range(1, params.steps+1):
@@ -107,11 +107,11 @@ def optimize_torch(dataset, params, seed=None):
             t1 = time.time()
             print(('Training step: ', step))
 
-            log_stats('Train', 'Train', train_loss.data[0], train_accuracy.data[0], step)
+            log_stats('Train', 'Train', train_loss.data.item(), train_accuracy.data.item(), step)
 
             # Test on validation set
             val_loss, val_accuracy = test_split(net, val_X, val_Y, params, loss_fn, batch_size=params.batch_size)
-            log_stats('Validation', 'Val', val_loss[0], val_accuracy[0], step)
+            log_stats('Validation', 'Val', val_loss.item(), val_accuracy.item(), step)
 
         # if step % params.checkpoint_freq == 0:
         # checkpoint by epoch
@@ -122,10 +122,8 @@ def optimize_torch(dataset, params, seed=None):
             print(("Model saved in file: %s" % save_path))
 
             # record best model
-            print(val_accuracy.shape)
-            # TODO these shapes will have to be changed in 0.4.0
-            if val_accuracy[0] > best_val_acc:
-                best_val_acc = val_accuracy[0]
+            if val_accuracy.item() > best_val_acc:
+                best_val_acc = val_accuracy.item()
                 best_val_save = save_path
 
     # Test trained model
@@ -139,7 +137,7 @@ def optimize_torch(dataset, params, seed=None):
         print(f'Loaded best validation checkpoint from: {best_val_save}')
 
         test_loss, test_accuracy = test_split(net, test_X, test_Y, params, loss_fn, batch_size=params.batch_size)
-        log_stats('Test', 'Test', test_loss[0], test_accuracy[0], 0)
+        log_stats('Test', 'Test', test_loss.item(), test_accuracy.item(), 0)
 
 
     writer.export_scalars_to_json(os.path.join(params.log_path, "all_scalars.json"))
