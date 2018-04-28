@@ -11,6 +11,8 @@ from torch.optim.lr_scheduler import StepLR
 from tensorboardX import SummaryWriter
 from optimize_nmt import optimize_nmt
 from optimize_iwslt import optimize_iwslt
+from optimize_vae import optimize_vae
+
 
 def optimize_torch(dataset, params):
     if params.model == 'Attention':
@@ -18,6 +20,8 @@ def optimize_torch(dataset, params):
             return optimize_nmt(dataset, params)
         elif dataset.name == 'iwslt':
             return optimize_iwslt(dataset, params)
+    elif params.model == 'VAE':
+            return optimize_vae(dataset, params)
 
     writer = SummaryWriter(params.log_path)
     net = construct_net(params)
