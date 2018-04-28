@@ -73,9 +73,17 @@ def optimize_torch(dataset, params, seed=None):
     loss_fn = get_loss(params)
 
 
+    # compute initial stats
     t1 = time.time()
+    init_loss, init_accuracy = test_split(net, val_X, val_Y, params, loss_fn, batch_size=params.batch_size)
+    losses['val'].append(init_loss)
+    accuracies['val'].append(init_accuracy)
+    writer.add_scalar('Val/Loss', init_loss, 0)
+    writer.add_scalar('Val/Accuracy', init_accuracy, 0)
+    print(('Initial loss, accuracy %s: %f, %f' % (params.class_type, init_loss, init_accuracy)))
+
     epochs = 0
-    for step in range(params.steps):
+    for step in range(1, params.steps+1):
         batch_xs, batch_ys = dataset.batch(params.batch_size, step)
         batch_xs, batch_ys = Variable(torch.FloatTensor(batch_xs).cuda()), Variable(torch.FloatTensor(batch_ys).cuda())
         optimizer.zero_grad()   # zero the gradient buffers
