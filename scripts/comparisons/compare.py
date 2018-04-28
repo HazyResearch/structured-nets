@@ -84,7 +84,6 @@ parser.add_argument('--torch', type=int) # Pytorch or TF
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 parser.add_argument('--parallel') #
 parser.add_argument('--trials', type=int, default=3) #
-parser.add_argument('--cupy', action="store_true") #
 args = parser.parse_args()
 
 

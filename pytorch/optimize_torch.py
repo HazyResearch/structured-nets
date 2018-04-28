@@ -15,6 +15,9 @@ from optimize_vae import optimize_vae
 
 
 def optimize_torch(dataset, params):
+    seed = 0
+    torch.manual_seed(seed)
+
     if params.model == 'Attention':
         if dataset.name == 'copy':
             return optimize_nmt(dataset, params)
