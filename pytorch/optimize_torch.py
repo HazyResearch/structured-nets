@@ -84,7 +84,7 @@ def optimize_torch(dataset, params, seed=None):
 
             # Test on validation set
             output = net.forward(val_X)
-            val_loss, val_accuracy = compute_loss_and_accuracy(output, val_Y, params, loss_fn)
+            val_loss, val_accuracy = compute_loss_and_accuracy(output, val_Y, params, loss_fn, batch=params.batch_size)
 
             writer.add_scalar('Val/Loss', val_loss.data, step)
             writer.add_scalar('Val/Accuracy', val_accuracy.data, step)
@@ -108,7 +108,7 @@ def optimize_torch(dataset, params, seed=None):
         test_X, test_Y = Variable(torch.FloatTensor(dataset.test_X).cuda()), Variable(torch.FloatTensor(dataset.test_Y).cuda())
 
         output = net.forward(test_X)
-        test_loss, test_accuracy = compute_loss_and_accuracy(output, test_Y, params, loss_fn)
+        test_loss, test_accuracy = compute_loss_and_accuracy(output, test_Y, params, loss_fn, batch=params.batch_size)
 
         writer.add_scalar('Test/Loss', test_loss.data)
         writer.add_scalar('Test/Accuracy', test_accuracy.data)

@@ -109,7 +109,7 @@ class LabelSmoothing(nn.Module):
         return self.criterion(x, Variable(true_dist, requires_grad=False))
 
 # y_: One hot. y: vector of predicted class probabilities.
-def compute_loss_and_accuracy(pred, true, params, loss_fn, ntokens=None):
+def compute_loss_and_accuracy_(pred, true, params, loss_fn, ntokens=None):
     if params.loss == 'mse':
         mse = loss_fn(pred, true)
         accuracy = torch.FloatTensor([0])
@@ -133,3 +133,22 @@ def compute_loss_and_accuracy(pred, true, params, loss_fn, ntokens=None):
     else:
         print(('Not supported: ', params.loss))
         assert 0
+
+# version with optional batching (to save memory)
+def compute_loss_and_accuracy(pred, true, params, loss_fn, ntokens=None, batch=None):
+    # print("pred, true shape: ", pred.shape, true.shape)
+    assert(pred.shape[0] == true.shape[0])
+    if batch is None:
+        return compute_loss_and_accuracy_(pred, true, params, loss_fn, ntokens)
+
+    total_loss = 0.0
+    total_acc = 0.0
+    n = pred.shape[0]
+    for b in range(0, n, batch):
+        b_ = min(b+batch, n)
+        pred_batch = pred[b:b_, ...]
+        true_batch = true[b:b_, ...]
+        loss_batch, acc_batch = compute_loss_and_accuracy_(pred_batch, true_batch, params, loss_fn, ntokens)
+        total_loss += (b_-b)*loss_batch
+        total_acc += (b_-b)*acc_batch
+    return total_loss/n, total_acc/n
