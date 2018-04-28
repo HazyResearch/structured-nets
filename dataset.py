@@ -270,6 +270,17 @@ class Dataset:
 
         print('Training set X,Y: ', self.train_X.shape, self.train_Y.shape)
         print('Validation set X,Y: ', self.val_X.shape, self.val_Y.shape)
+        self.print_dataset_stats()
+
+    def print_dataset_stats(self,test=False):
+        print('Train X mean, std: ', np.mean(self.train_X,axis=0), np.std(self.train_X,axis=0))
+        print('Train X min, max: ', np.min(self.train_X), np.max(self.train_X))
+        print('Val X mean, std: ', np.mean(self.val_X,axis=0), np.std(self.val_X,axis=0))
+        print('Val X min, max: ', np.min(self.val_X), np.max(self.val_X))
+
+        if test:
+            print('Test X mean, std: ', np.mean(self.test_X,axis=0), np.std(self.test_X,axis=0))
+            print('Test X min, max: ', np.min(self.test_X), np.max(self.test_X))
 
     def set_data_locs(self):
         prefix = '/dfs/scratch1/thomasat/datasets/'
@@ -361,6 +372,7 @@ class Dataset:
             self.test_Y = enc.fit_transform(self.test_Y).todense()
         print('Loaded test data from: ', self.test_loc)
         print('Test X,Y:', self.test_X.shape, self.test_Y.shape)
+        self.print_dataset_stats(test=True)
 
     def load_train_data(self):
         train_data = np.genfromtxt(self.train_loc)
@@ -376,15 +388,16 @@ class Dataset:
         self.current_idx += batch_size
         if self.current_idx >= self.train_X.shape[0]:
             self.current_idx = 0
-        # print('Current training data index: ', self.current_idx)
+        #print('Current training data index: ', self.current_idx)
 
     def next_batch(self, batch_size):
-        #Randomly shuffle training set if sampling without replacement
+        #Randomly shuffle training set at the start of each epoch if sampling without replacement
         if self.current_idx == 0:
             idx = np.arange(0, self.train_X.shape[0])
             np.random.shuffle(idx)
             self.train_X = self.train_X[idx,:]
             self.train_Y = self.train_Y[idx,:]
+            print('Shuffling: new epoch')
 
         idx_end = min(self.train_X.shape[0], self.current_idx+batch_size)
         batch_X = self.train_X[self.current_idx:idx_end,:]
