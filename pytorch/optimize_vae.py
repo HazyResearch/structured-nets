@@ -31,7 +31,6 @@ seed = 1
 log_interval = 10
 cuda = False
 
-device = torch.device("cuda" if cuda else "cpu")
 
 class VAE(nn.Module):
     def __init__(self, params=None):
@@ -42,6 +41,8 @@ class VAE(nn.Module):
         self.fc22 = nn.Linear(784, 20)
         self.fc3 = nn.Linear(20, 400)
         self.fc4 = nn.Linear(400, 784)
+
+        self.device = torch.device("cuda" if cuda else "cpu")
 
     def encode(self, x):
         h1 = F.relu(self.fc1(x))
@@ -81,7 +82,7 @@ def train(model,epoch,train_loader,optimizer):
     model.train()
     train_loss = 0
     for batch_idx, (data, _) in enumerate(train_loader):
-        data = data.to(device)
+        data = data.to(model.device)
         optimizer.zero_grad()
         recon_batch, mu, logvar = model(data)
         loss = loss_function(recon_batch, data, mu, logvar)
@@ -103,7 +104,7 @@ def test(model,epoch,test_loader):
     test_loss = 0
     with torch.no_grad():
         for i, (data, _) in enumerate(test_loader):
-            data = data.to(device)
+            data = data.to(model.device)
             recon_batch, mu, logvar = model(data)
             test_loss += loss_function(recon_batch, data, mu, logvar).item()
             if i == 0:
@@ -120,7 +121,8 @@ def test(model,epoch,test_loader):
 def optimize_vae(dataset, params):
     torch.manual_seed(seed)
 
-    model = VAE(params).to(device)
+    model = VAE(params)
+    model = model.to(model.device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if cuda else {}
@@ -142,7 +144,7 @@ def optimize_vae(dataset, params):
         #plt.show()
         test(model,epoch,test_loader)
         with torch.no_grad():
-            sample = torch.randn(64, 20).to(device)
+            sample = torch.randn(64, 20).to(model.device)
             sample = model.decode(sample).cpu()
             save_image(sample.view(64, 1, 28, 28),
                        'results/sample_' + str(epoch) + '.png')
