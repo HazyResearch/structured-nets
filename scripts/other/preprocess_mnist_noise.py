@@ -1,6 +1,7 @@
 import numpy as np
 import pickle as pkl
 from sklearn.preprocessing import OneHotEncoder 
+from data_utils import normalize_data, apply_normalization
 
 n_variations = 6
 for idx in np.arange(1, n_variations+1):
@@ -31,6 +32,10 @@ for idx in np.arange(1, n_variations+1):
     test_Y = Y[test_idx, :]
     train_X = X[train_idx, :]
     train_Y = Y[train_idx, :]
+
+    # Normalize
+    train_X, mean, sd = normalize_data(train_X)
+    test_X = apply_normalization(test_X, mean, sd)
 
     # Save
     print('test_X, test_Y shape: ', test_X.shape, test_Y.shape)

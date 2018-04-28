@@ -3,9 +3,7 @@ import pickle as pkl
 import os
 from sklearn.preprocessing import OneHotEncoder                                                                
 import matplotlib.pyplot as plt
-
-def normalize_range(data, max_val=255.0):
-    return data/max_val
+from data_utils import normalize_data, apply_normalization
 
 # Assumes 3 input channels
 # Converts to grayscale
@@ -21,15 +19,13 @@ def convert_grayscale(data, img_size=32):
     data = avg_img.reshape((n, img_size*img_size))
     return data
 
-def load_and_preprocess_data(loc):
+# Loads data and optionally converts to grayscale
+def load_data(loc):
     data_dict = pkl.load(open(loc, 'rb'),encoding='latin1')
     X = data_dict['data']
     if grayscale:
         print('Converting to grayscale')
         X = convert_grayscale(X)
-    if normalize:
-        print('Normalizing to [0,1.0] range')
-        X = normalize_range(X)
     Y = np.array(data_dict['labels'])
     Y = np.expand_dims(Y,1)
     Y = enc.fit_transform(Y).todense()
@@ -37,7 +33,7 @@ def load_and_preprocess_data(loc):
     print('X.shape, Y.shape: ', X.shape, Y.shape)
     return X,Y
 
-grayscale = True
+grayscale = False
 normalize = True
 train_batches = 5
 data_dir = '/dfs/scratch1/thomasat/datasets/cifar10'
@@ -56,7 +52,7 @@ enc = OneHotEncoder()
 
 for i in range(train_batches):
     this_batch_loc = os.path.join(data_dir, 'data_batch_' + str(i+1)) 
-    X,Y = load_and_preprocess_data(this_batch_loc)
+    X,Y = load_data(this_batch_loc)
     train_X.append(X)
     train_Y.append(Y)
 
@@ -64,6 +60,8 @@ for i in range(train_batches):
 train_X = np.vstack(train_X)
 train_Y = np.vstack(train_Y)
 
+# Normalize
+train_X, mean, sd = normalize_data(train_X)
 
 # Shuffle
 idx = np.arange(0, train_X.shape[0])  
@@ -74,8 +72,11 @@ train_Y = train_Y[idx,:]
 print('train_X.shape, train_Y.shape: ', train_X.shape, train_Y.shape)
 
 # Prepare test data
-test_X,test_Y = load_and_preprocess_data(test_loc)
+test_X,test_Y = load_data(test_loc)
 print('test_X.shape, test_Y.shape: ', test_X.shape, test_Y.shape)
+
+# Normalize
+test_X = apply_normalization(test_X, mean, sd)
 
 # Save
 train = {'X': train_X, 'Y': train_Y}

@@ -29,8 +29,7 @@ batch_size = 128
 epochs = 10
 seed = 1
 log_interval = 10
-cuda = False
-
+cuda = True
 
 class VAE(nn.Module):
     def __init__(self, params=None):
@@ -99,7 +98,7 @@ def train(model,epoch,train_loader,optimizer):
           epoch, train_loss / len(train_loader.dataset)))
 
 
-def test(model,epoch,test_loader):
+def test(model,epoch,test_loader,params):
     model.eval()
     test_loss = 0
     with torch.no_grad():
@@ -112,7 +111,7 @@ def test(model,epoch,test_loader):
                 comparison = torch.cat([data[:n],
                                       recon_batch.view(batch_size, 1, 28, 28)[:n]])
                 save_image(comparison.cpu(),
-                         'results/reconstruction_' + str(epoch) + '.png', nrow=n)
+                         params.result_path + params.class_type + 'reconstruction_' + str(epoch) + '.png', nrow=n)
 
     test_loss /= len(test_loader.dataset)
     print('====> Test set loss: {:.4f}'.format(test_loss))
@@ -120,18 +119,17 @@ def test(model,epoch,test_loader):
 
 def optimize_vae(dataset, params):
     torch.manual_seed(seed)
-
     model = VAE(params)
     model = model.to(model.device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if cuda else {}
     train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=True, download=True,
+        datasets.MNIST('/dfs/scratch1/thomasat/datasets/mnist', train=True, download=True,
                        transform=transforms.ToTensor()),
         batch_size=batch_size, shuffle=True, **kwargs)
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=False, transform=transforms.ToTensor()),
+        datasets.MNIST('/dfs/scratch1/thomasat/datasets/mnist', train=False, transform=transforms.ToTensor()),
         batch_size=
         batch_size, shuffle=True, **kwargs)
 
@@ -142,9 +140,9 @@ def optimize_vae(dataset, params):
         #weight = model.fc1.weight.data
         #plt.imshow(weight)
         #plt.show()
-        test(model,epoch,test_loader)
+        test(model,epoch,test_loader,params)
         with torch.no_grad():
             sample = torch.randn(64, 20).to(model.device)
             sample = model.decode(sample).cpu()
             save_image(sample.view(64, 1, 28, 28),
-                       'results/sample_' + str(epoch) + '.png')
+                       params.result_path + params.class_type + 'sample_' + str(epoch) + '.png')
