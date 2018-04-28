@@ -5,13 +5,18 @@ Compare methods and hyperparameter settings sequentially.
 import sys, os, datetime
 import pickle as pkl
 sys.path.insert(0, '../../')
+import argparse
+import threading
+import logging
+import numpy as np
+
 from optimize import optimize
 from utils import *
 from model_params import ModelParams
 from dataset import Dataset
-import argparse
-import threading
-import logging
+
+seed = 0
+np.random.seed(seed)
 
 logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadName)s %(message)s')
 
@@ -55,7 +60,7 @@ def compare(args, method, rank, lr, decay_rate, mom):
         if not os.path.exists(params.vis_path):
             os.makedirs(params.vis_path)
 
-        losses, accuracies = optimize(dataset, params)
+        losses, accuracies = optimize(dataset, params, seed)
         tf.reset_default_graph()
 
         pkl.dump(losses, open(params.result_path + '_losses.p', 'wb'), protocol=2)

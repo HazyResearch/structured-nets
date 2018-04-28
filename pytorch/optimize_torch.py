@@ -14,9 +14,9 @@ from optimize_iwslt import optimize_iwslt
 from optimize_vae import optimize_vae
 
 
-def optimize_torch(dataset, params):
-    seed = 0
-    torch.manual_seed(seed)
+def optimize_torch(dataset, params, seed=None):
+    if seed is not None:
+        torch.manual_seed(seed)
 
     if params.model == 'Attention':
         if dataset.name == 'copy':
