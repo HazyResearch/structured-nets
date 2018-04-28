@@ -16,13 +16,15 @@ class LDR(nn.Module):
         self.out_channels = out_channels
         self.r = rank
         self.n = layer_size
+        self.bias = None
 
         self.G = Parameter(torch.Tensor(self.in_channels, self.out_channels, self.r, self.n))
         self.H = Parameter(torch.Tensor(self.in_channels, self.out_channels, self.r, self.n))
-        # self.b = Parameter(torch.Tensor(self.in_channels, self.out_channels))
         torch.nn.init.normal(self.G, std=0.01) #TODO maybe set stddev to 0.1 or something?
         torch.nn.init.normal(self.H, std=0.01)
-        # torch.nn.init.normal(self.b)
+        if bias:
+            self.bias = Parameter(torch.Tensor(self.out_channels, 1, self.n))
+            torch.nn.init.normal(self.bias, std=0.1)
         if self.displacement == 'toep_corner':
             self.corner = True
         elif self.displacement == 'toep_nocorn':
@@ -50,13 +52,18 @@ class LDR(nn.Module):
         for i in range(self.in_channels):
             for j in range(self.out_channels):
                 if self.displacement in ['toep_corner', 'toep_nocorn']:
+                    g = self.G[i,j]
+                    h = self.H[i,j]
+                    fat = x[i]
                     comps[i,j] = toep.toeplitz_mult(self.G[i,j], self.H[i,j], x[i], self.corner)
                 elif self.displacement == 'subdiagonal':
                     comps[i,j] = subd.subd_mult(self.subd_A[i,j], self.subd_B[i,j], self.G[i,j], self.H[i,j], x[i])
-        # return Variable(torch.sum(comps, dim=0))
-        return torch.sum(comps, dim=0)
+        out = torch.sum(comps, dim=0)
+        if self.bias is not None:
+            out += self.bias
+        return out
 
     def loss(self):
-        lamb = 0.00001
+        lamb = 0.0001
         # lamb = 0
         return lamb*torch.sum(torch.abs(self.G)) + lamb*torch.sum(torch.abs(self.H))

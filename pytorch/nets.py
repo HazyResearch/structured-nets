@@ -29,6 +29,8 @@ def construct_net(params):
         return RNN(params)
     elif params.model == 'Attention':
         return Attention(params)
+    elif params.model == 'Test':
+        return TestCifar(params)
     else:
         print(('Model not supported: ', params.model))
         assert 0
@@ -122,6 +124,22 @@ class LeNet(nn.Module):
         x = self.fc3(x)
         return x
 
+class TestCifar(nn.Module):
+    def __init__(self, params):
+        super(TestCifar, self).__init__()
+        # in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True
+        self.conv1 = nn.Conv2d(3, 3, 5, padding=2)
+        self.fc = nn.Linear(3*1024, 84)
+        self.fc3 = nn.Linear(84, 10)
+
+    def forward(self, x):
+        x = x.view(-1, 3, 32, 32)
+        x = F.relu(self.conv1(x))
+        x = x.view(-1, 3*1024)
+        x = F.relu(self.fc(x))
+        x = self.fc3(x)
+        return x
+
     def loss(self):
         return 0
 
@@ -130,31 +148,40 @@ class LDRNet(nn.Module):
         super(LDRNet, self).__init__()
         self.n = params.layer_size
 
-        self.LDR1 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
-        self.LDR2 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
-        self.LDR3 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
-        self.LDR4 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
+        channels = 1
+
+        self.LDR1 = ldr.LDR(params.class_type, 3, 3, params.r, params.layer_size, bias=True)
+        # self.LDR2 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
+        # self.LDR3 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
+        # self.LDR4 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
         # self.b1 = Parameter(torch.Tensor(params.layer_size))
-        self.W = Parameter(torch.Tensor(params.layer_size, params.out_size))
-        self.b = Parameter(torch.Tensor(params.out_size))
         # torch.nn.init.normal(self.b1,std=params.init_stddev)
-        torch.nn.init.normal(self.b,std=params.init_stddev)
-        torch.nn.init.normal(self.W,std=params.init_stddev)
+        # self.W1 = Parameter(torch.Tensor(3*1024, 84))
+        self.fc = nn.Linear(3*self.n, 84)
+        self.fc3 = nn.Linear(84, 10)
 
     def forward(self, x):
-        x_ = x.view(1, -1, self.n)
-        l = F.relu(self.LDR1(x_))
-        # l1 += self.b1
-        # l = l1.view(-1, self.n)
-        l = F.relu(self.LDR2(l))
-        # l3 = F.relu(self.LDR3(l2))
-        # l4 = F.relu(self.LDR4(l3))
-        l = l.view(-1, self.n)
-        y = ( l @ self.W ) + self.b
-        return y
+        # print("\nx shape", x.shape)
+        x = x.view(-1, 3, 1024)
+        x = x.transpose(0,1).contiguous().view(3, -1, self.n)
+        # print("x shape", x.shape)
+        x = F.relu(self.LDR1(x))
+        # x += self.b1
+        # x = F.relu(self.LDR2(x))
+        # x = F.relu(self.LDR3(x))
+        # x = F.relu(self.LDR4(x))
+        # x = x.view(-1, self.n)
+        # print("x shape", x.shape)
+        x = x.transpose(0,1) # swap batches and channels axis
+        # print("x shape", x.shape)
+        x = x.contiguous().view(-1, 3*self.n)
+        # print("x shape", x.shape)
+        x = F.relu(self.fc(x))
+        x = self.fc3(x)
+        return x
 
     def loss(self):
-        return self.LDR1.loss() + self.LDR2.loss() + self.LDR3.loss() + self.LDR4.loss()
+        return self.LDR1.loss()
 
 class MLP(nn.Module):
     def __init__(self, params):
