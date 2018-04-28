@@ -7,7 +7,7 @@ import triXXF as subd
 
 
 # sizes = [1<<9, 1<<10, 1<<11, 1<<12, 1<<13, 1<<14, 1<<15]
-exps = np.arange(7, 12)
+exps = np.arange(7, 16)
 sizes = 1 << exps
 
 ranks = [1,4]
