@@ -135,3 +135,12 @@ def ihfft(X):
 def hfft(X):
     # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
     return irfft(conjugate(X)) * (X.shape[-2] - 1) * 2
+
+def torch_ihfft(X):
+    # np.fft.ihfft is the same as np.fft.rfft().conj() / n
+    return conjugate(torch.rfft(X, 1)) / X.shape[-1]
+
+def torch_hfft(X):
+    # np.fft.ihfft is the same as np.fft.rfft().conj() / n
+    n = (X.shape[-2] - 1) * 2
+    return torch.irfft(conjugate(X), 1, signal_sizes=(n, )) * (X.shape[-2] - 1) * 2
