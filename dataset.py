@@ -120,6 +120,10 @@ class Dataset:
             self.val_Y = train_Y[val_idx, :]
             self.train_X = train_X[train_idx, :]
             self.train_Y = train_Y[train_idx, :]
+
+            # post-processing transforms
+            self.train_X = self.postprocess(self.train_X)
+            self.val_X = self.postprocess(self.val_X)
         elif self.name == 'smallnorb':
             data_loc = '/dfs/scratch1/thomasat/datasets/smallnorb/processed_py2.pkl'
             # Load
@@ -252,15 +256,6 @@ class Dataset:
             print('Not supported: ', self.name)
             assert 0
 
-        # post-processing transforms
-        if 'mnist' in self.name:
-            self.process_mnist()
-            # print("size", self.train_X.shape, self.test_X.shape)
-            # x = self.train_X[0]
-            # print("range: ", np.max(x), np.min(x))
-            # print(self.train_X[0].reshape((32,32)))
-            # plt.imshow(self.train_X[0].reshape((32,32)))
-            # plt.show()
 
 
         if not self.replacement:
@@ -335,11 +330,14 @@ class Dataset:
             print('Name not recognized: ', name)
             assert 0
 
-    def process_mnist(self):
+    def postprocess(self, X):
+        # pad from 784 to 1024
         if 'pad' in self.transform:
-            self.train_X = np.pad(self.train_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
-            self.val_X = np.pad(self.val_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
-            self.test_X = np.pad(self.test_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
+            X = np.pad(X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
+            # self.train_X = np.pad(self.train_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
+            # self.val_X = np.pad(self.val_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
+            # self.test_X = np.pad(self.test_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
+        return X
 
     def out_size(self):
         if self.name in ['convex', 'rect', 'rect_images']:
@@ -360,6 +358,7 @@ class Dataset:
             data = pkl.load(open(self.test_loc, 'rb'))
             self.test_X = data['X']
             self.test_Y = data['Y']
+            self.test_X = self.postprocess(self.test_X)
 
         elif self.test_loc:
             test_data = np.genfromtxt(self.test_loc)
