@@ -2,7 +2,6 @@ import functools
 import numpy as np
 
 import torch
-from torch.autograd import Variable
 
 import cufat as cf
 from triextrafat import krylov_construct
@@ -11,6 +10,8 @@ from triextrafat import krylov_construct
 from complex_utils import complex_mult_, conjugate
 import fft_utils as fu
 
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def krylov_transpose_multiply(subdiag, v, u):
     """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
@@ -66,7 +67,6 @@ def krylov_transpose_multiply(subdiag, v, u):
     return T_00[:, :, :, reverse_index].squeeze(dim=2)
 
 
-
 def krylov_transpose_multiply_mine(subdiag, v, u):
     """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
     Use my own CuFFT wrapper, so it's about 5% faster than pytorch's FFT.
@@ -87,7 +87,6 @@ def krylov_transpose_multiply_mine(subdiag, v, u):
     T_00 = u[:, np.newaxis, ..., np.newaxis] * v[np.newaxis, ..., np.newaxis]
     T_01 = u[..., np.newaxis]
     T_10 = v[..., np.newaxis]
-    # T_11 = Variable(torch.cuda.FloatTensor(n, 1).fill_(1.0))
     T_11 = torch.ones((n, 1), device=T_00.device)
     for d in range(m)[::-1]:
         n1, n2 = 1 << d, 1 << (m - d - 1)
@@ -120,8 +119,7 @@ def krylov_transpose_multiply_mine(subdiag, v, u):
     # Negative step isn't supported by Pytorch
     # (https://github.com/pytorch/pytorch/issues/229) so we have to construct
     # the index explicitly.
-    # reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
-    reverse_index = torch.arange(n - 1, -1, -1, out=torch.cuda.LongTensor())
+    reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=T_00.device)
     return T_00[:, :, :, reverse_index].squeeze(dim=2)
 
 
@@ -145,6 +143,7 @@ def krylov_multiply_by_autodiff(subdiag, v, w):
     prod = krylov_transpose_multiply(subdiag, v, u)
     result, = torch.autograd.grad(prod, u, grad_outputs=w, create_graph=True)
     return result
+
 
 def krylov_multiply_forward(subdiag, v):
     rank, n = v.shape
@@ -197,18 +196,16 @@ def krylov_multiply(subdiag, v, w):
     assert n == 1 << m, 'n must be a power of 2'
 
     save_for_backward = krylov_multiply_forward_mine(subdiag, v)
-    # reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
-    reverse_index = torch.arange(n - 1, -1, -1, out=torch.cuda.LongTensor())
-    w = w.view(batch_size, rank, 1, n)
-    # dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.zeros((batch_size, 1, n)).cuda())
-    dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.cuda.FloatTensor(batch_size, 1, n).fill_(0.0))
+    reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=w.device)
+    w = w[:, :, np.newaxis, :]
+    dT_00, dT_01 = w[:, :, :, reverse_index], torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
 
     for d in range(m):
         n1, n2 = 1 << d, 1 << (m - d - 1)
-        dS_00 = Variable(torch.cuda.FloatTensor(batch_size, rank, 2 * n1, n2))
+        dS_00 = torch.empty((batch_size, rank, 2 * n1, n2), device=w.device)
         dS_00[:, :, ::2] = dT_00[:, :, :, n2:]
         dS_00[:, :, 1::2] = dT_00[:, :, :, n2:]
-        dS_01 = Variable(torch.cuda.FloatTensor(batch_size, 2 * n1, n2))
+        dS_01 = torch.empty((batch_size, 2 * n1, n2), device=w.device)
         dS_01[:, ::2] = dT_01[:, :, n2:]
 
         dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
@@ -280,18 +277,16 @@ def krylov_multiply_mine(subdiag, v, w):
     assert n == 1 << m, 'n must be a power of 2'
 
     save_for_backward = krylov_multiply_forward_mine(subdiag, v)
-    # reverse_index = torch.arange(n - 1, -1, -1).long().cuda()
-    reverse_index = torch.arange(n - 1, -1, -1, out=torch.cuda.LongTensor())
-    w = w.view(batch_size, rank, 1, n)
-    # dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.zeros((batch_size, 1, n)).cuda())
-    dT_00, dT_01 = w[:, :, :, reverse_index], Variable(torch.cuda.FloatTensor(batch_size, 1, n).fill_(0.0))
+    reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=w.device)
+    w = w[:, :, np.newaxis, :]
+    dT_00, dT_01 = w[:, :, :, reverse_index], torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
 
     for d in range(m):
         n1, n2 = 1 << d, 1 << (m - d - 1)
-        dS_00 = Variable(torch.cuda.FloatTensor(batch_size, rank, 2 * n1, n2))
+        dS_00 = torch.empty((batch_size, rank, 2 * n1, n2), device=w.device)
         dS_00[:, :, ::2] = dT_00[:, :, :, n2:]
         dS_00[:, :, 1::2] = dT_00[:, :, :, n2:]
-        dS_01 = Variable(torch.cuda.FloatTensor(batch_size, 2 * n1, n2))
+        dS_01 = torch.empty((batch_size, 2 * n1, n2), device=w.device)
         dS_01[:, ::2] = dT_01[:, :, n2:]
 
         dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
@@ -320,16 +315,15 @@ def subd_mult(subd_A, subd_B, G, H, x):
     return K_out
 
 
-
 def test_transpose_multiply():
     m = 12
     n = 1<<m
     batch_size = 512
     rank = 3
-    subdiag = Variable(torch.rand(n-1), requires_grad=True).cuda()
+    subdiag = torch.rand(n-1, requires_grad=True, device=device)
     A = np.diag(subdiag.data.cpu().numpy(), -1)
-    u = Variable(torch.rand((batch_size, n)), requires_grad=True).cuda()
-    v = Variable(torch.rand((rank, n)), requires_grad=True).cuda()
+    u = torch.rand((batch_size, n), requires_grad=True, device=device)
+    v = torch.rand((rank, n), requires_grad=True, device=device)
     result = krylov_transpose_multiply(subdiag, v, u)
     grad,  = torch.autograd.grad(torch.sum(result), v, retain_graph=True)
     grad = grad.data.cpu().numpy()
@@ -345,7 +339,7 @@ def test_transpose_multiply():
     result2 = np.stack([u_cpu @ K.T for K in Ks])
     result2 = result2.swapaxes(0, 1).squeeze()
     # GPU dense multiply
-    Ks_pytorch = [Variable(torch.Tensor(K)).cuda() for K in Ks]
+    Ks_pytorch = [torch.Tensor(K).cuda() for K in Ks]
     result3 = torch.stack([u @ K.t() for K in Ks_pytorch])
     result3 = result3.data.cpu().numpy().swapaxes(0, 1).squeeze()
     # Explicit construction on GPU
@@ -365,16 +359,17 @@ def test_transpose_multiply():
     print(np.max(abs(result4 - result2)))
     print(np.mean(abs(result4 - result2)))
 
+
 def test_multiply():
     m = 12
     n = 1 << m
     batch_size = 512
     rank = 3
-    subdiag = Variable(torch.rand(n-1), requires_grad=True).cuda()
+    subdiag = torch.rand(n-1, requires_grad=True, device=device)
     A = np.diag(subdiag.data.cpu().numpy(), -1)
-    u = Variable(torch.rand((batch_size, n)), requires_grad=True).cuda()
-    v = Variable(torch.rand((rank, n)), requires_grad=True).cuda()
-    w = Variable(torch.rand((batch_size, rank, n)), requires_grad=True).cuda()
+    u = torch.rand((batch_size, n), requires_grad=True, device=device)
+    v = torch.rand((rank, n), requires_grad=True, device=device)
+    w = torch.rand((batch_size, rank, n), requires_grad=True, device=device)
     result = krylov_multiply(subdiag, v, w)
     grad, = torch.autograd.grad(torch.sum(result), v, retain_graph=True)
     grad = grad.data.cpu().numpy()
@@ -392,9 +387,9 @@ def test_multiply():
     w_cpu = w.data.cpu().numpy()
     result2 = np.stack([w_cpu[:, i] @ Ks[i] for i in range(rank)]).sum(axis=0)
     result2 = result2.squeeze()
-    np.allclose(result_mine, result)
-    np.allclose(result, result1)
-    np.allclose(result1, result2)
+    assert np.allclose(result_mine, result)
+    assert np.allclose(result, result1)
+    assert np.allclose(result1, result2)
     print(np.max(abs(result_mine - result)))
     print(np.mean(abs(result_mine - result)))
     print(np.max(abs(grad_mine - grad)))
@@ -406,6 +401,7 @@ def test_multiply():
 
     # Combine transpose multiply follow by non-transpose multiply
     result = krylov_multiply_mine(subdiag, v, krylov_transpose_multiply_mine(subdiag, v, u))
+
 
 def test_misc():
     pass

@@ -16,7 +16,6 @@ def torch_to_cupy(tensor):
     Probably not safe, since we're manipulating GPU memory addresses directly.
     '''
     assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
-    # assert tensor.is_contiguous(), 'Input must be contiguous'
     offset = tensor.data_ptr() - CUPY_MEM.ptr
     array_mem = cp.cuda.memory.MemoryPointer(CUPY_MEM, offset)
     array = cp.ndarray(tensor.shape, dtype='float32', memptr=array_mem)
