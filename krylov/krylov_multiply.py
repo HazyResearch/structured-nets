@@ -8,7 +8,7 @@ import cufat as cf
 from triextrafat import krylov_construct
 # from triXXF import KrylovTransposeMultiply
 
-import complex_utils as cu
+from complex_utils import complex_mult_, conjugate
 import fft_utils as fu
 
 
@@ -43,10 +43,10 @@ def krylov_transpose_multiply(subdiag, v, u):
         # polynomial multiplications
         S_f = torch.rfft(S, 1)
         S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
-        T_00_f = cu.complex_mult_(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        T_01_f = cu.complex_mult_(S1_01_f, S0_11_f)
-        T_10_f = cu.complex_mult_(S1_11_f, S0_10_f)
-        T_11_f = cu.complex_mult_(S1_11_f, S0_11_f)
+        T_00_f = complex_mult_(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        T_01_f = complex_mult_(S1_01_f, S0_11_f)
+        T_10_f = complex_mult_(S1_11_f, S0_10_f)
+        T_11_f = complex_mult_(S1_11_f, S0_11_f)
 
         T_f = torch.cat((torch.cat((T_00_f, T_01_f[:, np.newaxis]), dim=1),
                          torch.cat((T_10_f[np.newaxis], T_11_f[np.newaxis, np.newaxis]), dim=1)))
@@ -101,10 +101,10 @@ def krylov_transpose_multiply_mine(subdiag, v, u):
         # polynomial multiplications
         S_f = fu.rfft(S)
         S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
-        T_00_f = cu.complex_mult_(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        T_01_f = cu.complex_mult_(S1_01_f, S0_11_f)
-        T_10_f = cu.complex_mult_(S1_11_f, S0_10_f)
-        T_11_f = cu.complex_mult_(S1_11_f, S0_11_f)
+        T_00_f = complex_mult_(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        T_01_f = complex_mult_(S1_01_f, S0_11_f)
+        T_10_f = complex_mult_(S1_11_f, S0_10_f)
+        T_11_f = complex_mult_(S1_11_f, S0_11_f)
 
         T_f = torch.cat((torch.cat((T_00_f, T_01_f[:, np.newaxis]), dim=1),
                          torch.cat((T_10_f[np.newaxis], T_11_f[np.newaxis, np.newaxis]), dim=1)))
@@ -167,8 +167,8 @@ def krylov_multiply_forward(subdiag, v):
         S0_10_f, S0_11_f, S1_11_f = S_f[:rank], S_f[-2], S_f[-1]
         save_for_backward[d] = (S0_10_f, S0_11_f)
 
-        T_10_f = cu.complex_mult_(S1_11_f, S0_10_f)
-        T_11_f = cu.complex_mult_(S1_11_f, S0_11_f)
+        T_10_f = complex_mult_(S1_11_f, S0_10_f)
+        T_11_f = complex_mult_(S1_11_f, S0_11_f)
 
         T_f = torch.cat((T_10_f, T_11_f[np.newaxis]))
 
@@ -214,15 +214,13 @@ def krylov_multiply(subdiag, v, w):
         dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
         dT = dT * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
-        dT_f = fu.torch_ihfft(dT)
-        # dT_f = fu.rfft(dT) / (2 * n2)
+        dT_f = torch.rfft(dT, 1) / (2 * n2)
         dT_00_f, dT_01_f = dT_f[:, :rank], dT_f[:, -1]
 
         S0_10_f, S0_11_f = save_for_backward[d]
-        dS1_01_f = cu.complex_mult_(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + cu.complex_mult_(S0_11_f, dT_01_f)
+        dS1_01_f = complex_mult_(conjugate(S0_10_f)[np.newaxis], dT_00_f).sum(dim=1) + complex_mult_(conjugate(S0_11_f), dT_01_f)
 
-        dS1_01 = fu.torch_hfft(dS1_01_f)
-        # dS1_01 = fu.irfft(dS1_01_f) * (2 * n2)
+        dS1_01 = torch.irfft(dS1_01_f, 1, signal_sizes=(2 * n2, )) * (2 * n2)
         dS_01[:, 1::2] = dS1_01[:, :, :n2]
 
         dT_00, dT_01 = dS_00, dS_01
@@ -251,8 +249,8 @@ def krylov_multiply_forward_mine(subdiag, v):
         S0_10_f, S0_11_f, S1_11_f = S_f[:rank], S_f[-2], S_f[-1]
         save_for_backward[d] = (S0_10_f, S0_11_f)
 
-        T_10_f = cu.complex_mult_(S1_11_f, S0_10_f)
-        T_11_f = cu.complex_mult_(S1_11_f, S0_11_f)
+        T_10_f = complex_mult_(S1_11_f, S0_10_f)
+        T_11_f = complex_mult_(S1_11_f, S0_11_f)
 
         T_f = torch.cat((T_10_f, T_11_f[np.newaxis]))
 
@@ -299,15 +297,13 @@ def krylov_multiply_mine(subdiag, v, w):
         dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
         dT = dT * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
 
-        dT_f = fu.ihfft(dT)
-        # dT_f = fu.rfft(dT) / (2 * n2)
+        dT_f = fu.rfft(dT) / (2 * n2)
         dT_00_f, dT_01_f = dT_f[:, :rank], dT_f[:, -1]
 
         S0_10_f, S0_11_f = save_for_backward[d]
-        dS1_01_f = cu.complex_mult_(S0_10_f[np.newaxis], dT_00_f).sum(dim=1) + cu.complex_mult_(S0_11_f, dT_01_f)
+        dS1_01_f = complex_mult_(conjugate(S0_10_f)[np.newaxis], dT_00_f).sum(dim=1) + complex_mult_(conjugate(S0_11_f), dT_01_f)
 
-        dS1_01 = fu.hfft(dS1_01_f)
-        # dS1_01 = fu.irfft(dS1_01_f) * (2 * n2)
+        dS1_01 = fu.irfft(dS1_01_f) * (2 * n2)
         dS_01[:, 1::2] = dS1_01[:, :, :n2]
 
         dT_00, dT_01 = dS_00, dS_01
