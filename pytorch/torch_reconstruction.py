@@ -34,6 +34,8 @@ def recon(net):
     W = krylov_recon(net.params.r, net.params.layer_size, net.G, net.H, net.fn_A, net.fn_B_T)
 
     # Normalize
+    if net.params.class_type in ['vandermonde_like', 'hankel_like']:
+        return W
     if net.params.class_type == 'toeplitz_like':
         return 0.5*W
     elif net.params.class_type in ['circulant_sparsity', 'tridiagonal_corner']:

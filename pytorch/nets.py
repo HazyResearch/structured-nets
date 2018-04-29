@@ -35,72 +35,6 @@ def construct_net(params):
         print(('Model not supported: ', params.model))
         assert 0
 
-def structured_layer(net, x):
-    if net.params.class_type == 'unconstrained':
-        return torch.matmul(x, net.W)
-    elif net.params.class_type == 'low_rank':
-        xH = torch.matmul(x, net.H.t())
-        return torch.matmul(xH, net.G)
-    elif net.params.class_type in ['toep_corner', 'toep_nocorn']:
-        # test that it matches slow version
-        # W = krylov_recon(net.params.r, net.params.layer_size, net.G, net.H, net.fn_A, net.fn_B_T)
-        # ans = toep.toeplitz_mult(net.G, net.H, x, net.cycle)
-        # print(torch.norm(ans-torch.matmul(x, W.t())))
-        # K = toep.krylov_construct(1, net.G[0].squeeze(), net.params.layer_size)
-        # KT = toep.krylov_construct(-1, net.H[0].squeeze(), net.params.layer_size)
-        # W1 = torch.matmul(K, KT.t())
-        # ans2 = toep.toeplitz_mult_slow(net.G, net.H, x, net.cycle)
-        # print(torch.norm(ans-torch.matmul(x, W1.t())))
-        return toep.toeplitz_mult(net.G, net.H, x, net.cycle)
-        # return toep.toeplitz_mult(net.G.t(), net.H.t(), x, net.cycle)
-    elif net.params.class_type == 'subdiagonal':
-        return subd.subd_mult(net.subd_A, net.subd_B, net.G, net.H, x)
-        # return subd.krylov_multiply_fast(net.subd_A, net.G, subd.krylov_transpose_multiply_fast(net.subd_B, net.H, x))
-    elif net.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
-        'circulant_sparsity', 'tridiagonal_corner']:
-        #print('krylov fast')
-        #print('net.H: ', net.H)
-        #print('x: ', x)
-        #print(KB)
-        #return krylov_multiply_fast(net.subdiag_f_A[1:], net.G, krylov_transpose_multiply_fast(net.subdiag_f_B[1:], net.H, x))
-        W = krylov_recon(net.params.r, net.params.layer_size, net.G, net.H, net.fn_A, net.fn_B_T)
-        # NORMALIZE W
-        return torch.matmul(x, W.t())
-    else:
-        print(('Not supported: ', net.params.class_type))
-        assert 0
-
-def set_structured_W(net, params):
-    if params.class_type == 'unconstrained':
-        net.W = Parameter(torch.Tensor(params.layer_size, params.layer_size))
-        torch.nn.init.normal_(net.W, std=params.init_stddev)
-    elif params.class_type in ['low_rank', 'toeplitz_like', 'toep_corner', 'toep_nocorn', 'subdiagonal', 'vandermonde_like', 'hankel_like',
-        'circulant_sparsity', 'tridiagonal_corner']:
-        net.G = Parameter(torch.Tensor(params.r, params.layer_size))
-        net.H = Parameter(torch.Tensor(params.r, params.layer_size))
-        torch.nn.init.normal_(net.G, std=params.init_stddev)
-        torch.nn.init.normal_(net.H, std=params.init_stddev)
-
-        if params.class_type == 'low_rank':
-            pass
-        elif params.class_type == 'toep_corner':
-            net.cycle = True
-            fn_A, fn_B_T = StructuredLinear.set_mult_fns(net, params)
-            net.fn_A = fn_A
-            net.fn_B_T = fn_B_T
-        elif params.class_type == 'toep_nocorn':
-            net.cycle = False
-        elif params.class_type == 'subdiagonal':
-            net.subd_A = Parameter(torch.ones(params.layer_size))
-            net.subd_B = Parameter(torch.ones(params.layer_size))
-        else:
-            fn_A, fn_B_T = StructuredLinear.set_mult_fns(net, params)
-            net.fn_A = fn_A
-            net.fn_B_T = fn_B_T
-
-    else:
-        print(('Not supported: ', params.class_type))
-        assert 0
 
 class LeNet(nn.Module):
     def __init__(self, params):
@@ -186,7 +120,7 @@ class LDRNet(nn.Module):
 class MLP(nn.Module):
     def __init__(self, params):
         super(MLP, self).__init__()
-        set_structured_W(self, params)
+        self.W = StructuredLinear(params)
 
         self.params = params
 
@@ -200,7 +134,7 @@ class MLP(nn.Module):
             torch.nn.init.normal_(self.W2,std=params.init_stddev)
 
     def forward(self, x):
-        xW = structured_layer(self, x)
+        xW = self.W(x)
 
         if self.params.num_layers==0:
             return xW
