@@ -3,7 +3,6 @@ import functools
 import torch
 from torch.autograd import Variable
 
-import pytorch_fft.fft as pyfft
 import cupy as cp
 from cupy.cuda import cufft
 
@@ -261,66 +260,5 @@ class ComplexMult(torch.autograd.Function):
             grad_Y = grad_Y.sum(dim=dim)
         return Variable(grad_X), Variable(grad_Y)
 
-class Rfft_slow(torch.autograd.Function):
-    def forward(self, X_re):
-        X_re = X_re.contiguous()
-        self._to_save_input_size = X_re.size(-1)
-        return pyfft.rfft(X_re)
-
-    def backward(self, grad_output_re, grad_output_im):
-        # Clone the array and make contiguous if needed
-        grad_output_re = pyfft.autograd.contiguous_clone(grad_output_re)
-        grad_output_im = pyfft.autograd.contiguous_clone(grad_output_im)
-
-        if self._to_save_input_size & 1:
-            grad_output_re[...,1:] /= 2
-        elif self._to_save_input_size > 2:
-            grad_output_re[...,1:-1] /= 2
-
-        if self._to_save_input_size & 1:
-            grad_output_im[...,1:] /= 2
-        elif self._to_save_input_size > 2:
-            grad_output_im[...,1:-1] /= 2
-
-        gr = pyfft.irfft(grad_output_re,grad_output_im,self._to_save_input_size, normalize=False)
-        return gr
-
-class Irfft_slow(torch.autograd.Function):
-
-    def forward(self, k_re, k_im):
-        k_re, k_im = pyfft.autograd.make_contiguous(k_re, k_im)
-        return pyfft.irfft(k_re, k_im)
-
-    def backward(self, grad_output_re):
-        grad_output_re = grad_output_re.contiguous()
-        gr, gi = pyfft.rfft(grad_output_re)
-
-        N = grad_output_re.size(-1)
-        gr[...,0] /= N
-        if gr.shape[-1] > 2:
-            gr[...,1:-1] /= N/2
-        gr[...,-1] /= N
-
-        gi[...,0] /= N
-        if gi.shape[-1] > 2:
-            gi[...,1:-1] /= N/2
-        gi[...,-1] /= N
-        return gr, gi
-
-def Ihfft_slow(X_re):
-    # np.fft.ihfft is the same as np.fft.rfft().conj() / n
-    n = X_re.shape[-1]
-    X_f_re, X_f_im = Rfft_slow()(X_re)
-    return X_f_re / n, -X_f_im / n
-
-def Hfft_slow(X_re, X_im):
-    # np.fft.hfft is the same as np.fft.irfft(input.conj()) * n
-    n = (X_re.shape[-1] - 1) * 2
-    return Irfft_slow()(X_re, -X_im) * n
-
-def complex_mult(X, Y):
-    X_re, X_im = X
-    Y_re, Y_im = Y
-    return X_re * Y_re - X_im * Y_im, X_re * Y_im + X_im * Y_re
 
 complex_mult_ = ComplexMult.apply if use_cupy else complex_mult_slow
