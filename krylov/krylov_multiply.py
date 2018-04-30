@@ -3,7 +3,6 @@ import numpy as np
 
 import torch
 
-import cufat as cf
 from triextrafat import krylov_construct
 # from triXXF import KrylovTransposeMultiply
 
