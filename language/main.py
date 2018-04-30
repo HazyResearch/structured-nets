@@ -90,12 +90,6 @@ test_data = batchify(corpus.test, eval_batch_size)
 ntokens = len(corpus.dictionary)
 model = model.RNNModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, args.dropout, args.tied).to(device)
 
-for name, param in model.named_parameters():
-    if param.requires_grad:
-        print(('Parameter name, shape: ', name, param.data.shape))
-
-quit()
-
 criterion = nn.CrossEntropyLoss()
 
 ###############################################################################
