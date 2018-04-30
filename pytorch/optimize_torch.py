@@ -139,6 +139,13 @@ def optimize_torch(dataset, params, seed=None):
         test_loss, test_accuracy = test_split(net, test_X, test_Y, params, loss_fn, batch_size=params.batch_size)
         log_stats('Test', 'Test', test_loss.item(), test_accuracy.item(), 0)
 
+        train_X, train_Y = Variable(torch.FloatTensor(dataset.train_X).cuda()), Variable(torch.FloatTensor(dataset.train_Y).cuda())
+        train_loss, train_accuracy = test_split(net, train_X, train_Y, params, loss_fn, batch_size=params.batch_size)
+
+        # Log best validation accuracy and training acc for that model
+        writer.add_scalar('MaxAcc/Val', best_val_acc)
+        writer.add_scalar('MaxAcc/Train', train_accuracy)
+
 
     writer.export_scalars_to_json(os.path.join(params.log_path, "all_scalars.json"))
     writer.close()
