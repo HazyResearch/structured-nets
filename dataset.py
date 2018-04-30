@@ -104,7 +104,10 @@ class Dataset:
             data = pkl.load(open(self.train_loc, 'rb'))
             train_X = data['X']
             train_Y = data['Y']
-            val_size = 2000
+            if self.name == 'norb':
+                val_size = 50000
+            else:
+                val_size = 2000
             train_size = train_X.shape[0] - val_size
             # Shuffle X
             idx = np.arange(0, train_X.shape[0])
@@ -113,6 +116,8 @@ class Dataset:
             train_idx = idx[0:train_size]
             val_idx = idx[-val_size:]
 
+            print("train_X shape", train_X.shape)
+            print("train_size, val_size", train_size, val_size)
             assert train_idx.size == train_size
             assert val_idx.size == val_size
 
@@ -160,9 +165,13 @@ class Dataset:
             self.test_Y = self.mnist.test.labels
         elif self.name == 'mnist_rot':
             self.load_train_data()
-        elif self.name == 'mnist_bg_rot':
-            train_size = 11000
-            val_size = 1000
+        elif self.name in ['mnist_bg_rot','swap_mnist_bg_rot']:
+            if self.name.startswith('swap'):
+                train_size = 40000
+                val_size = 10000
+            else:
+                train_size = 10000
+                val_size = 2000
             data = np.genfromtxt(self.train_loc)
 
             # Shuffle
@@ -185,6 +194,10 @@ class Dataset:
             self.train_Y = Y[train_idx, :]
             self.val_X = X[val_idx, :]
             self.val_Y = Y[val_idx, :]
+
+            # post-processing transforms
+            self.train_X = self.postprocess(self.train_X)
+            self.val_X = self.postprocess(self.val_X)
         elif self.name == 'mnist_rand_bg':
             self.load_train_data()
         elif self.name == 'convex':
@@ -289,6 +302,10 @@ class Dataset:
             idx = self.name[-1]
             self.train_loc = os.path.join(prefix,'mnist_noise/train_' + str(idx))
             self.test_loc = os.path.join(prefix,'mnist_noise/test_' + str(idx))
+        elif self.name.startswith('swap_mnist_noise'):
+            idx = self.name[-1]
+            self.train_loc = os.path.join(prefix,'mnist_noise/test_' + str(idx))
+            self.test_loc = os.path.join(prefix,'mnist_noise/train_' + str(idx))
         elif self.name == 'norb':
             self.train_loc = os.path.join(prefix,'norb_full/processed_py2_train_28.pkl')
             self.test_loc = os.path.join(prefix,'norb_full/processed_py2_test_28.pkl')
@@ -307,6 +324,9 @@ class Dataset:
         elif self.name == 'mnist_bg_rot':
             self.train_loc = os.path.join(prefix, 'mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat')
             self.test_loc = os.path.join(prefix, 'mnist_bg_rot/mnist_all_background_images_rotation_normalized_test.amat')
+        elif self.name == 'swap_mnist_bg_rot':
+            self.train_loc = os.path.join(prefix, 'mnist_bg_rot/mnist_all_background_images_rotation_normalized_test.amat')
+            self.test_loc = os.path.join(prefix, 'mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat')
 
     def get_input_size(self):
         if 'mnist' in self.name or 'convex' in self.name:
@@ -358,8 +378,6 @@ class Dataset:
             data = pkl.load(open(self.test_loc, 'rb'))
             self.test_X = data['X']
             self.test_Y = data['Y']
-            self.test_X = self.postprocess(self.test_X)
-
         elif self.test_loc:
             test_data = np.genfromtxt(self.test_loc)
 
@@ -369,6 +387,7 @@ class Dataset:
             # Y must be one-hot
             enc = OneHotEncoder()
             self.test_Y = enc.fit_transform(self.test_Y).todense()
+        self.test_X = self.postprocess(self.test_X)
         print('Loaded test data from: ', self.test_loc)
         print('Test X,Y:', self.test_X.shape, self.test_Y.shape)
         self.print_dataset_stats(test=True)
@@ -414,7 +433,9 @@ class Dataset:
         if self.name == 'mnist':
             batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
             return batch_xs, batch_ys
-        elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'cifar10']:
+        elif self.name.startswith('mnist') \
+             or self.name.startswith('swap_mnist') \
+             or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'cifar10']:
             #Randomly sample batch_size from train_X and train_Y
             idx = np.random.randint(self.train_X.shape[0], size=batch_size)
             return self.train_X[idx, :], self.train_Y[idx, :]
@@ -424,14 +445,17 @@ class Dataset:
             else:
                 return self.next_batch(batch_size)
         else:
-            print('Not supported: ', name)
+            print('Not supported: ', self.name)
             assert 0
 
     def sample_without_replacement(self, batch_size, step):
         if self.name == 'mnist':
             batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
             return batch_xs, batch_ys
-        elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'cifar10']:
+        # elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'cifar10']:
+        elif self.name.startswith('mnist') \
+             or self.name.startswith('swap_mnist') \
+             or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'cifar10']:
             return self.next_batch(batch_size)
         elif self.name.startswith('true'):
             if self.stochastic_train:
