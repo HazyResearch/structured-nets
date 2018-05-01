@@ -250,6 +250,23 @@ def toeplitz_mult_slow(G, H, x, cycle=True):
     prods = [torch.matmul(K[0] , torch.matmul(K[1] , x.t())) for K in krylovs]
     return sum(prods).t()
 
+def krylov_construct_fast(f, v):
+    n,  = v.shape
+    a = torch.arange(n, dtype=torch.long, device=v.device)
+    b = -a
+    indices = a[:, np.newaxis] + b[np.newaxis]
+    K = v[indices]
+    K[indices < 0] *= f
+    return K
+
+def toeplitz_mult_slow_fast(G, H, x, cycle=True):
+    assert G.shape == H.shape
+    rank, n = G.shape
+    f = (1,-1) if cycle else (0,0)
+    krylovs = [(krylov_construct_fast(f[0], G[i]), krylov_construct_fast(f[1], H[i]).t()) for i in range(rank)]
+    prods = [torch.matmul(K[0] , torch.matmul(K[1] , x.t())) for K in krylovs]
+    return sum(prods).t()
+
 if __name__ == '__main__':
     v = Variable(torch.Tensor([[0,1,0,-1],[0,1,2,3]])).cuda()
     u = Variable(torch.Tensor([[1,1,1,1],[0,1,2,3]])).cuda()
@@ -274,17 +291,21 @@ if __name__ == '__main__':
     # array([[ 0.,  6., 16., 26.],
     #        [ 0., 12., 38., 66.]])
 
-    m = 5
+    m = 10
     n = 1<<m
-    batch_size = 3
-    rank = 2
+    batch_size = 512
+    rank = 3
     u = torch.rand((batch_size, n), requires_grad=True, device="cuda")
     v = torch.rand((rank, n), requires_grad=True, device="cuda")
-    result = toeplitz_mult(v, v, u, cycle=False)
-    result_slow = toeplitz_mult_slow(v, v, u, cycle=False)
+    result = toeplitz_mult(v, v, u, cycle=True)
+    result_slow = toeplitz_mult_slow(v, v, u, cycle=True)
+    result_slow_fast = toeplitz_mult_slow_fast(v, v, u, cycle=True)
     print(np.allclose(result.detach().cpu().numpy(), result_slow.detach().cpu().numpy()))
     print(torch.max(torch.abs(result - result_slow)).item())
     print(torch.mean(torch.abs(result - result_slow)).item())
+    print(np.allclose(result.detach().cpu().numpy(), result_slow_fast.detach().cpu().numpy()))
+    print(torch.max(torch.abs(result - result_slow_fast)).item())
+    print(torch.mean(torch.abs(result - result_slow_fast)).item())
 
 
 def mem_test():
