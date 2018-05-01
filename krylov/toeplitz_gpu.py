@@ -250,22 +250,33 @@ def toeplitz_mult_slow(G, H, x, cycle=True):
     prods = [torch.matmul(K[0] , torch.matmul(K[1] , x.t())) for K in krylovs]
     return sum(prods).t()
 
-def krylov_construct_fast(f, v):
-    n,  = v.shape
+def krylov_construct_toeplitz(v, f=0.0):
+    """Fast construction using indices, so it's vectorized.
+    Batched wrt rank of v.
+    v: (rank x n) tensor
+    f: real number
+    """
+    rank, n  = v.shape
     a = torch.arange(n, dtype=torch.long, device=v.device)
     b = -a
     indices = a[:, np.newaxis] + b[np.newaxis]
-    K = v[indices]
-    K[indices < 0] *= f
+    # Pytorch's advanced indexing (as of 0.4.0) is wrong for negative indices when combined with basic indexing.
+    # So we have to make the indices positive.
+    # K = v[:, indices]
+    K = v[:, indices % n]
+    K[:, indices < 0] *= f
     return K
 
 def toeplitz_mult_slow_fast(G, H, x, cycle=True):
     assert G.shape == H.shape
     rank, n = G.shape
-    f = (1,-1) if cycle else (0,0)
-    krylovs = [(krylov_construct_fast(f[0], G[i]), krylov_construct_fast(f[1], H[i]).t()) for i in range(rank)]
-    prods = [torch.matmul(K[0] , torch.matmul(K[1] , x.t())) for K in krylovs]
-    return sum(prods).t()
+    f_G, f_H = (1, -1) if cycle else (0, 0)
+    K_G, K_H = krylov_construct_toeplitz(G, f_G), krylov_construct_toeplitz(H, f_H)
+    temp = (K_H.transpose(1, 2) @ x.t())
+    # result = K_G @ temp3
+    # For some reason K_G @ temp3 gives less accurate results than this
+    result = torch.stack([K_G_ @ temp_ for K_G_, temp_ in zip(K_G, temp)])
+    return result.sum(dim=0).t()
 
 if __name__ == '__main__':
     v = Variable(torch.Tensor([[0,1,0,-1],[0,1,2,3]])).cuda()
@@ -293,8 +304,8 @@ if __name__ == '__main__':
 
     m = 10
     n = 1<<m
-    batch_size = 512
-    rank = 3
+    batch_size = 50
+    rank = 16
     u = torch.rand((batch_size, n), requires_grad=True, device="cuda")
     v = torch.rand((rank, n), requires_grad=True, device="cuda")
     result = toeplitz_mult(v, v, u, cycle=True)
