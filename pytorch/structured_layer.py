@@ -5,32 +5,45 @@ from torch.nn.parameter import Parameter
 
 from torch_krylov import *
 from torch_reconstruction import *
+import sys
+sys.path.insert(0, '../krylov/')
 import toeplitz_gpu as toep
 import krylov_multiply as subd
 
 class StructuredLinear(nn.Module):
-    def __init__(self, params):
+    def __init__(self, params=None, class_type=None, layer_size=None, init_stddev=None, r=None):
         super(StructuredLinear,self).__init__()
-        self.params = params
-        if self.params.class_type == 'unconstrained':
-            self.W = Parameter(torch.Tensor(params.layer_size, params.layer_size))
-            torch.nn.init.normal_(self.W, std=params.init_stddev)
+        if params is None:
+            assert None not in (class_type, layer_size, init_stddev, r)
+            self.class_type = class_type
+            self.layer_size = layer_size
+            self.init_stddev = init_stddev
+            self.r = r
+        else:
+            self.class_type = params.class_type
+            self.layer_size = params.layer_size
+            self.init_stddev = params.init_stddev
+            self.r = params.r
+            self.params = params
+        if self.class_type == 'unconstrained':
+            self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
+            torch.nn.init.normal_(self.W, std=self.init_stddev)
         elif self.params.class_type in ['low_rank', 'toeplitz_like', 'vandermonde_like', 'hankel_like',
                                         'circulant_sparsity', 'tridiagonal_corner', 'toep_corner', 'toep_nocorn', 'subdiagonal']:
-            self.G = Parameter(torch.Tensor(params.r, params.layer_size))
-            self.H = Parameter(torch.Tensor(params.r, params.layer_size))
-            torch.nn.init.normal_(self.G, std=params.init_stddev)
-            torch.nn.init.normal_(self.H, std=params.init_stddev)
+            self.G = Parameter(torch.Tensor(self.r, self.layer_size))
+            self.H = Parameter(torch.Tensor(self.r, self.layer_size))
+            torch.nn.init.normal_(self.G, std=self.init_stddev)
+            torch.nn.init.normal_(self.H, std=self.init_stddev)
 
-            if self.params.class_type == 'low_rank':
+            if self.class_type == 'low_rank':
                 pass
-            elif self.params.class_type == 'toep_corner':
+            elif self.class_type == 'toep_corner':
                 self.cycle = True
-            elif self.params.class_type == 'toep_nocorn':
+            elif self.class_type == 'toep_nocorn':
                 self.cycle = False
-            elif self.params.class_type == 'subdiagonal':
-                self.subd_A = Parameter(torch.ones(self.params.layer_size))
-                self.subd_B = Parameter(torch.ones(self.params.layer_size))
+            elif self.class_type == 'subdiagonal':
+                self.subd_A = Parameter(torch.ones(self.layer_size))
+                self.subd_B = Parameter(torch.ones(self.layer_size))
             else:
                 fn_A, fn_B_T = self.set_mult_fns(self.params)
                 self.fn_A = fn_A
@@ -97,7 +110,7 @@ class StructuredLinear(nn.Module):
         elif self.params.class_type in ['toep_corner', 'toep_nocorn']:
             return toep.toeplitz_mult(self.G, self.H, x, self.cycle)
         elif self.params.class_type == 'subdiagonal':
-            return subd.subd_mult(self.subd_A, self.subd_B, self.G, self.H, x)
+            return subd.subd_mult_slow_fast(self.subd_A, self.subd_B, self.G, self.H, x)
         elif self.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
             'circulant_sparsity', 'tridiagonal_corner']:
 
