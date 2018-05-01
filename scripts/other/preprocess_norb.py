@@ -77,7 +77,7 @@ def process_images(names, out_loc, mean=None, sd=None):
 train_names = ['train' + str(i+1) for i in np.arange(10)]
 train_out_loc = '/dfs/scratch1/thomasat/datasets/norb_full/processed_py2_train_' + str(DS_SIZE[0]) + '.pkl'
 test_names = ['test' + str(i+1) for i in range(2)]
-test_out_loc = '/dfs/scratch1/thomasat/datasets/norb_full/processed_py2_test' + str(DS_SIZE[0]) + '.pkl'
+test_out_loc = '/dfs/scratch1/thomasat/datasets/norb_full/processed_py2_test_' + str(DS_SIZE[0]) + '.pkl'
 
 mean, sd = process_images(train_names, train_out_loc)
 process_images(test_names, test_out_loc, mean, sd)
