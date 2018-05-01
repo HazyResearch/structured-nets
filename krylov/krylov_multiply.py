@@ -326,10 +326,12 @@ def subd_mult_slow(subd_A, subd_B, G, H, x):
 def subd_mult_slow_fast(subd_A, subd_B, G, H, x):
     rank, n = G.shape
     batch_size = x.shape[0]
-    krylovs = [(krylov_construct_fast(subd_A, G[i]), krylov_construct_fast(subd_B, H[i]).t()) for i in range(rank)]
-    prods = [K[0] @ (K[1] @ x.t()) for K in krylovs]
-    return sum(prods).t()
-
+    K_G, K_H = krylov_construct_subdiag(subd_A, G), krylov_construct_subdiag(subd_B, H)
+    temp = (K_H.transpose(1, 2) @ x.t())
+    # result = K_G @ temp3
+    # For some reason K_G @ temp3 gives less accurate results than this
+    result = torch.stack([K_G_ @ temp_ for K_G_, temp_ in zip(K_G, temp)])
+    return result.sum(dim=0).t()
 
 def test_transpose_multiply():
     m = 12
@@ -383,10 +385,10 @@ def test_transpose_multiply():
 
 
 def test_multiply():
-    m = 12
+    m = 10
     n = 1 << m
-    batch_size = 512
-    rank = 3
+    batch_size = 50
+    rank = 16
     subdiag = torch.rand(n-1, requires_grad=True, device=device)
     A = np.diag(subdiag.data.cpu().numpy(), -1)
     u = torch.rand((batch_size, n), requires_grad=True, device=device)
@@ -458,17 +460,19 @@ def Krylov(linear_map, v, n=None):
         cols.append(v)
     return torch.stack(cols, dim=-1)
 
-def krylov_construct_fast(subdiag, v, f=0.0):
-    n,  = v.shape
+def krylov_construct_subdiag(subdiag, v, f=0.0):
+    rank, n  = v.shape
     a = torch.arange(n, dtype=torch.long, device=v.device)
     b = -a
-    indices = a[:, np.newaxis] + b[np.newaxis]
-    v_circulant = v[indices]
+    # Pytorch's advanced indexing (as of 0.4.0) is wrong for negative indices when combined with basic indexing.
+    # So we have to make the indices positive.
+    indices = (a[:, np.newaxis] + b[np.newaxis]) % n
+    v_circulant = v[:, indices]
     subdiag_extended = torch.cat((torch.tensor([f], dtype=v.dtype, device=v.device), subdiag))
     subdiag_circulant = subdiag_extended[indices]
     subdiag_cumprod = subdiag_circulant.cumprod(dim=1)
     K = v_circulant
-    K[:, 1:] *= subdiag_cumprod[:, :-1]
+    K[:, :, 1:] *= subdiag_cumprod[:, :-1]
     return K
 
 if __name__ == "__main__":
