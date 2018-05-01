@@ -1,14 +1,30 @@
 import torch.nn as nn
+from torch.nn import Parameter
+import torch
+import numpy as np
+import sys
+sys.path.insert(0, '../pytorch/')
+#from structured_layer import StructuredLinear
+from bnlstm import LSTM, LSTMCell
 
 class RNNModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
 
-    def __init__(self, rnn_type, ntoken, ninp, nhid, nlayers, dropout=0.5, tie_weights=False):
+    def __init__(self, class_type, r, rnn_type, ntoken, ninp, nhid, nlayers, dropout=0.5, tie_weights=False):
         super(RNNModel, self).__init__()
         self.drop = nn.Dropout(dropout)
         self.encoder = nn.Embedding(ntoken, ninp)
         if rnn_type in ['LSTM', 'GRU']:
-            self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout)
+            print('ninp, nhid, nlayers: ', ninp, nhid, nlayers)
+            if rnn_type == 'LSTM':
+                self.rnn = LSTM(class_type, r, LSTMCell, input_size=ninp, hidden_size=nhid, num_layers=nlayers, dropout=dropout)
+            else:
+                self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout)
+            # Replace with structured layers
+            #self.rnn.weight_ih_l0 = StructuredLinear(None, 'unconstrained', 512, 0.01, 1)
+            #self.rnn.weight_ih_l0 = Parameter(torch.Tensor(np.random.random((800,200))))
+            #print(self.rnn.weight_ih_l0)
+            #quit()
         else:
             try:
                 nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
@@ -43,7 +59,13 @@ class RNNModel(nn.Module):
 
     def forward(self, input, hidden):
         emb = self.drop(self.encoder(input))
-        output, hidden = self.rnn(emb, hidden)
+        #print('hidden: ', hidden.shape)
+        #print('emb, hidden: ', emb.shape, hidden[0].shape, hidden[1].shape)
+        output, hidden = self.rnn(emb, hx=hidden)
+        output = output.squeeze()
+        hidden = (hidden[0].squeeze(0), hidden[1].squeeze(0))
+        #print('output, hidden: ', output.shape, hidden[0].shape, hidden[1].shape)
+        #quit()
         output = self.drop(output)
         decoded = self.decoder(output.view(output.size(0)*output.size(1), output.size(2)))
         return decoded.view(output.size(0), output.size(1), decoded.size(1)), hidden

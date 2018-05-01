@@ -4,11 +4,15 @@ import time
 import math
 import torch
 import torch.nn as nn
-
+import pickle as pkl
 import data
 import model
 
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM Language Model')
+parser.add_argument('--class_type', type=str, default='unconstrained',
+                    help='structured class')
+parser.add_argument('--r', type=int, default=1,
+                    help='displacement rank')
 parser.add_argument('--data', type=str, default='./data/wikitext-2',
                     help='location of the data corpus')
 parser.add_argument('--model', type=str, default='LSTM',
@@ -39,8 +43,10 @@ parser.add_argument('--cuda', action='store_true',
                     help='use CUDA')
 parser.add_argument('--log-interval', type=int, default=200, metavar='N',
                     help='report interval')
-parser.add_argument('--save', type=str,  default='model.pt',
+parser.add_argument('--save', type=str,  default='/dfs/scratch1/thomasat/results/lang/',
                     help='path to save the final model')
+parser.add_argument('--test', type=int,  default=0,
+                    help='Flag to test on test set')
 args = parser.parse_args()
 
 # Set the random seed manually for reproducibility.
@@ -48,6 +54,7 @@ torch.manual_seed(args.seed)
 if torch.cuda.is_available():
     if not args.cuda:
         print("WARNING: You have a CUDA device, so you should probably run with --cuda")
+
 
 device = torch.device("cuda" if args.cuda else "cpu")
 
@@ -88,7 +95,12 @@ test_data = batchify(corpus.test, eval_batch_size)
 ###############################################################################
 
 ntokens = len(corpus.dictionary)
-model = model.RNNModel(args.model, ntokens, args.emsize, args.nhid, args.nlayers, args.dropout, args.tied).to(device)
+model = model.RNNModel(args.class_type, args.r, args.model, ntokens, args.emsize, args.nhid, args.nlayers, args.dropout, args.tied).to(device)
+
+# Print params
+for name, param in model.named_parameters():
+    if param.requires_grad:
+        print(('Parameter name, shape: ', name, param.data.shape))
 
 criterion = nn.CrossEntropyLoss()
 
@@ -150,7 +162,10 @@ def train():
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         hidden = repackage_hidden(hidden)
         model.zero_grad()
+        #print('data, hidden: ', data.shape, hidden[0].shape, hidden[1].shape)
         output, hidden = model(data, hidden)
+        #print('output, hidden: ', output.shape, hidden[0].shape, hidden[1].shape)
+        #quit()
         loss = criterion(output.view(-1, ntokens), targets)
         loss.backward()
 
@@ -175,12 +190,17 @@ def train():
 lr = args.lr
 best_val_loss = None
 
+val_losses = []
+val_perps = []
+
 # At any point you can hit Ctrl + C to break out of training early.
 try:
     for epoch in range(1, args.epochs+1):
         epoch_start_time = time.time()
         train()
         val_loss = evaluate(val_data)
+        val_losses.append(val_loss)
+        val_perps.append(math.exp(val_loss))
         print('-' * 89)
         print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
                 'valid ppl {:8.2f}'.format(epoch, (time.time() - epoch_start_time),
@@ -188,7 +208,7 @@ try:
         print('-' * 89)
         # Save the model if the validation loss is the best we've seen so far.
         if not best_val_loss or val_loss < best_val_loss:
-            with open(args.save, 'wb') as f:
+            with open(args.save + 'model.pt', 'wb') as f:
                 torch.save(model, f)
             best_val_loss = val_loss
         else:
@@ -199,15 +219,28 @@ except KeyboardInterrupt:
     print('Exiting from training early')
 
 # Load the best saved model.
-with open(args.save, 'rb') as f:
+with open(args.save + 'model.pt', 'rb') as f:
     model = torch.load(f)
     # after load the rnn params are not a continuous chunk of memory
     # this makes them a continuous chunk, and will speed up forward pass
-    model.rnn.flatten_parameters()
+    #model.rnn.flatten_parameters()
 
-# Run on test data.
-test_loss = evaluate(test_data)
-print('=' * 89)
-print('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
-    test_loss, math.exp(test_loss)))
-print('=' * 89)
+
+losses = {}
+losses['val_losses'] = val_losses
+losses['val_perps'] = val_perps
+
+if args.test:
+    # Run on test data.
+    test_loss = evaluate(test_data)
+    print('=' * 89)
+    print('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
+        test_loss, math.exp(test_loss)))
+    print('=' * 89)
+
+    losses['test_loss'] = test_loss
+    losses['test_perp'] = math.exp(test_loss)
+
+# Save
+out = args.save + args.class_type + '.p'
+pkl.dump(losses, open(out, 'wb'))

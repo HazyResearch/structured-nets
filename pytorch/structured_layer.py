@@ -28,7 +28,7 @@ class StructuredLinear(nn.Module):
         if self.class_type == 'unconstrained':
             self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
             torch.nn.init.normal_(self.W, std=self.init_stddev)
-        elif self.params.class_type in ['low_rank', 'toeplitz_like', 'vandermonde_like', 'hankel_like',
+        elif self.class_type in ['low_rank', 'toeplitz_like', 'vandermonde_like', 'hankel_like',
                                         'circulant_sparsity', 'tridiagonal_corner', 'toep_corner', 'toep_nocorn', 'subdiagonal']:
             self.G = Parameter(torch.Tensor(self.r, self.layer_size))
             self.H = Parameter(torch.Tensor(self.r, self.layer_size))
@@ -102,6 +102,7 @@ class StructuredLinear(nn.Module):
 
 
     def forward(self, x):
+        #print('class_type: ', self.class_type)
         if self.class_type == 'unconstrained':
             return torch.matmul(x, self.W)
         elif self.class_type == 'low_rank':
@@ -110,6 +111,7 @@ class StructuredLinear(nn.Module):
         elif self.class_type in ['toep_corner', 'toep_nocorn']:
             return toep.toeplitz_mult(self.G, self.H, x, self.cycle)
         elif self.class_type == 'subdiagonal':
+            #print('subdiagonal mult slow fast')
             return subd.subd_mult_slow_fast(self.subd_A, self.subd_B, self.G, self.H, x)
         elif self.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
             'circulant_sparsity', 'tridiagonal_corner']:
