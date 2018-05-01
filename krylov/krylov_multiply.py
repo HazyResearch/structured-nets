@@ -313,6 +313,23 @@ def subd_mult(subd_A, subd_B, G, H, x):
     K_out = krylov_multiply(subd_A, G, KT_out)
     return K_out
 
+def subd_mult_slow(subd_A, subd_B, G, H, x):
+    rank, n = G.shape
+    batch_size = x.shape[0]
+    linear_map_A = functools.partial(shift_subdiag, subd_A)
+    linear_map_B = functools.partial(shift_subdiag, subd_B)
+    krylovs = [(Krylov(linear_map_A, G[i]), Krylov(linear_map_B, H[i]).t()) for i in range(rank)]
+    prods = [K[0] @ (K[1] @ x.t()) for K in krylovs]
+    return sum(prods).t()
+
+
+def subd_mult_slow_fast(subd_A, subd_B, G, H, x):
+    rank, n = G.shape
+    batch_size = x.shape[0]
+    krylovs = [(krylov_construct_fast(subd_A, G[i]), krylov_construct_fast(subd_B, H[i]).t()) for i in range(rank)]
+    prods = [K[0] @ (K[1] @ x.t()) for K in krylovs]
+    return sum(prods).t()
+
 
 def test_transpose_multiply():
     m = 12
@@ -346,6 +363,10 @@ def test_transpose_multiply():
     Ks_gpu = [Krylov(linear_fn, v_) for v_ in v]
     result4 = torch.stack([u @ K for K in Ks_gpu])
     result4 = result4.data.cpu().numpy().swapaxes(0, 1).squeeze()
+    # Explicit construction on GPU, but faster
+    Ks_gpu = [krylov_construct_fast(subdiag, v_, f=0.0) for v_ in v]
+    result5 = torch.stack([u @ K for K in Ks_gpu])
+    result5 = result5.data.cpu().numpy().swapaxes(0, 1).squeeze()
     # np.allclose(result_mine, result2)
     print(np.max(abs(result - result_mine)))
     print(np.mean(abs(result - result_mine)))
@@ -357,6 +378,8 @@ def test_transpose_multiply():
     print(np.mean(abs(result3 - result2)))
     print(np.max(abs(result4 - result2)))
     print(np.mean(abs(result4 - result2)))
+    print(np.max(abs(result5 - result)))
+    print(np.mean(abs(result5 - result)))
 
 
 def test_multiply():
@@ -401,6 +424,14 @@ def test_multiply():
     # Combine transpose multiply follow by non-transpose multiply
     result = krylov_multiply_mine(subdiag, v, krylov_transpose_multiply_mine(subdiag, v, u))
 
+    result = subd_mult(subdiag, subdiag, v, v, u)
+    result_slow = subd_mult_slow(subdiag, subdiag, v, v, u)
+    result_slow_fast = subd_mult_slow_fast(subdiag, subdiag, v, v, u)
+    print(torch.max(torch.abs(result - result_slow)).item())
+    print(torch.mean(torch.abs(result - result_slow)).item())
+    print(torch.max(torch.abs(result_slow_fast - result_slow)).item())
+    print(torch.mean(torch.abs(result_slow_fast - result_slow)).item())
+
 
 def test_misc():
     pass
@@ -416,7 +447,7 @@ def shift(v, f=1):
     return torch.cat((f * v[[v.size(0) - 1]], v[:-1]))
 
 def shift_subdiag(subdiag, v, f=0.0):
-    return torch.cat((f * v[[v.size(0) - 1]], subdiag * v[:-1]))
+    return torch.cat((f * v[[-1]], subdiag * v[:-1]))
 
 def Krylov(linear_map, v, n=None):
     if n is None:
@@ -427,7 +458,20 @@ def Krylov(linear_map, v, n=None):
         cols.append(v)
     return torch.stack(cols, dim=-1)
 
+def krylov_construct_fast(subdiag, v, f=0.0):
+    n,  = v.shape
+    a = torch.arange(n, dtype=torch.long, device=v.device)
+    b = -a
+    indices = a[:, np.newaxis] + b[np.newaxis]
+    v_circulant = v[indices]
+    subdiag_extended = torch.cat((torch.tensor([f], dtype=v.dtype, device=v.device), subdiag))
+    subdiag_circulant = subdiag_extended[indices]
+    subdiag_cumprod = subdiag_circulant.cumprod(dim=1)
+    K = v_circulant
+    K[:, 1:] *= subdiag_cumprod[:, :-1]
+    return K
 
 if __name__ == "__main__":
     test_transpose_multiply()
     test_multiply()
+
