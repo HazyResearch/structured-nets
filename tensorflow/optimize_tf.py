@@ -107,15 +107,32 @@ def optimize_tf(dataset, params):
     if params.test:
         # Load test
         dataset.load_test_data()
-        test_loss, test_accuracy, test_loss_summ, test_acc_summ = sess.run([loss, accuracy, test_loss_summary, test_acc_summary], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+        # Test on the current model
+        if not params.test_best_val_checkpoint:
+            test_loss, test_accuracy, test_loss_summ, test_acc_summ = sess.run([loss, accuracy, test_loss_summary, test_acc_summary], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
 
-        summary_writer.add_summary(test_loss_summ, this_step)
-        summary_writer.add_summary(test_acc_summ, this_step)
+            summary_writer.add_summary(test_loss_summ, this_step)
+            summary_writer.add_summary(test_acc_summ, this_step)
 
-        logging.debug('Test loss, %s: %f' % (params.class_type, test_loss))
-        logging.debug('Test accuracy, %s: %f ' % (params.class_type, test_accuracy))
+            logging.debug('Test loss, %s: %f' % (params.class_type, test_loss))
+            logging.debug('Test accuracy, %s: %f ' % (params.class_type, test_accuracy))
 
-        losses['test'] = test_loss
-        accuracies['test'] = test_accuracy
+            losses['test'] = test_loss
+            accuracies['test'] = test_accuracy
+
+        else:
+            # Restore the best validation checkpoint, test on that
+            saver.restore(sess, tf.train.latest_checkpoint(params.checkpoint_path))
+            print('Restored from most recent checkpoint: ')
+            val_loss, val_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.val_X, y_: dataset.val_Y})
+            print('After restoring, val loss and accuracy: %f, %f' % (val_loss, val_accuracy))
+            
+            test_loss, test_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
+            
+            logging.debug('Test loss of best val checkpoint, %s: %f' % (params.class_type, test_loss))
+            logging.debug('Test accuracy of best val checkpoint, %s: %f ' % (params.class_type, test_accuracy))
+
+            losses['test_best_val'] = test_loss
+            accuracies['test_best_val'] = test_accuracy
 
     return losses, accuracies
