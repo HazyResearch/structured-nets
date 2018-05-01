@@ -102,16 +102,16 @@ class StructuredLinear(nn.Module):
 
 
     def forward(self, x):
-        if self.params.class_type == 'unconstrained':
+        if self.class_type == 'unconstrained':
             return torch.matmul(x, self.W)
-        elif self.params.class_type == 'low_rank':
+        elif self.class_type == 'low_rank':
             xH = torch.matmul(x, self.H.t())
             return torch.matmul(xH, self.G)
-        elif self.params.class_type in ['toep_corner', 'toep_nocorn']:
+        elif self.class_type in ['toep_corner', 'toep_nocorn']:
             return toep.toeplitz_mult(self.G, self.H, x, self.cycle)
-        elif self.params.class_type == 'subdiagonal':
+        elif self.class_type == 'subdiagonal':
             return subd.subd_mult_slow_fast(self.subd_A, self.subd_B, self.G, self.H, x)
-        elif self.params.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
+        elif self.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
             'circulant_sparsity', 'tridiagonal_corner']:
 
             W = recon(self)
