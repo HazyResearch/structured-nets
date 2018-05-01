@@ -100,11 +100,11 @@ class Dataset:
 
         if self.name in ['iwslt', 'copy']:
             return
-        elif self.name.startswith('mnist_noise') or self.name in ['norb', 'cifar10']:
+        elif self.name.startswith('mnist_noise') or self.name in ['norb', 'norb_val','cifar10']:
             data = pkl.load(open(self.train_loc, 'rb'))
             train_X = data['X']
             train_Y = data['Y']
-            if self.name == 'norb':
+            if self.name == 'norb_val':
                 val_size = 50000
             else:
                 val_size = 2000
@@ -116,8 +116,6 @@ class Dataset:
             train_idx = idx[0:train_size]
             val_idx = idx[-val_size:]
 
-            print("train_X shape", train_X.shape)
-            print("train_size, val_size", train_size, val_size)
             assert train_idx.size == train_size
             assert val_idx.size == val_size
 
@@ -306,7 +304,7 @@ class Dataset:
             idx = self.name[-1]
             self.train_loc = os.path.join(prefix,'mnist_noise/test_' + str(idx))
             self.test_loc = os.path.join(prefix,'mnist_noise/train_' + str(idx))
-        elif self.name == 'norb':
+        elif self.name == 'norb' or self.name=='norb_val':
             self.train_loc = os.path.join(prefix,'norb_full/processed_py2_train_28.pkl')
             self.test_loc = os.path.join(prefix,'norb_full/processed_py2_test_28.pkl')
         elif self.name == 'rect_images':
@@ -336,7 +334,7 @@ class Dataset:
                 return 784
         elif self.name == 'smallnorb':
             return 576
-        elif self.name == 'norb':
+        elif self.name == 'norb' or self.name=='norb_val':
             return 784#729
         elif self.name == 'cifar10':
             if 'grayscale' in self.transform:
@@ -374,7 +372,7 @@ class Dataset:
     def load_test_data(self):
         if self.name == 'smallnorb':
             return
-        elif self.name.startswith('mnist_noise') or self.name in ['norb', 'cifar10']:
+        elif self.name.startswith('mnist_noise') or self.name in ['norb', 'norb_val','cifar10']:
             data = pkl.load(open(self.test_loc, 'rb'))
             self.test_X = data['X']
             self.test_Y = data['Y']
@@ -435,7 +433,7 @@ class Dataset:
             return batch_xs, batch_ys
         elif self.name.startswith('mnist') \
              or self.name.startswith('swap_mnist') \
-             or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'cifar10']:
+             or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'norb_val', 'cifar10']:
             #Randomly sample batch_size from train_X and train_Y
             idx = np.random.randint(self.train_X.shape[0], size=batch_size)
             return self.train_X[idx, :], self.train_Y[idx, :]
@@ -455,7 +453,7 @@ class Dataset:
         # elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'cifar10']:
         elif self.name.startswith('mnist') \
              or self.name.startswith('swap_mnist') \
-             or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'cifar10']:
+             or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'norb_val', 'cifar10']:
             return self.next_batch(batch_size)
         elif self.name.startswith('true'):
             if self.stochastic_train:
