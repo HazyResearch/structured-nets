@@ -9,6 +9,8 @@ import data
 import model
 
 parser = argparse.ArgumentParser(description='PyTorch Wikitext-2 RNN/LSTM Language Model')
+parser.add_argument('--name', type=str, default='',
+                    help='name of the experiment')
 parser.add_argument('--class_type', type=str, default='unconstrained',
                     help='structured class')
 parser.add_argument('--r', type=int, default=1,
@@ -242,5 +244,6 @@ if args.test:
     losses['test_perp'] = math.exp(test_loss)
 
 # Save
-out = args.save + args.class_type + '.p'
+out = args.save + args.name + '_' + args.class_type + '_' + str(args.r) + '.p'
+print('Saving losses to: ', out)
 pkl.dump(losses, open(out, 'wb'))
