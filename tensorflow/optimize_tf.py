@@ -10,6 +10,14 @@ from model import *
 import time
 import logging
 
+def restore_from_checkpoint(dataset, params, sess, saver, x, y_, loss, accuracy):
+    # Restore the best validation checkpoint, test on that
+    saver.restore(sess, tf.train.latest_checkpoint(params.checkpoint_path))
+    print('Restored from most recent checkpoint: ')
+    val_loss, val_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.val_X, y_: dataset.val_Y})
+    print('After restoring, val loss and accuracy: %f, %f' % (val_loss, val_accuracy))
+    return val_loss, val_accuracy
+
 def optimize_tf(dataset, params):
     # Create model
     x = tf.placeholder(tf.float64, [None, params.input_size],name='x')
@@ -36,6 +44,8 @@ def optimize_tf(dataset, params):
     tf.initialize_all_variables().run()
 
     saver = tf.train.Saver()
+    if params.restore_from_checkpoint:
+        val_loss,val_accuracy = restore_from_checkpoint(dataset,params,sess,saver,x,y_,loss,accuracy)
 
     eigvals = {'E': [], 'W': [], 'A': [], 'B': []}
     losses = {'train': [], 'val': [], 'DR': [], 'ratio': [], 'eigvals': eigvals}
@@ -121,12 +131,7 @@ def optimize_tf(dataset, params):
             accuracies['test'] = test_accuracy
 
         else:
-            # Restore the best validation checkpoint, test on that
-            saver.restore(sess, tf.train.latest_checkpoint(params.checkpoint_path))
-            print('Restored from most recent checkpoint: ')
-            val_loss, val_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.val_X, y_: dataset.val_Y})
-            print('After restoring, val loss and accuracy: %f, %f' % (val_loss, val_accuracy))
-            
+            restore_from_checkpoint(dataset, params, sess, saver, x, y_, loss, accuracy)
             test_loss, test_accuracy = sess.run([loss, accuracy], feed_dict={x: dataset.test_X, y_: dataset.test_Y})
             
             logging.debug('Test loss of best val checkpoint, %s: %f' % (params.class_type, test_loss))

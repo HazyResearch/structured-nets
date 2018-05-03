@@ -10,7 +10,7 @@ class ModelParams:
             test_freq, verbose, decay_rate, decay_freq, learn_diagonal,
             fix_A_identity, stochastic_train, flip_K_B, num_conv_layers,
             torch, model, viz_freq, num_pred_plot, viz_powers,early_stop_steps,replacement,
-            test_best_val_checkpoint):
+            test_best_val_checkpoint, restore_from_checkpoint):
         if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'toep_corner', 'subdiagonal', 'toep_nocorn', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner', 'tridiagonal_corners']:
             print('Class type ' + class_type + ' not supported')
             assert 0
@@ -59,6 +59,7 @@ class ModelParams:
         self.num_pred_plot = num_pred_plot
         self.viz_powers = viz_powers
         self.test_best_val_checkpoint = test_best_val_checkpoint
+        self.restore_from_checkpoint = restore_from_checkpoint
         # c1_filters, c1_ksize, p1_size, p1_strides, c2_filters, c2_ksize, p2_size, p2_strides
         if self.model == 'CNN' or 'cnn' in self.transform:
             self.set_cnn_params()
