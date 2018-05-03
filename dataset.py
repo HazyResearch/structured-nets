@@ -1,9 +1,9 @@
 from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
-import os,sys
+import os,sys,h5py
+import scipy.io as sio
 from scipy.linalg import solve_sylvester
 import pickle as pkl
-from scipy.ndimage.interpolation import zoom
 from sklearn.preprocessing import OneHotEncoder
 sys.path.insert(0, '../../../../')
 from utils import *
@@ -100,6 +100,34 @@ class Dataset:
 
         if self.name in ['iwslt', 'copy']:
             return
+        elif self.name == 'timit':
+            train_feat_loc = '../../../timit/timit_train_feat.mat'
+            train_lab_loc = '../../../timit/timit_train_lab.mat'
+            train_X = h5py.File(train_feat_loc, 'r')['fea']
+            print('loaded')
+            train_X = np.array(train_X).T
+            print('train_X: ', train_X.shape)
+            train_Y = sio.loadmat(train_lab_loc)['lab']
+            # Ensure Y is one-hot
+            enc = OneHotEncoder()
+            train_Y = enc.fit_transform(train_Y).todense()
+            # Split into validation and train
+            val_size = int(0.1*train_X.shape[0]) 
+            train_size = train_X.shape[0] - val_size
+            # Shuffle X
+            idx = np.arange(0, train_X.shape[0])
+            np.random.shuffle(idx)
+
+            train_idx = idx[0:train_size]
+            val_idx = idx[-val_size:]
+
+            assert train_idx.size == train_size
+            assert val_idx.size == val_size
+
+            self.val_X = train_X[val_idx, :]
+            self.val_Y = train_Y[val_idx, :]
+            self.train_X = train_X[train_idx, :]
+            self.train_Y = train_Y[train_idx, :]
         elif self.name.startswith('mnist_noise') or self.name in ['norb', 'norb_val','cifar10']:
             data = pkl.load(open(self.train_loc, 'rb'))
             train_X = data['X']
@@ -336,6 +364,8 @@ class Dataset:
             return 576
         elif self.name == 'norb' or self.name=='norb_val':
             return 784#729
+        elif self.name == 'timit':
+            return 440
         elif self.name == 'cifar10':
             if 'grayscale' in self.transform:
                 return 1024
@@ -366,11 +396,27 @@ class Dataset:
             return 6
         elif 'mnist' in self.name or 'cifar10' in self.name:
             return 10
+        elif self.name == 'timit':
+            return 147
         else:
             return self.input_size
 
     def load_test_data(self):
-        if self.name == 'smallnorb':
+        if self.name == 'timit':
+            test_feat_loc = '../../../timit/timit_heldout_feat.mat'
+            test_lab_loc = '../../../timit/timit_heldout_lab.mat'
+            test_X = sio.loadmat(test_feat_loc)['fea']
+            print('loaded test')
+            test_X = np.array(test_X)
+            print('test_X: ', test_X.shape)
+            test_Y = sio.loadmat(test_lab_loc)['lab']
+            # Ensure Y is one-hot
+            enc = OneHotEncoder()
+            test_Y = enc.fit_transform(test_Y).todense()
+            self.test_X = test_X
+            self.test_Y = test_Y
+            print('test_Y: ', test_Y.shape)
+        elif self.name == 'smallnorb':
             return
         elif self.name.startswith('mnist_noise') or self.name in ['norb', 'norb_val','cifar10']:
             data = pkl.load(open(self.test_loc, 'rb'))
@@ -386,7 +432,7 @@ class Dataset:
             enc = OneHotEncoder()
             self.test_Y = enc.fit_transform(self.test_Y).todense()
         self.test_X = self.postprocess(self.test_X)
-        print('Loaded test data from: ', self.test_loc)
+        print('Loaded test data: ')
         print('Test X,Y:', self.test_X.shape, self.test_Y.shape)
         self.print_dataset_stats(test=True)
 
@@ -433,7 +479,7 @@ class Dataset:
             return batch_xs, batch_ys
         elif self.name.startswith('mnist') \
              or self.name.startswith('swap_mnist') \
-             or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'norb_val', 'cifar10']:
+             or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'norb_val', 'cifar10', 'timit']:
             #Randomly sample batch_size from train_X and train_Y
             idx = np.random.randint(self.train_X.shape[0], size=batch_size)
             return self.train_X[idx, :], self.train_Y[idx, :]
@@ -453,7 +499,7 @@ class Dataset:
         # elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'cifar10']:
         elif self.name.startswith('mnist') \
              or self.name.startswith('swap_mnist') \
-             or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'norb_val', 'cifar10']:
+             or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'norb_val', 'cifar10', 'timit']:
             return self.next_batch(batch_size)
         elif self.name.startswith('true'):
             if self.stochastic_train:
