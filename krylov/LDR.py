@@ -30,8 +30,8 @@ class LDR(nn.Module):
         elif self.displacement == 'toep_nocorn':
             self.corner = False
         elif self.displacement == 'subdiagonal':
-            self.subd_A = Parameter(torch.ones((self.in_channels, self.out_channels, params.layer_size)))
-            self.subd_B = Parameter(torch.ones((self.in_channels, self.out_channels, params.layer_size)))
+            self.subd_A = Parameter(torch.ones((self.in_channels, self.out_channels, self.n-1)))
+            self.subd_B = Parameter(torch.ones((self.in_channels, self.out_channels, self.n-1)))
 
 
     def forward(self, x):

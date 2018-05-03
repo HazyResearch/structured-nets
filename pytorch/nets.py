@@ -25,12 +25,14 @@ def construct_net(params):
         return MLP(params)
     elif params.model == 'LDR':
         return LDRNet(params)
+    elif params.model == 'LDRfat':
+        return LDR2(params)
     elif params.model == 'RNN':
         return RNN(params)
     elif params.model == 'Attention':
         return Attention(params)
-    elif params.model == 'Test':
-        return TestCifar(params)
+    elif params.model == 'CNN':
+        return CNN(params)
     else:
         print(('Model not supported: ', params.model))
         assert 0
@@ -58,13 +60,13 @@ class LeNet(nn.Module):
         x = self.fc3(x)
         return x
 
-class TestCifar(nn.Module):
+class CNN(nn.Module):
     def __init__(self, params):
-        super(TestCifar, self).__init__()
+        super(CNN, self).__init__()
         # in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True
         self.conv1 = nn.Conv2d(3, 3, 5, padding=2)
-        self.fc = nn.Linear(3*1024, 84)
-        self.fc3 = nn.Linear(84, 10)
+        self.fc = nn.Linear(3*1024, 1024)
+        self.fc3 = nn.Linear(1024, 10)
 
     def forward(self, x):
         x = x.view(-1, 3, 32, 32)
@@ -77,22 +79,48 @@ class TestCifar(nn.Module):
     def loss(self):
         return 0
 
+class LDR2(nn.Module):
+    def __init__(self, params):
+        super(LDR2, self).__init__()
+
+        fc_size = 1024
+
+        self.params = params
+
+        self.W = StructuredLinear(params)
+        self.fc = nn.Linear(params.layer_size, fc_size)
+        self.fc3 = nn.Linear(fc_size, 10)
+
+    def forward(self, x):
+        x = self.W(x)
+        x = F.relu(self.fc(x))
+        x = self.fc3(x)
+        return x
+
+    def loss(self):
+        lamb = 0.0001
+        if self.params.class_type == 'unconstrained':
+            return 0 #TODO should probably compare against L2 regularized
+        return lamb*torch.sum(torch.abs(self.W.G)) + lamb*torch.sum(torch.abs(self.W.H))
+
+
+
 class LDRNet(nn.Module):
     def __init__(self, params):
         super(LDRNet, self).__init__()
-        self.n = params.layer_size
+        self.n = 1024
+        channels = 3
+        fc_size = 1024
 
-        channels = 1
-
-        self.LDR1 = ldr.LDR(params.class_type, 3, 3, params.r, params.layer_size, bias=True)
+        self.LDR1 = ldr.LDR(params.class_type, 3, 3, params.r, self.n, bias=True)
         # self.LDR2 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
         # self.LDR3 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
         # self.LDR4 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
         # self.b1 = Parameter(torch.Tensor(params.layer_size))
         # torch.nn.init.normal_(self.b1,std=params.init_stddev)
-        # self.W1 = Parameter(torch.Tensor(3*1024, 84))
-        self.fc = nn.Linear(3*self.n, 84)
-        self.fc3 = nn.Linear(84, 10)
+        # self.W1 = Parameter(torch.Tensor(3*1024, fc_size))
+        self.fc = nn.Linear(3*self.n, fc_size)
+        self.fc3 = nn.Linear(fc_size, 10)
 
     def forward(self, x):
         # print("\nx shape", x.shape)
