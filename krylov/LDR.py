@@ -23,8 +23,9 @@ class LDR(nn.Module):
         torch.nn.init.normal_(self.G, std=0.01) #TODO maybe set stddev to 0.1 or something?
         torch.nn.init.normal_(self.H, std=0.01)
         if bias:
-            self.bias = Parameter(torch.Tensor(self.out_channels, 1, self.n))
-            torch.nn.init.normal_(self.bias, std=0.1)
+            # self.bias = Parameter(torch.Tensor(self.out_channels, 1, self.n))
+            # torch.nn.init.normal_(self.bias, std=0.1)
+            self.bias = Parameter(torch.zeros(self.out_channels, 1, self.n))
         if self.displacement == 'toep_corner':
             self.corner = True
         elif self.displacement == 'toep_nocorn':
