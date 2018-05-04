@@ -28,18 +28,18 @@ method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'tridiagon
               'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'subdiagonal': 'sd', 'hankel_like': 'h', 'vandermonde_like': 'v'}
 
 def compare(args, method, rank, lr, decay_rate, mom):
-    params = ModelParams(args.dataset, args.transform, args.test, log_path, 
-            dataset.input_size, args.layer_size, dataset.out_size(), num_layers, 
-            loss, rank, args.steps, args.batch_size, lr, mom, init_type, 
-            method, learn_corner, n_diag_learned, init_stddev, fix_G, 
-            check_disp, check_disp_freq, checkpoint_freq, checkpoint_path, test_freq, verbose, 
-            decay_rate, args.decay_freq, learn_diagonal, fix_A_identity, 
+    params = ModelParams(args.dataset, args.transform, args.test, log_path,
+            dataset.input_size, args.layer_size, dataset.out_size(), num_layers,
+            loss, rank, args.steps, args.batch_size, lr, mom, init_type,
+            method, learn_corner, n_diag_learned, init_stddev, fix_G,
+            check_disp, check_disp_freq, checkpoint_freq, checkpoint_path, test_freq, verbose,
+            decay_rate, args.decay_freq, learn_diagonal, fix_A_identity,
             stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model,
             viz_freq, num_pred_plot, viz_powers, early_stop_steps, replacement,
             test_best_val_checkpoint)
 
     # Save params + git commit ID
-    this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size)
+    this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size) + '_steps' + str(args.steps)
     this_results_dir = params.save(results_dir, this_id, commit_id, command)
 
     for test_iter in range(args.trials):
@@ -76,11 +76,11 @@ parser.add_argument("--name") # Name of run
 parser.add_argument("--methods") # Which methods
 parser.add_argument("--dataset") # Which dataset
 parser.add_argument("--result_dir") # Where to save results
-parser.add_argument("--r") # Rank / displacement ranks
+parser.add_argument("--r", default='0') # Rank / displacement ranks
 parser.add_argument('--lr') # Learning rates
-parser.add_argument('--decay_rate', default=1.0) # Decay rates of learning rate
+parser.add_argument('--decay_rate', default='1.0') # Decay rates of learning rate
 parser.add_argument('--decay_freq', type=float) # Decay steps
-parser.add_argument('--mom') # Momentums
+parser.add_argument('--mom', default='0.9') # Momentums
 parser.add_argument('--steps', type=int) # Steps
 parser.add_argument('--batch_size', type=int) # Batch size
 parser.add_argument('--test', type=int, default=1) # Test on test set
@@ -114,7 +114,7 @@ train_size = 10000
 verbose = False
 replacement = False # If true, sample with replacement when batching
 check_disp = False # If true, checks rank of error matrix every check_disp_freq iters
-check_disp_freq = 5000 
+check_disp_freq = 5000
 fix_G = False
 early_stop_steps = 500000
 fix_A_identity = False
