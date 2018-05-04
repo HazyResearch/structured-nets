@@ -23,16 +23,20 @@ def construct_net(params):
         return LeNet(params)
     elif params.model == 'MLP':
         return MLP(params)
-    elif params.model == 'LDR':
+    elif params.model == 'LDRNet':
         return LDRNet(params)
     elif params.model == 'LDRfat':
-        return LDR2(params)
+        return LDRFat(params)
+    elif params.model == 'LDRLDR':
+        return LDRLDR(params)
     elif params.model == 'RNN':
         return RNN(params)
     elif params.model == 'Attention':
         return Attention(params)
     elif params.model == 'CNN':
         return CNN(params)
+    elif params.model == 'CNNPool':
+        return CNNPool(params)
     else:
         print(('Model not supported: ', params.model))
         assert 0
@@ -60,41 +64,89 @@ class LeNet(nn.Module):
         x = self.fc3(x)
         return x
 
-class CNN(nn.Module):
+# Simple 3 layer CNN with pooling
+class CNNPool(nn.Module):
     def __init__(self, params):
-        super(CNN, self).__init__()
-        # in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True
-        self.conv1 = nn.Conv2d(3, 3, 5, padding=2)
-        self.fc = nn.Linear(3*1024, 1024)
-        self.fc3 = nn.Linear(1024, 10)
+        super(CNNPool, self).__init__()
+        self.channels = 3
+        fc_size = 512
+        self.conv1 = nn.Conv2d(3, self.channels, 5, padding=2)
+        self.pool = nn.MaxPool2d(2, 2)
+
+        self.fc = nn.Linear(self.channels/4*1024, fc_size)
+        self.logits = nn.Linear(fc_size,10)
 
     def forward(self, x):
         x = x.view(-1, 3, 32, 32)
         x = F.relu(self.conv1(x))
-        x = x.view(-1, 3*1024)
+        x = self.pool(x)
+        x = x.view(-1, self.channels/4*1024)
+
         x = F.relu(self.fc(x))
-        x = self.fc3(x)
+        x = self.logits(x)
         return x
 
     def loss(self):
         return 0
 
-class LDR2(nn.Module):
-    def __init__(self, params):
-        super(LDR2, self).__init__()
 
-        fc_size = 1024
+# Simple 2 layer CNN: convolution channels, FC, softmax
+class CNN(nn.Module):
+    def __init__(self, params):
+        super(CNN, self).__init__()
+        self.noconv = False
+        self.pool = True
+        # in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True
+        if self.noconv:
+            self.conv1 = nn.Linear(3*1024, 3*1024)
+        else:
+            self.conv1 = nn.Conv2d(3, 3, 5, padding=2)
+
+        if self.pool:
+            self.pool = nn.MaxPool2d(2, 2)
+            self.fc = nn.Linear(768, 512)
+            self.logits = nn.Linear(512,10)
+        else:
+            self.fc = nn.Linear(3*1024, 512)
+            self.logits = nn.Linear(512, 10)
+
+    def forward(self, x):
+        if self.noconv:
+            x = F.relu(self.conv1(x))
+        else:
+            x = x.view(-1, 3, 32, 32)
+            x = F.relu(self.conv1(x))
+            x = x.view(-1, 3*1024)
+
+        if self.pool:
+            x = x.view(-1, 3, 32, 32)
+            x = self.pool(x)
+            x = x.view(-1, 768)
+
+        x = F.relu(self.fc(x))
+        x = self.logits(x)
+        return x
+
+    def loss(self):
+        return 0
+
+# LDR layer (single weight matrix), followed by FC and softmax
+class LDRFat(nn.Module):
+    def __init__(self, params):
+        super(LDRFat, self).__init__()
+
+        fc_size = 512
 
         self.params = params
 
-        self.W = StructuredLinear(params)
-        self.fc = nn.Linear(params.layer_size, fc_size)
-        self.fc3 = nn.Linear(fc_size, 10)
+        self.W = StructuredLinear(class_type=params.class_type, layer_size=3072, init_stddev=params.init_stddev, r=params.r)
+        self.fc = nn.Linear(3072, fc_size)
+        self.logits = nn.Linear(fc_size, 10)
 
     def forward(self, x):
         x = self.W(x)
         x = F.relu(self.fc(x))
-        x = self.fc3(x)
+        x = self.logits(x)
         return x
 
     def loss(self):
@@ -105,12 +157,13 @@ class LDR2(nn.Module):
 
 
 
+# LDR layer with channels, followed by FC and softmax
 class LDRNet(nn.Module):
     def __init__(self, params):
         super(LDRNet, self).__init__()
         self.n = 1024
         channels = 3
-        fc_size = 1024
+        fc_size = 512
 
         self.LDR1 = ldr.LDR(params.class_type, 3, 3, params.r, self.n, bias=True)
         # self.LDR2 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
@@ -120,7 +173,7 @@ class LDRNet(nn.Module):
         # torch.nn.init.normal_(self.b1,std=params.init_stddev)
         # self.W1 = Parameter(torch.Tensor(3*1024, fc_size))
         self.fc = nn.Linear(3*self.n, fc_size)
-        self.fc3 = nn.Linear(fc_size, 10)
+        self.logits = nn.Linear(fc_size, 10)
 
     def forward(self, x):
         # print("\nx shape", x.shape)
@@ -139,11 +192,68 @@ class LDRNet(nn.Module):
         x = x.contiguous().view(-1, 3*self.n)
         # print("x shape", x.shape)
         x = F.relu(self.fc(x))
-        x = self.fc3(x)
+        x = self.logits(x)
         return x
 
     def loss(self):
         return self.LDR1.loss()
+
+# LDR layer with channels, followed by another LDR layer, then softmax
+class LDRLDR(nn.Module):
+    def __init__(self, params):
+        super(LDRLDR, self).__init__()
+        self.channels = True
+
+        self.n = 1024
+        fc_size = 512
+
+        rank1 = 16
+        rank2 = 16
+        class1 = 'subdiagonal'
+        class2 = 'subdiagonal'
+
+        if self.channels:
+            self.LDR1 = ldr.LDR(class1, 3, 3, rank1, self.n, bias=True)
+        else:
+            self.LDR1 = StructuredLinear(class_type=class1, layer_size=3*1024, init_stddev=params.init_stddev, r=rank1)
+
+        self.LDR211 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
+        self.LDR212 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
+        self.LDR221 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
+        self.LDR222 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
+        self.LDR231 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
+        self.LDR232 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
+        self.b = Parameter(torch.zeros(fc_size))
+        self.logits = nn.Linear(fc_size, 10)
+
+    def forward(self, x):
+        if self.channels:
+            x = x.view(-1, 3, 1024)
+            x = x.transpose(0,1).contiguous().view(3, -1, self.n)
+            x = F.relu(self.LDR1(x))
+        else:
+            x = F.relu(self.LDR1(x))
+            x = x.view(-1, 3, 1024)
+            x = x.transpose(0,1).contiguous().view(3, -1, self.n)
+        x11 = x[0][:,:512]
+        x12 = x[0][:,512:]
+        x21 = x[1][:,:512]
+        x22 = x[1][:,512:]
+        x31 = x[2][:,:512]
+        x32 = x[2][:,512:]
+        # x = x.transpose(0,1) # swap batches and channels axis
+        # x = x.contiguous().view(-1, 3*self.n)
+        # x = F.relu(self.LDR21(x1) + self.LDR22(x2) + self.LDR23(x3) + self.b)
+        x = F.relu(self.LDR211(x11) + self.LDR212(x12) + self.LDR221(x21) + self.LDR222(x22) + self.LDR231(x31) + self.LDR232(x32) + self.b)
+        x = self.logits(x)
+        return x
+
+    def loss(self):
+        if self.channels:
+            return self.LDR1.loss()
+        else:
+            return 0
+
 
 class MLP(nn.Module):
     def __init__(self, params):
@@ -185,28 +295,6 @@ class Attention(nn.Module):
 
     def forward(self, x):
         return self.model.forward(x)
-
-    def loss(self):
-        return 0
-
-class RNN(nn.Module):
-    def __init__(self, params):
-        super(RNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
-
-    def forward(self, x, params):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 5 * 5)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
 
     def loss(self):
         return 0
