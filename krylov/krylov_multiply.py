@@ -309,6 +309,21 @@ def krylov_multiply_mine(subdiag, v, w):
 def subd_mult(subd_A, subd_B, G, H, x):
     rank, n = G.shape
     batch_size = x.shape[0]
+    # print("x.shape", x.shape)
+    # if not power of 2, round everything up
+    # TODO: this can maybe be handled better. also should benchmark how much speed non-po2 FFT loses
+    m = int(np.ceil(np.log2(n)))
+    if n != 1 << m:
+        n_ = 1 << m
+        x_ = torch.cat((x, torch.zeros(batch_size,n_-n).cuda()), dim=-1)
+        G_ = torch.cat((G, torch.zeros(rank,n_-n).cuda()), dim=-1)
+        H_ = torch.cat((H, torch.zeros(rank,n_-n).cuda()), dim=-1)
+        subd_A_ = torch.cat((subd_A, torch.zeros(n_-n).cuda()))
+        subd_B_ = torch.cat((subd_B, torch.zeros(n_-n).cuda()))
+        KT_out_ = krylov_transpose_multiply(subd_B_, H_, x_)
+        K_out_ = krylov_multiply(subd_A_, G_, KT_out_)
+        return K_out_[:, :n]
+
     KT_out = krylov_transpose_multiply(subd_B, H, x)
     K_out = krylov_multiply(subd_A, G, KT_out)
     return K_out
