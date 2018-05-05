@@ -36,7 +36,7 @@ def compare(args, method, rank, lr, decay_rate, mom):
             decay_rate, args.decay_freq, learn_diagonal, fix_A_identity,
             stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model,
             viz_freq, num_pred_plot, viz_powers, early_stop_steps, replacement,
-            test_best_val_checkpoint)
+            test_best_val_checkpoint, args.restore)
 
     # Save params + git commit ID
     this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size) + '_steps' + str(args.steps)
@@ -90,6 +90,7 @@ parser.add_argument('--torch', type=int) # Pytorch or TF
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 parser.add_argument('--parallel') #
 parser.add_argument('--trials', type=int, default=3) #
+parser.add_argument('--restore', type=int, default=0) # Whether to restore from latest checkpoint
 args = parser.parse_args()
 
 
