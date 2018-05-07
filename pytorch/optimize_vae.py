@@ -1,45 +1,31 @@
 from __future__ import print_function
 import argparse
-import torch
+import torch,torchvision
 import torch.utils.data
+import numpy as np
 from torch import nn, optim
 import matplotlib.pyplot as plt
 from torch.nn import functional as F
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
 from structured_layer import StructuredLinear
+from torch.nn.modules.padding import ConstantPad2d
 
-"""
-parser_vae = argparse.ArgumentParser(description='VAE MNIST Example')
-parser_vae.add_argument('--batch-size', type=int, default=128, metavar='N',
-                    help='input batch size for training (default: 128)')
-parser_vae.add_argument('--epochs', type=int, default=10, metavar='N',
-                    help='number of epochs to train (default: 10)')
-parser_vae.add_argument('--no-cuda', action='store_true', default=False,
-                    help='enables CUDA training')
-parser_vae.add_argument('--seed', type=int, default=1, metavar='S',
-                    help='random seed (default: 1)')
-parser_vae.add_argument('--log-interval', type=int, default=10, metavar='N',
-                    help='how many batches to wait before logging training status')
-args = parser_vae.parse_args()
-args.cuda = not args.no_cuda and torch.cuda.is_available()
-"""
-
-batch_size = 128
-epochs = 10
-seed = 1
-log_interval = 10
-cuda = True
+# Takes batch_size x 1 x 28 x 28 -> batch_size x 1 x 32 x 32 (pad with zeros)
+def pad(data):
+    pad_fn = ConstantPad2d(2,0)
+    padded = pad_fn(data)
+    return padded
 
 class VAE(nn.Module):
-    def __init__(self, params=None):
+    def __init__(self, params=None, cuda=True):
         super(VAE, self).__init__()
-
-        self.fc1 = StructuredLinear(params)#nn.Linear(784, 784) #
-        self.fc21 = nn.Linear(784, 20)
-        self.fc22 = nn.Linear(784, 20)
+        self.params = params
+        self.fc1 = StructuredLinear(params)#nn.Linear(params.layer_size, params.layer_size) #
+        self.fc21 = nn.Linear(self.params.layer_size, 20)
+        self.fc22 = nn.Linear(self.params.layer_size, 20)
         self.fc3 = nn.Linear(20, 400)
-        self.fc4 = nn.Linear(400, 784)
+        self.fc4 = nn.Linear(400, self.params.layer_size)
 
         self.device = torch.device("cuda" if cuda else "cpu")
 
@@ -60,13 +46,13 @@ class VAE(nn.Module):
         return F.sigmoid(self.fc4(h3))
 
     def forward(self, x):
-        mu, logvar = self.encode(x.view(-1, 784))
+        mu, logvar = self.encode(x.view(-1, self.params.layer_size))
         z = self.reparameterize(mu, logvar)
         return self.decode(z), mu, logvar
 
 # Reconstruction + KL divergence losses summed over all elements and batch
-def loss_function(recon_x, x, mu, logvar):
-    BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), size_average=False)
+def loss_function(recon_x, x, mu, logvar, params):
+    BCE = F.binary_cross_entropy(recon_x, x.view(-1, params.layer_size), size_average=False)
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
@@ -76,73 +62,105 @@ def loss_function(recon_x, x, mu, logvar):
 
     return BCE + KLD
 
-
-def train(model,epoch,train_loader,optimizer):
+def train(model,epoch,dataset,optimizer,params):
     model.train()
     train_loss = 0
-    for batch_idx, (data, _) in enumerate(train_loader):
+    n_batches = 200
+    total_examples = n_batches*batch_size
+    for batch_idx in range(n_batches):
+        data, _ = dataset.batch(batch_size, batch_idx)
+        data = torch.Tensor(data.reshape((data.shape[0],1,28,28)))
+        data = pad(data)
         data = data.to(model.device)
         optimizer.zero_grad()
         recon_batch, mu, logvar = model(data)
-        loss = loss_function(recon_batch, data, mu, logvar)
+        loss = loss_function(recon_batch, data, mu, logvar,params)
         loss.backward()
         train_loss += loss.item()
         optimizer.step()
-        if batch_idx % log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader),
-                loss.item() / len(data)))
-
+    avg_train_loss = train_loss / total_examples
     print('====> Epoch: {} Average loss: {:.4f}'.format(
-          epoch, train_loss / len(train_loader.dataset)))
+          epoch, avg_train_loss))
+    return avg_train_loss
 
-
-def test(model,epoch,test_loader,params):
+def validate(model,epoch,dataset,params,test=False):
     model.eval()
-    test_loss = 0
+    val_loss = 0
     with torch.no_grad():
-        for i, (data, _) in enumerate(test_loader):
-            data = data.to(model.device)
-            recon_batch, mu, logvar = model(data)
-            test_loss += loss_function(recon_batch, data, mu, logvar).item()
-            if i == 0:
-                n = min(data.size(0), 8)
-                comparison = torch.cat([data[:n],
-                                      recon_batch.view(batch_size, 1, 28, 28)[:n]])
-                save_image(comparison.cpu(),
-                         params.result_path + params.class_type + 'reconstruction_' + str(epoch) + '.png', nrow=n)
+        data = dataset.test_X if test else dataset.val_X
+        data = torch.Tensor(data.reshape((data.shape[0],1,28,28)))
+        data = pad(data)
+        data = data.to(model.device)
+        recon_batch, mu, logvar = model(data)
+        val_loss += loss_function(recon_batch, data, mu, logvar, params).item()
 
-    test_loss /= len(test_loader.dataset)
-    print('====> Test set loss: {:.4f}'.format(test_loss))
+    val_loss /= data.shape[0]
+    prefix = 'Test' if test else 'Validation'
+    print('====> ' + prefix + ' loss: {:.4f}'.format(val_loss))
+    return val_loss
 
-
-def optimize_vae(dataset, params):
+def optimize_vae(dataset, params, seed=1):
     torch.manual_seed(seed)
     model = VAE(params)
     model = model.to(model.device)
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    optim.Adam(model.parameters(), lr=params.lr)
 
-    kwargs = {'num_workers': 1, 'pin_memory': True} if cuda else {}
-    train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('/dfs/scratch1/thomasat/datasets/mnist', train=True, download=True,
-                       transform=transforms.ToTensor()),
-        batch_size=batch_size, shuffle=True, **kwargs)
-    test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('/dfs/scratch1/thomasat/datasets/mnist', train=False, transform=transforms.ToTensor()),
-        batch_size=
-        batch_size, shuffle=True, **kwargs)
+    writer = SummaryWriter(params.log_path)
+    print((torch.cuda.get_device_name(0)))
 
+    def log_stats(name, split, loss, step):
+        losses[split].append(loss)
+        writer.add_scalar(split+'/Loss', loss, step)
+        print(f"{name} loss  {params.class_type}: {loss:.6f}")
 
-    for epoch in range(1, epochs + 1):
-        train(model,epoch,train_loader,optimizer)
-        # Visualize FC1
-        #weight = model.fc1.weight.data
-        #plt.imshow(weight)
-        #plt.show()
-        test(model,epoch,test_loader,params)
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(('Parameter name, shape: ', name, param.data.shape))
+
+    losses = {'Train': [], 'Val': [], 'DR': [], 'ratio': [], 'Test':[], 'Best_val': np.inf,
+        'Best_val_epoch': 0, 'Best_val_save': None}
+    accuracies = {}
+
+    print('Running for %s epochs' % params.steps)
+    for epoch in range(1, params.steps + 1):
+        train_loss = train_dataset(model,epoch,dataset,optimizer, params)
+        val_loss = validate(model,epoch,dataset,params)
+
+        losses['Train'].append(train_loss)
+        losses['Val'].append(val_loss)
+
+        # Log
+        log_stats('Train', 'Train', train_loss, epoch)
+        log_stats('Validation', 'Val', val_loss, epoch)
+
+        # Update best validation loss so far
+        if val_loss < losses['Best_val']:
+            losses['Best_val'] = val_loss
+            losses['Best_val_epoch'] = epoch
+            save_path = os.path.join(params.checkpoint_path, str(epoch))
+            losses['Best_val_save'] = save_path
+            with open(save_path, 'wb') as f:
+                torch.save(net.state_dict(), f)
+            print(("Model saved in file: %s" % save_path))
+
         with torch.no_grad():
             sample = torch.randn(64, 20).to(model.device)
             sample = model.decode(sample).cpu()
-            save_image(sample.view(64, 1, 28, 28),
+            save_image(sample.view(64, 1, 32, 32),
                        params.result_path + params.class_type + 'sample_' + str(epoch) + '.png')
+
+    # Test
+    if params.test:
+        dataset.load_test_data()
+        # Load net from best validation
+        if losses['Best_val_save'] is not None: model.load_state_dict(torch.load(losses['Best_val_save']))
+        print(f'Loaded best validation checkpoint from: {losses['Best_val_save']}')
+
+        test_loss = validate(model,epoch,dataset,params,test=True)
+        losses['Test'].append(test_loss)
+        log_stats('Test', 'Test', test_loss, 0)
+
+    writer.export_scalars_to_json(os.path.join(params.log_path, "all_scalars.json"))
+    writer.close()
+
+    return losses, accuracies
