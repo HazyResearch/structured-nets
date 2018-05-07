@@ -1,5 +1,6 @@
 from __future__ import print_function
-import argparse
+from tensorboardX import SummaryWriter
+import argparse, os
 import torch,torchvision
 import torch.utils.data
 import numpy as np
@@ -66,9 +67,9 @@ def train(model,epoch,dataset,optimizer,params):
     model.train()
     train_loss = 0
     n_batches = 200
-    total_examples = n_batches*batch_size
+    total_examples = n_batches*params.batch_size
     for batch_idx in range(n_batches):
-        data, _ = dataset.batch(batch_size, batch_idx)
+        data, _ = dataset.batch(params.batch_size, batch_idx)
         data = torch.Tensor(data.reshape((data.shape[0],1,28,28)))
         data = pad(data)
         data = data.to(model.device)
@@ -103,7 +104,7 @@ def optimize_vae(dataset, params, seed=1):
     torch.manual_seed(seed)
     model = VAE(params)
     model = model.to(model.device)
-    optim.Adam(model.parameters(), lr=params.lr)
+    optimizer = optim.Adam(model.parameters(), lr=params.lr)
 
     writer = SummaryWriter(params.log_path)
     print((torch.cuda.get_device_name(0)))
@@ -123,7 +124,7 @@ def optimize_vae(dataset, params, seed=1):
 
     print('Running for %s epochs' % params.steps)
     for epoch in range(1, params.steps + 1):
-        train_loss = train_dataset(model,epoch,dataset,optimizer, params)
+        train_loss = train(model,epoch,dataset,optimizer, params)
         val_loss = validate(model,epoch,dataset,params)
 
         losses['Train'].append(train_loss)
@@ -140,7 +141,7 @@ def optimize_vae(dataset, params, seed=1):
             save_path = os.path.join(params.checkpoint_path, str(epoch))
             losses['Best_val_save'] = save_path
             with open(save_path, 'wb') as f:
-                torch.save(net.state_dict(), f)
+                torch.save(model.state_dict(), f)
             print(("Model saved in file: %s" % save_path))
 
         with torch.no_grad():
@@ -154,7 +155,7 @@ def optimize_vae(dataset, params, seed=1):
         dataset.load_test_data()
         # Load net from best validation
         if losses['Best_val_save'] is not None: model.load_state_dict(torch.load(losses['Best_val_save']))
-        print(f'Loaded best validation checkpoint from: {losses['Best_val_save']}')
+        print('Loaded best validation checkpoint from:', {losses['Best_val_save']})
 
         test_loss = validate(model,epoch,dataset,params,test=True)
         losses['Test'].append(test_loss)
