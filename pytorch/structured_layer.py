@@ -11,19 +11,21 @@ import toeplitz_gpu as toep
 import krylov_multiply as subd
 
 class StructuredLinear(nn.Module):
-    def __init__(self, params=None, class_type=None, layer_size=None, init_stddev=None, r=None):
+    def __init__(self, params=None, class_type=None, layer_size=None, init_stddev=None, r=None, tie_operators=False):
         super(StructuredLinear,self).__init__()
         if params is None:
-            assert None not in (class_type, layer_size, init_stddev, r)
+            assert None not in (class_type, layer_size, init_stddev, r, tie_operators)
             self.class_type = class_type
             self.layer_size = layer_size
             self.init_stddev = init_stddev
             self.r = r
+            self.tie_operators = tie_operators
         else:
             self.class_type = params.class_type
             self.layer_size = params.layer_size
             self.init_stddev = params.init_stddev
             self.r = params.r
+            self.tie_operators = params.tie_operators_same_layer
             self.params = params
         if self.class_type == 'unconstrained':
             self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
@@ -43,7 +45,10 @@ class StructuredLinear(nn.Module):
                 self.cycle = False
             elif self.class_type == 'subdiagonal':
                 self.subd_A = Parameter(torch.ones(self.layer_size))
-                self.subd_B = Parameter(torch.ones(self.layer_size))
+                if self.tie_operators:
+                    self.subd_B = self.subd_A
+                else:
+                    self.subd_B = Parameter(torch.ones(self.layer_size))
             else:
                 fn_A, fn_B_T = self.set_mult_fns(self.params)
                 self.fn_A = fn_A

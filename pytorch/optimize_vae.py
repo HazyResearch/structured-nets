@@ -19,14 +19,28 @@ def pad(data):
     return padded
 
 class VAE(nn.Module):
+    # tie_layers_same: A->A, B->B of the two layers
+    # tie_layers_opp: A->B, B->A of the two layers
     def __init__(self, params=None, cuda=True):
         super(VAE, self).__init__()
         self.params = params
         self.fc1 = StructuredLinear(params)#nn.Linear(params.layer_size, params.layer_size) #
         self.fc21 = nn.Linear(self.params.layer_size, 20)
         self.fc22 = nn.Linear(self.params.layer_size, 20)
-        self.fc3 = nn.Linear(20, 400)
-        self.fc4 = nn.Linear(400, self.params.layer_size)
+        if self.params.num_structured_layers == 1:    
+            self.fc3 = nn.Linear(20, 400)
+            self.fc4 = nn.Linear(400, self.params.layer_size)
+        else:
+            assert self.params.num_structured_layers == 2
+            self.fc3 = nn.Linear(20, self.params.layer_size)
+            self.fc4 = StructuredLinear(params)
+            if self.params.class_type == 'subdiagonal':
+                if self.params.tie_layers_A_A:
+                    self.fc4.subd_A = self.fc1.subd_A
+                    self.fc4.subd_B = self.fc1.subd_B
+                elif params.tie_layers_A_B:
+                    self.fc4.subd_A = self.fc1.subd_B
+                    self.fc4.subd_B = self.fc1.subd_A
 
         self.device = torch.device("cuda" if cuda else "cpu")
 
@@ -127,9 +141,6 @@ def optimize_vae(dataset, params, seed=1):
         train_loss = train(model,epoch,dataset,optimizer, params)
         val_loss = validate(model,epoch,dataset,params)
 
-        losses['Train'].append(train_loss)
-        losses['Val'].append(val_loss)
-
         # Log
         log_stats('Train', 'Train', train_loss, epoch)
         log_stats('Validation', 'Val', val_loss, epoch)
@@ -158,7 +169,6 @@ def optimize_vae(dataset, params, seed=1):
         print('Loaded best validation checkpoint from:', {losses['Best_val_save']})
 
         test_loss = validate(model,epoch,dataset,params,test=True)
-        losses['Test'].append(test_loss)
         log_stats('Test', 'Test', test_loss, 0)
 
     writer.export_scalars_to_json(os.path.join(params.log_path, "all_scalars.json"))

@@ -36,7 +36,8 @@ def compare(args, method, rank, lr, decay_rate, mom):
             decay_rate, args.decay_freq, learn_diagonal, fix_A_identity,
             stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model,
             viz_freq, num_pred_plot, viz_powers, early_stop_steps, replacement,
-            test_best_val_checkpoint, args.restore)
+            test_best_val_checkpoint, args.restore, num_structured_layers,
+            tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B)
 
     # Save params + git commit ID
     this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size) + '_steps' + str(args.steps)
@@ -133,6 +134,13 @@ checkpoint_freq = 1000
 num_conv_layers = 2
 test_best_val_checkpoint = True # If true, tests best checkpoint (by validation accuracy). Otherwise, tests last one.
 # trials = 3
+# Only affect VAE
+num_structured_layers = 1
+tie_operators_same_layer = False
+tie_layers_A_A = False
+tie_layers_A_B = False
+
+
 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
 results_dir = os.path.join(out_dir, 'results', args.result_dir)
 checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
