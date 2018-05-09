@@ -199,6 +199,7 @@ def toeplitz_mult(G, H, x, cycle=True):
     rank, n = G.shape
     batch_size = x.shape[0]
     f = (1,-1) if cycle else (0,0)
+    # f = (1,-1) if cycle else (1,1)
     transpose_out = KT_Toeplitz(n, f[1], batch_size, rank)(H, x)
     krylov_out = K_Toeplitz(n, f[0], batch_size, rank)(G, transpose_out)
     scaled = krylov_out if cycle else krylov_out

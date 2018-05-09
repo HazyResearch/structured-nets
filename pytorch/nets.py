@@ -6,16 +6,16 @@ from torch.nn.parameter import Parameter
 import copy
 import sys
 sys.path.insert(0, '../../krylov/')
-sys.path.insert(0, '../../pytorch/attention/')
+# sys.path.insert(0, '../../pytorch/attention/')
 
-from torch_krylov import *
-from torch_reconstruction import *
-from attention import *
-import toeplitz_gpu as toep
-import krylov_multiply as subd
+# from torch_krylov import *
+# from torch_reconstruction import *
+# from attention import *
+# import toeplitz_gpu as toep
+# import krylov_multiply as subd
 import LDR as ldr
 #from krylov_multiply import *
-# import structured_layer # this is already in attention
+from structured_layer import StructuredLinear # this is already in attention
 # TODO fix the 'import *'s
 
 def construct_net(params):
@@ -42,7 +42,8 @@ def construct_net(params):
         assert 0
 
 
-class LeNet(nn.Module):
+# Pytorch tutorial lenet variant
+class PTLeNet(nn.Module):
     def __init__(self, params):
         super(LeNet, self).__init__()
         # self.W1 = get_structured_W(params)
@@ -63,6 +64,32 @@ class LeNet(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+# single channel LeNet
+class LeNet(nn.Module):
+    def __init__(self, params):
+        super(LeNet, self).__init__()
+        self.d = int(np.sqrt(params.layer_size))
+        # in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True
+        self.conv1 = nn.Conv2d(1, 6, 5, padding=2)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
+        # self.fc = nn.Linear(self.d**2, self.d**2)
+        self.W = StructuredLinear(params)
+        self.b = Parameter(torch.zeros(self.d**2))
+        self.logits = nn.Linear(self.d**2, 10)
+
+    def forward(self, x):
+        x = x.view(-1, 1, self.d, self.d)
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = x.view(-1, self.d**2)
+        x = F.relu(self.W(x) + self.b)
+        x = self.logits(x)
+        return x
+
+    def loss(self):
+        return 0
 
 # Simple 3 layer CNN with pooling
 class CNNPool(nn.Module):
@@ -202,12 +229,12 @@ class LDRNet(nn.Module):
 class LDRLDR(nn.Module):
     def __init__(self, params):
         super(LDRLDR, self).__init__()
-        self.channels = True
+        self.channels = False
 
         self.n = 1024
         fc_size = 512
 
-        rank1 = 16
+        rank1 = 48
         rank2 = 16
         class1 = 'subdiagonal'
         class2 = 'subdiagonal'
@@ -252,7 +279,41 @@ class LDRLDR(nn.Module):
         if self.channels:
             return self.LDR1.loss()
         else:
-            return 0
+            lamb = 0.0001
+            # return 0
+            return lamb*torch.sum(torch.abs(self.LDR1.G)) + lamb*torch.sum(torch.abs(self.LDR1.H))
+
+
+class LDRLDR2(nn.Module):
+    def __init__(self, params):
+        super(LDRLDR, self).__init__()
+
+        self.n = 1024
+        channels = 4
+        fc_size = 512
+
+        rank1 = 48
+        rank2 = 16
+        class1 = 'subdiagonal'
+        class2 = 'subdiagonal'
+
+        self.LDR1 = StructuredLinear(class_type=class1, layer_size=self.channels*self.n, init_stddev=params.init_stddev, r=rank1, bias=True)
+        self.LDR2 = StructuredLinear(class_type=class2, layer_size=self.channels*self.n, init_stddev=params.init_stddev, r=rank2, bias=True)
+        self.logits = nn.Linear(fc_size, 10)
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        x = torch.cat((x, torch.zeros(batch_size, self.channels*self.n).cuda()), dim=-1)
+        x = F.relu(self.LDR1(x))
+        x = F.relu(self.LDR2(x))
+        x = self.logits(x)
+        return x
+
+    def loss(self):
+        lamb = 0.0001
+        # return 0
+        return lamb*torch.sum(torch.abs(self.LDR1.G)) + lamb*torch.sum(torch.abs(self.LDR1.H))
+
 
 
 class MLP(nn.Module):

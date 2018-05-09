@@ -11,7 +11,7 @@ import toeplitz_gpu as toep
 import krylov_multiply as subd
 
 class StructuredLinear(nn.Module):
-    def __init__(self, params=None, class_type=None, layer_size=None, init_stddev=None, r=None, tie_operators=False):
+    def __init__(self, params=None, class_type=None, layer_size=None, init_stddev=None, r=None, tie_operators=False, bias=False):
         super(StructuredLinear,self).__init__()
         if params is None:
             assert None not in (class_type, layer_size, init_stddev, r, tie_operators)
@@ -56,6 +56,10 @@ class StructuredLinear(nn.Module):
         else:
             print((f"{self.__class__.__name__} does not support {self.params.class_type}"))
             assert 0
+
+        self.bias = None
+        if bias:
+            self.bias = Parameter(torch.zeros(self.layer_size))
 
     # Assumes Stein displacement.
     def set_mult_fns(self, params):
@@ -109,19 +113,25 @@ class StructuredLinear(nn.Module):
     def forward(self, x):
         #print('class_type: ', self.class_type)
         if self.class_type == 'unconstrained':
-            return torch.matmul(x, self.W)
+            out = torch.matmul(x, self.W)
         elif self.class_type == 'low_rank':
             xH = torch.matmul(x, self.H.t())
-            return torch.matmul(xH, self.G)
+            out = torch.matmul(xH, self.G)
         elif self.class_type in ['toep_corner', 'toep_nocorn']:
-            return toep.toeplitz_mult(self.G, self.H, x, self.cycle)
+            out = toep.toeplitz_mult(self.G, self.H, x, self.cycle)
+            # out = toep.toeplitz_mult(self.G, self.G, x, self.cycle)
         elif self.class_type == 'subdiagonal':
-            return subd.subd_mult(self.subd_A, self.subd_B, self.G, self.H, x)
+            out = subd.subd_mult(self.subd_A, self.subd_B, self.G, self.H, x)
             #print('subdiagonal mult slow fast')
-            # return subd.subd_mult_slow_fast(self.subd_A, self.subd_B, self.G, self.H, x)
+            # out = subd.subd_mult_slow_fast(self.subd_A, self.subd_B, self.G, self.H, x)
         elif self.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
             'circulant_sparsity', 'tridiagonal_corner']:
 
             W = recon(self)
 
-            return torch.matmul(x, W.t())
+            out = torch.matmul(x, W.t())
+
+        if self.bias is not None:
+            return self.bias + out
+        else:
+            return out
