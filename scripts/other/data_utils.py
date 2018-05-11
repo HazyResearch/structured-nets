@@ -8,7 +8,7 @@ def normalize_data(data):
 
 def apply_normalization(data, mean, std):
     normalized = (data-mean)/std
-    print('mean, std: ', np.mean(normalized,axis=0), np.std(normalized,axis=0))
+    print('Apply normalization: mean, std: ', np.mean(normalized,axis=0), np.std(normalized,axis=0))
     return normalized
 
 def standardize(data, max_val=255.0):

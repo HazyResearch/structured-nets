@@ -60,6 +60,12 @@ def process_images(names, out_loc, mean=None, sd=None):
     X = np.vstack(Xs)
     Y = np.vstack(Ys)
 
+    # Shuffle
+    idx = np.arange(0, X.shape[0])  
+    np.random.shuffle(idx)
+    X = X[idx,:]
+    Y = Y[idx,:]
+
     if mean is None and sd is None:
         X, mean, sd  = normalize_data(X)
         print('X, Y: ', X.shape, Y.shape)
