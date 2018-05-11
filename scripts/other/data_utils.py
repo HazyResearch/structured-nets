@@ -3,6 +3,7 @@ import numpy as np
 def normalize_data(data):
     mean = np.mean(data,axis=0)
     std = np.std(data,axis=0)
+
     return apply_normalization(data,mean,std), mean, std
 
 def apply_normalization(data, mean, std):
