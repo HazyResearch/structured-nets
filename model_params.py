@@ -11,13 +11,14 @@ class ModelParams:
             fix_A_identity, stochastic_train, flip_K_B, num_conv_layers,
             torch, model, viz_freq, num_pred_plot, viz_powers,early_stop_steps,replacement,
             test_best_val_checkpoint, restore_from_checkpoint, num_structured_layers,
-            tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B):
+            tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B, train_fraction):
         if class_type not in ['symmetric', 'polynomial_transform', 'low_rank', 'toeplitz_like', 'toep_corner', 'subdiagonal', 'toep_nocorn', 'hankel_like', 'vandermonde_like', 'unconstrained', 'circulant_sparsity', 'tridiagonal_corner', 'tridiagonal_corners']:
             print('Class type ' + class_type + ' not supported')
             assert 0
         self.dataset_name = dataset_name
         # grayscale
         self.transform = transform
+        self.train_fraction = train_fraction
         self.replacement = replacement
         self.test = test
         self.early_stop_steps = early_stop_steps

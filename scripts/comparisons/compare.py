@@ -27,7 +27,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadNa
 method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'tridiagonal_corners': 'tcs', 'low_rank': 'lr', 'unconstrained': 'u',
               'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'subdiagonal': 'sd', 'hankel_like': 'h', 'vandermonde_like': 'v'}
 
-def compare(args, method, rank, lr, decay_rate, mom):
+def compare(args, method, rank, lr, decay_rate, mom, train_frac):
     params = ModelParams(args.dataset, args.transform, args.test, log_path,
             dataset.input_size, args.layer_size, dataset.out_size(), num_layers,
             loss, rank, args.steps, args.batch_size, lr, mom, init_type,
@@ -37,10 +37,10 @@ def compare(args, method, rank, lr, decay_rate, mom):
             stochastic_train, flip_K_B, num_conv_layers, args.torch, args.model,
             viz_freq, num_pred_plot, viz_powers, early_stop_steps, replacement,
             test_best_val_checkpoint, args.restore, num_structured_layers,
-            tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B)
+            tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B, train_frac)
 
     # Save params + git commit ID
-    this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size) + '_steps' + str(args.steps)
+    this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size) + '_tf' + str(train_frac) + '_steps' + str(args.steps)
     this_results_dir = params.save(results_dir, this_id, commit_id, command)
 
     for test_iter in range(args.trials):
@@ -73,7 +73,7 @@ def compare(args, method, rank, lr, decay_rate, mom):
 
 # Command line params
 parser = argparse.ArgumentParser()
-parser.add_argument("--name") # Name of run
+parser.add_argument("--name", default='') # Name of run
 parser.add_argument("--methods") # Which methods
 parser.add_argument("--dataset") # Which dataset
 parser.add_argument("--result_dir") # Where to save results
@@ -90,6 +90,7 @@ parser.add_argument('--transform', default='none') # Any transform of dataset, e
 parser.add_argument('--torch', type=int) # Pytorch or TF
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 parser.add_argument('--parallel') #
+parser.add_argument('--train_frac', default='1.0')
 parser.add_argument('--trials', type=int, default=3) #
 parser.add_argument('--restore', type=int, default=0) # Whether to restore from latest checkpoint
 args = parser.parse_args()
@@ -100,12 +101,14 @@ ranks = [int(r) for r in args.r.split(',')]
 lrs = [float(lr) for lr in args.lr.split(',')]
 decay_rates = [float(dr) for dr in args.decay_rate.split(',')]
 moms = [float(mom) for mom in args.mom.split(',')]
+train_fracs = [float(train_frac) for train_frac in args.train_frac.split(',')]
 
 logging.debug('Testing methods: ' + str(methods))
 logging.debug('Testing ranks: ' + str(ranks))
 logging.debug('Testing lrs: ' + str(lrs))
 logging.debug('Testing decay rates: ' + str(decay_rates))
 logging.debug('Testing moms: ' + str(moms))
+logging.debug('Testing train fracs: ' + str(train_fracs))
 
 # Fixed params
 num_layers = 1
@@ -135,7 +138,7 @@ num_conv_layers = 2
 test_best_val_checkpoint = True # If true, tests best checkpoint (by validation accuracy). Otherwise, tests last one.
 # trials = 3
 # Only affect VAE
-num_structured_layers = 1
+num_structured_layers = 2
 tie_operators_same_layer = False
 tie_layers_A_A = False
 tie_layers_A_B = False
@@ -146,22 +149,23 @@ results_dir = os.path.join(out_dir, 'results', args.result_dir)
 checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
 vis_path = os.path.join(out_dir, 'vis', args.result_dir)
 
-dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform,
-    stochastic_train, replacement, test_size, train_size, args.test)
-n_diag_learned = dataset.input_size - 1
 commit_id = get_commit_id()
 command = ' '.join(sys.argv)
 
 # setattr(cf, 'use_cupy', True)
 
 # TODO use itertools.product to do this
-for method in methods:
-    for rank in ranks:
-        for lr in lrs:
-            for decay_rate in decay_rates:
-                for mom in moms:
-                    if args.parallel:
-                        logging.debug('Starting thread')
-                        threading.Thread(target=compare,args=(args, method, rank, lr, decay_rate, mom),).start()
-                    else:
-                        compare(args, method, rank, lr, decay_rate, mom)
+for train_frac in train_fracs:
+    dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform,
+    stochastic_train, replacement, test_size, train_size, args.test, train_frac)
+    n_diag_learned = dataset.input_size - 1
+    for method in methods:
+        for rank in ranks:
+            for lr in lrs:
+                for decay_rate in decay_rates:
+                    for mom in moms:
+                        if args.parallel:
+                            logging.debug('Starting thread')
+                            threading.Thread(target=compare,args=(args, method, rank, lr, decay_rate, mom, train_frac),).start()
+                        else:
+                            compare(args, method, rank, lr, decay_rate, mom, train_frac)

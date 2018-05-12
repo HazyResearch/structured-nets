@@ -81,9 +81,12 @@ def batch_size_fn(new, count, sofar):
 class Dataset:
     # here n is the input size.
     # true_test: if True, we test on test set. Otherwise, split training set into train/validation.
-    def __init__(self, name, layer_size, num_iters, transform, stochastic_train, replacement, test_size=1000, train_size=10000, true_test=False):
+    def __init__(self, name, layer_size, num_iters, transform, stochastic_train, replacement, test_size=1000, train_size=10000, true_test=False, train_fraction=1.0, val_fraction=0.15):
         self.name = name
         self.mnist = None
+        # train_fraction and val_fraction used only in sample complexity experiments currently
+        self.train_fraction = train_fraction
+        self.val_fraction = val_fraction
         self.transform = transform
         self.replacement = replacement
         self.stochastic_train = stochastic_train
@@ -132,14 +135,30 @@ class Dataset:
             data = pkl.load(open(self.train_loc, 'rb'))
             train_X = data['X']
             train_Y = data['Y']
-            if self.name == 'norb_val':
-                val_size = 50000
-            elif self.name == 'rect':
-                val_size = 100
-            elif self.name == 'convex':
-                val_size = 800
+
+            # Shuffle
+            idx = np.arange(train_X.shape[0])
+            np.random.shuffle(idx)
+            train_X = train_X[idx,:]
+            train_Y = train_Y[idx,:]
+
+            # Downsample for sample complexity experiments
+            if self.train_fraction < 1.0:
+                num_samples = int(self.train_fraction*train_X.shape[0])
+                train_X = train_X[0:num_samples,:]
+                train_Y = train_Y[0:num_samples,:]
+
+                val_size = int(self.val_fraction*train_X.shape[0])
+
             else:
-                val_size = 2000
+                if self.name == 'norb_val':
+                    val_size = 50000
+                elif self.name == 'rect':
+                    val_size = 100
+                elif self.name == 'convex':
+                    val_size = 800
+                else:
+                    val_size = 2000
             train_size = train_X.shape[0] - val_size
             # Shuffle X
             idx = np.arange(0, train_X.shape[0])
