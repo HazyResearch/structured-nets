@@ -27,10 +27,10 @@ logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadNa
 method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'tridiagonal_corners': 'tcs', 'low_rank': 'lr', 'unconstrained': 'u',
               'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'subdiagonal': 'sd', 'hankel_like': 'h', 'vandermonde_like': 'v'}
 
-def compare(args, method, rank, lr, decay_rate, mom, train_frac):
+def compare(args, method, rank, lr, decay_rate, mom, train_frac, steps):
     params = ModelParams(args.dataset, args.transform, args.test, log_path,
             dataset.input_size, args.layer_size, dataset.out_size(), num_layers,
-            loss, rank, args.steps, args.batch_size, lr, mom, init_type,
+            loss, rank, steps, args.batch_size, lr, mom, init_type,
             method, learn_corner, n_diag_learned, init_stddev, fix_G,
             check_disp, check_disp_freq, checkpoint_freq, checkpoint_path, test_freq, verbose,
             decay_rate, args.decay_freq, learn_diagonal, fix_A_identity,
@@ -40,7 +40,7 @@ def compare(args, method, rank, lr, decay_rate, mom, train_frac):
             tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B, train_frac)
 
     # Save params + git commit ID
-    this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size) + '_tf' + str(train_frac) + '_steps' + str(args.steps)
+    this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size) + '_tf' + str(train_frac) + '_steps' + str(steps)
     this_results_dir = params.save(results_dir, this_id, commit_id, command)
 
     for test_iter in range(args.trials):
@@ -95,8 +95,6 @@ parser.add_argument('--trials', type=int, default=3) #
 parser.add_argument('--restore', type=int, default=0) # Whether to restore from latest checkpoint
 args = parser.parse_args()
 
-# Scale steps by train_frac
-args.steps = int(args.train_frac*args.steps)
 
 methods = args.methods.split(',')
 ranks = [int(r) for r in args.r.split(',')]
@@ -158,7 +156,9 @@ command = ' '.join(sys.argv)
 
 # TODO use itertools.product to do this
 for train_frac in train_fracs:
-    dataset = Dataset(args.dataset, args.layer_size, args.steps, args.transform,
+    # Scale steps by train_frac
+    this_steps = int(train_frac*args.steps)
+    dataset = Dataset(args.dataset, args.layer_size, this_steps, args.transform,
     stochastic_train, replacement, test_size, train_size, args.test, train_frac)
     n_diag_learned = dataset.input_size - 1
     for method in methods:
@@ -168,6 +168,6 @@ for train_frac in train_fracs:
                     for mom in moms:
                         if args.parallel:
                             logging.debug('Starting thread')
-                            threading.Thread(target=compare,args=(args, method, rank, lr, decay_rate, mom, train_frac),).start()
+                            threading.Thread(target=compare,args=(args, method, rank, lr, decay_rate, mom, train_frac, this_steps),).start()
                         else:
-                            compare(args, method, rank, lr, decay_rate, mom, train_frac)
+                            compare(args, method, rank, lr, decay_rate, mom, train_frac,this_steps)
