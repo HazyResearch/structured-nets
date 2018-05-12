@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 def update_minmax(mini, maxi, a):
     return min(mini, min(a)), max(maxi, max(a))
 
-def plot_all(n, sd, td, t=None, v=None, h=None, lr=None, u=None, fc=None):
+def plot_all(ax, n, sd, td, t=None, v=None, h=None, lr=None, u=None, fc=None):
     """
     pass in as dict of three arrays: r, acc, std
     sd: subdiagonal
@@ -25,41 +25,46 @@ def plot_all(n, sd, td, t=None, v=None, h=None, lr=None, u=None, fc=None):
     learned_std = [t['std'][0]] + sd['std'] + td['std']
     minp, maxp = min(learned_params), max(learned_params)
     mina, maxa = min(learned_acc), max(learned_acc)
-    plt.errorbar(learned_params, learned_acc, yerr=learned_std, linewidth=2, label='Learned operators (ours)')
+    ax.errorbar(learned_params, learned_acc, yerr=learned_std, linewidth=2, label='Learned operators (ours)')
     if t is not None:
         t_params = list(map(lambda r: 2*n*r, t['r']))
         minp, maxp = update_minmax(minp, maxp, t_params)
         mina, maxa = update_minmax(mina, maxa, t['acc'])
-        plt.errorbar(t_params, t['acc'], yerr=t['std'], linewidth=2, label='Toeplitz-like')
+        ax.errorbar(t_params, t['acc'], yerr=t['std'], linewidth=2, label='Toeplitz-like')
     if v is not None:
         v_params = list(map(lambda r: 2*n*r, v['r'])) # should be +n but looks weird for visualization
         minp, maxp = update_minmax(minp, maxp, v_params)
         mina, maxa = update_minmax(mina, maxa, v['acc'])
-        plt.errorbar(v_params, v['acc'], yerr=v['std'], linewidth=2, label='Vandermonde-like')
+        ax.errorbar(v_params, v['acc'], yerr=v['std'], linewidth=2, label='Vandermonde-like')
     if h is not None:
         h_params = list(map(lambda r: 2*n*r, h['r']))
         minp, maxp = update_minmax(minp, maxp, h_params)
         mina, maxa = update_minmax(mina, maxa, h['acc'])
-        plt.errorbar(h_params, h['acc'], yerr=h['std'], linewidth=2, label='Hankel-like')
+        ax.errorbar(h_params, h['acc'], yerr=h['std'], linewidth=2, label='Hankel-like')
     if lr is not None:
         lr_params = list(map(lambda r: 2*n*r, lr['r']))
         minp, maxp = update_minmax(minp, maxp, lr_params)
         mina, maxa = update_minmax(mina, maxa, lr['acc'])
-        plt.errorbar(lr_params, lr['acc'], yerr=lr['std'], linewidth=2, label='Low Rank')
+        ax.errorbar(lr_params, lr['acc'], yerr=lr['std'], linewidth=2, label='Low Rank')
     if u is not None:
         u_params = list(map(lambda h: n*h, u['h']))
         minp, maxp = update_minmax(minp, maxp, u_params)
         mina, maxa = update_minmax(mina, maxa, u['acc'])
-        plt.errorbar(u_params, u['acc'], yerr=u['std'], linewidth=2, label='Unconstrained')
+        ax.errorbar(u_params, u['acc'], yerr=u['std'], linewidth=2, label='Unconstrained')
     if fc is not None:
         mina, maxa = update_minmax(mina, maxa, [fc[0]])
-        plt.plot([minp, maxp], [fc[0], fc[0]], label='Fully Connected', color='black', linewidth=3, linestyle='--')
+        ax.plot([minp, maxp], [fc[0], fc[0]], label='Fully Connected', color='black', linewidth=3, linestyle='--')
 
-    plt.xlim([minp-1, maxp+1])
-    plt.ylim([mina-(maxa-mina)*0.1, maxa+(maxa-mina)*0.1])
-    plt.xlabel('Total number of parameters')
-    plt.ylabel('Test accuracy')
-    plt.legend(loc='lower right')
+    ax.set_aspect('auto', adjustable='box')
+    ax.set_xlim([minp-1, maxp+1])
+    ax.set_ylim([mina-(maxa-mina)*0.1, maxa+(maxa-mina)*0.1])
+    # ax.set_xlabel('Total number of parameters')
+    # ax.set_ylabel('Test accuracy')
+    # if legend == True:
+    #     ax.legend(loc='lower right')
+
+
+fig = plt.figure(figsize=(20,5))
 
 # SHL MNIST noise
 sd = {
@@ -93,11 +98,13 @@ lr = {
     'std': [0.016624946, 0.002953345, 0.0028577377, 0.0042491788]
 }
 fc = (.6875, 0)
-plt.figure()
-plot_all(784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
+plt.subplot(1,3,1)
+plt.title("MNIST noise")
+plot_all(fig.axes[0], 784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
+fig.axes[0].set_ylabel('Test accuracy')
 # plt.show()
-plt.savefig('params_shl_mnist_noise.pdf', bbox_inches='tight')
-plt.clf()
+# plt.savefig('params_shl_mnist_noise.pdf', bbox_inches='tight')
+# plt.clf()
 
 # SHL CIFAR-10 mono
 sd = {
@@ -131,11 +138,15 @@ lr = {
 'std': [0.0012832283, 0.0010208919, 0.00089938374, 0.0048380499]
     }
 fc = (0.4708, 0)
-plt.figure()
-plot_all(1024, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
+# plt.figure()
+plt.subplot(1,3,2)
+plt.title("CIFAR-10 mono")
+plot_all(fig.axes[1], 1024, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
+fig.axes[1].set_xlabel('Number of Parameters in Hidden Layer')
+# fig.axes[1].legend(loc='lower right')
 # plt.show()
-plt.savefig('params_shl_cifar_mono.pdf', bbox_inches='tight')
-plt.clf()
+# plt.savefig('params_shl_cifar_mono.pdf', bbox_inches='tight')
+# plt.clf()
 
 # SHL NORB
 sd = {
@@ -169,11 +180,22 @@ lr = {
     'std': [0.0026101458, 0.0013176826, 0.0001270434, 0.001628752]
 }
 fc = (0.6041038, 0)
-plt.figure()
-plot_all(784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
+# plt.figure()
+plt.subplot(1,3,3)
+plt.title("NORB")
+plot_all(fig.axes[2], 784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
+# fig.axes[2].legend(loc='lower right')
 # plt.show()
-plt.savefig('params_shl_norb.pdf', bbox_inches='tight')
+# plt.savefig('params_shl_norb.pdf', bbox_inches='tight')
+# plt.clf()
+
+
+# plt.show()
+plt.savefig('acc_vs_params_shl.pdf', bbox_inches='tight')
 plt.clf()
+
+# CNN last layer
+fig = plt.figure(figsize=(20,5))
 
 
 # CNN MNIST-noise
@@ -208,11 +230,10 @@ lr = {
     'std': [0.02600107, 0.023686616, 0.014401001, 0.010217078]
 }
 fc = (0.903, 0)
-plt.figure()
-plot_all(784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
-# plt.show()
-plt.savefig('params_cnn_mnist_noise.pdf', bbox_inches='tight')
-plt.clf()
+plt.subplot(1,3,1)
+plt.title("MNIST noise")
+plot_all(fig.axes[0], 784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
+fig.axes[0].set_ylabel('Test accuracy')
 
 # CNN CIFAR-10 mono
 sd = {
@@ -246,11 +267,11 @@ lr = {
     'std': [0.0041817101, 0.0045460523, 0.004343845, 0.0048006908]
 }
 fc = (0.6528, 0)
-plt.figure()
-plot_all(1024, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
-# plt.show()
-plt.savefig('params_cnn_cifar_mono.pdf', bbox_inches='tight')
-plt.clf()
+plt.subplot(1,3,2)
+plt.title("CIFAR-10 mono")
+plot_all(fig.axes[1], 1024, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
+fig.axes[1].set_xlabel('Number of Parameters in CNN Last Layer')
+# fig.axes[1].legend(loc='lower right')
 
 
 # CNN NORB
@@ -285,8 +306,10 @@ lr = {
     'std': [0.0069264239, 0.0041847723, 0.0047160424, 0.0028731704]
 }
 fc = (0.73229307, 0)
-plt.figure()
-plot_all(784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
-# plt.show()
-plt.savefig('params_cnn_norb.pdf', bbox_inches='tight')
-plt.clf()
+plt.subplot(1,3,3)
+plt.title("NORB")
+plot_all(fig.axes[2], 784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
+fig.axes[2].legend(loc='lower right')
+
+
+plt.savefig('acc_vs_params_cnn.pdf', bbox_inches='tight')
