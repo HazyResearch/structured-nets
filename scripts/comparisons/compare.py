@@ -95,6 +95,8 @@ parser.add_argument('--trials', type=int, default=3) #
 parser.add_argument('--restore', type=int, default=0) # Whether to restore from latest checkpoint
 args = parser.parse_args()
 
+# Scale steps by train_frac
+args.steps = int(args.train_frac*args.steps)
 
 methods = args.methods.split(',')
 ranks = [int(r) for r in args.r.split(',')]
