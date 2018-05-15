@@ -212,9 +212,11 @@ def compute_loss_and_accuracy(y, y_, params):
     assert 0
 
 def compute_y_cnn(x, W1, params):
-  #input_layer = tf.reshape(x, [-1, 32, 32, 3])
-  dim = int(np.sqrt(params.input_size))
-  input_layer = tf.reshape(x, [-1, dim, dim, 1]) # Assuming single channel
+  if params.dataset_name == 'cifar10' and 'grayscale' not in params.transform:
+    input_layer = tf.reshape(x, [-1, 32, 32, 3])
+  else:
+    dim = int(np.sqrt(params.input_size))
+    input_layer = tf.reshape(x, [-1, dim, dim, 1]) # Assuming single channel
   input_layer = tf.cast(input_layer, tf.float32)
 
   print('input ', input_layer)

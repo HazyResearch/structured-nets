@@ -48,7 +48,7 @@ def optimize_tf(dataset, params):
         val_loss,val_accuracy = restore_from_checkpoint(dataset,params,sess,saver,x,y_,loss,accuracy)
 
     eigvals = {'E': [], 'W': [], 'A': [], 'B': []}
-    losses = {'train': [], 'val': [], 'DR': [], 'ratio': [], 'eigvals': eigvals}
+    losses = {'train': [], 'val': [], 'DR': [], 'norm_res': [], 'norm_W': [], 'eigvals': eigvals}
     accuracies = {'train': [], 'val': [], 'best_val': 0.0, 'best_val_iter': 0}
     t1 = time.time()
     
@@ -63,9 +63,10 @@ def optimize_tf(dataset, params):
             logging.debug('Training step: ' + str(this_step))
             # Verify displacement rank
             if params.check_disp and this_step % params.check_disp_freq == 0:
-                dr, ratio, E_ev, W_ev, A_ev, B_ev = check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
+                dr, norm_res, norm_W, E_ev, W_ev, A_ev, B_ev = check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
                 losses['DR'].append(dr)
-                losses['ratio'].append(ratio)
+                losses['norm_res'].append(norm_res)
+                losses['norm_W'].append(norm_W)
                 losses['eigvals']['E'].append(E_ev)
                 losses['eigvals']['W'].append(W_ev)
                 losses['eigvals']['A'].append(A_ev)
