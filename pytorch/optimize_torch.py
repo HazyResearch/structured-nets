@@ -9,8 +9,8 @@ from torch.autograd import Variable
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from tensorboardX import SummaryWriter
-from optimize_nmt import optimize_nmt
-from optimize_iwslt import optimize_iwslt
+#from optimize_nmt import optimize_nmt
+#from optimize_iwslt import optimize_iwslt
 from optimize_vae import optimize_vae
 
 

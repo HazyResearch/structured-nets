@@ -51,7 +51,7 @@ def optimize_tf(dataset, params):
     losses = {'train': [], 'val': [], 'DR': [], 'norm_res': [], 'norm_W': [], 'eigvals': eigvals}
     accuracies = {'train': [], 'val': [], 'best_val': 0.0, 'best_val_iter': 0}
     t1 = time.time()
-    
+
     for _ in range(params.steps):
         this_step, lr = sess.run([global_step, learning_rate])
         batch_xs, batch_ys = dataset.batch(params.batch_size, this_step)
