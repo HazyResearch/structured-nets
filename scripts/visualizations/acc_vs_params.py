@@ -1,7 +1,11 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 def update_minmax(mini, maxi, a):
     return min(mini, min(a)), max(maxi, max(a))
+
+def normalize(params, n):
+    return [float(p)/n**2 for p in params]
 
 def plot_all(ax, n, sd, td, t=None, v=None, h=None, lr=None, u=None, fc=None):
     """
@@ -21,42 +25,48 @@ def plot_all(ax, n, sd, td, t=None, v=None, h=None, lr=None, u=None, fc=None):
     """
     learned_params = [2*n] + list(map(lambda r: 2*n*(r+1), sd['r'])) \
                      + list(map(lambda r: 2*n*(r+3), td['r']))
+    learned_params = normalize(learned_params,n)
     learned_acc = [t['acc'][0]] + sd['acc'] + td['acc']
     learned_std = [t['std'][0]] + sd['std'] + td['std']
     minp, maxp = min(learned_params), max(learned_params)
     mina, maxa = min(learned_acc), max(learned_acc)
-    ax.errorbar(learned_params, learned_acc, yerr=learned_std, linewidth=2, label='Learned operators (ours)')
+    ax.plot(learned_params, learned_acc, linewidth=5, label='Learned operators (ours)')
     if t is not None:
         t_params = list(map(lambda r: 2*n*r, t['r']))
+        t_params = normalize(t_params,n)
         minp, maxp = update_minmax(minp, maxp, t_params)
         mina, maxa = update_minmax(mina, maxa, t['acc'])
-        ax.errorbar(t_params, t['acc'], yerr=t['std'], linewidth=2, label='Toeplitz-like')
+        ax.plot(t_params, t['acc'], linewidth=5, linestyle='--',label='Toeplitz-like')
     if v is not None:
         v_params = list(map(lambda r: 2*n*r, v['r'])) # should be +n but looks weird for visualization
+        v_params = normalize(v_params,n)
         minp, maxp = update_minmax(minp, maxp, v_params)
         mina, maxa = update_minmax(mina, maxa, v['acc'])
-        ax.errorbar(v_params, v['acc'], yerr=v['std'], linewidth=2, label='Vandermonde-like')
+        ax.plot(v_params, v['acc'], linewidth=5, linestyle='--',label='Vandermonde-like')
     if h is not None:
         h_params = list(map(lambda r: 2*n*r, h['r']))
+        h_params = normalize(h_params,n)
         minp, maxp = update_minmax(minp, maxp, h_params)
         mina, maxa = update_minmax(mina, maxa, h['acc'])
-        ax.errorbar(h_params, h['acc'], yerr=h['std'], linewidth=2, label='Hankel-like')
+        ax.plot(h_params, h['acc'], linewidth=5, linestyle='--',label='Hankel-like')
     if lr is not None:
         lr_params = list(map(lambda r: 2*n*r, lr['r']))
+        lr_params = normalize(lr_params,n)
         minp, maxp = update_minmax(minp, maxp, lr_params)
         mina, maxa = update_minmax(mina, maxa, lr['acc'])
-        ax.errorbar(lr_params, lr['acc'], yerr=lr['std'], linewidth=2, label='Low Rank')
+        ax.plot(lr_params, lr['acc'], linewidth=5, linestyle='--',label='Low Rank')
     if u is not None:
         u_params = list(map(lambda h: n*h, u['h']))
+        u_params = normalize(u_params,n)
         minp, maxp = update_minmax(minp, maxp, u_params)
         mina, maxa = update_minmax(mina, maxa, u['acc'])
-        ax.errorbar(u_params, u['acc'], yerr=u['std'], linewidth=2, label='Unconstrained')
+        ax.plot(u_params, u['acc'], linewidth=5, linestyle='--', label='Unconstrained')
     if fc is not None:
         mina, maxa = update_minmax(mina, maxa, [fc[0]])
-        ax.plot([minp, maxp], [fc[0], fc[0]], label='Fully Connected', color='black', linewidth=3, linestyle='--')
+        ax.plot([minp, maxp], [fc[0], fc[0]], label='Fully Connected', color='black', linewidth=5, linestyle=':')
 
     ax.set_aspect('auto', adjustable='box')
-    ax.set_xlim([minp-1, maxp+1])
+    ax.set_xlim([minp, maxp])
     ax.set_ylim([mina-(maxa-mina)*0.1, maxa+(maxa-mina)*0.1])
     # ax.set_xlabel('Total number of parameters')
     # ax.set_ylabel('Test accuracy')
@@ -142,7 +152,7 @@ fc = (0.4708, 0)
 plt.subplot(1,3,2)
 plt.title("CIFAR-10 mono")
 plot_all(fig.axes[1], 1024, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
-fig.axes[1].set_xlabel('Number of Parameters in Hidden Layer')
+fig.axes[1].set_xlabel('Compression Factor of Hidden Layer')
 # fig.axes[1].legend(loc='lower right')
 # plt.show()
 # plt.savefig('params_shl_cifar_mono.pdf', bbox_inches='tight')
@@ -184,7 +194,7 @@ fc = (0.6041038, 0)
 plt.subplot(1,3,3)
 plt.title("NORB")
 plot_all(fig.axes[2], 784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
-# fig.axes[2].legend(loc='lower right')
+fig.axes[2].legend(loc='lower right')
 # plt.show()
 # plt.savefig('params_shl_norb.pdf', bbox_inches='tight')
 # plt.clf()
@@ -270,7 +280,7 @@ fc = (0.6528, 0)
 plt.subplot(1,3,2)
 plt.title("CIFAR-10 mono")
 plot_all(fig.axes[1], 1024, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
-fig.axes[1].set_xlabel('Number of Parameters in CNN Last Layer')
+fig.axes[1].set_xlabel('Compression Factor of CNN Last Layer')
 # fig.axes[1].legend(loc='lower right')
 
 
