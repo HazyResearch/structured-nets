@@ -1,11 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+# from matplotlib import rc
+# # activate latex text rendering
+# rc('text', usetex=True)
+
 def update_minmax(mini, maxi, a):
     return min(mini, min(a)), max(maxi, max(a))
 
 def normalize(params, n):
     return [float(p)/n**2 for p in params]
+    # return [n**2/float(p) for p in params]
 
 def plot_all(ax, n, sd, td, t=None, v=None, h=None, lr=None, u=None, fc=None):
     """
@@ -30,50 +35,57 @@ def plot_all(ax, n, sd, td, t=None, v=None, h=None, lr=None, u=None, fc=None):
     learned_std = [t['std'][0]] + sd['std'] + td['std']
     minp, maxp = min(learned_params), max(learned_params)
     mina, maxa = min(learned_acc), max(learned_acc)
-    ax.plot(learned_params, learned_acc, linewidth=5, label='Learned operators (ours)')
+    ax.plot(learned_params, learned_acc, linewidth=3, marker='d',  label=r'\textbf{Learned operators}')
     if t is not None:
         t_params = list(map(lambda r: 2*n*r, t['r']))
-        t_params = normalize(t_params,n)
-        minp, maxp = update_minmax(minp, maxp, t_params)
+        t_params_ = normalize(t_params,n)
+        minp, maxp = update_minmax(minp, maxp, t_params_)
         mina, maxa = update_minmax(mina, maxa, t['acc'])
-        ax.plot(t_params, t['acc'], linewidth=5, linestyle='--',label='Toeplitz-like')
+        ax.plot(t_params_, t['acc'], linewidth=3, linestyle='-', marker='d', label='Toeplitz-like')
     if v is not None:
         v_params = list(map(lambda r: 2*n*r, v['r'])) # should be +n but looks weird for visualization
         v_params = normalize(v_params,n)
         minp, maxp = update_minmax(minp, maxp, v_params)
         mina, maxa = update_minmax(mina, maxa, v['acc'])
-        ax.plot(v_params, v['acc'], linewidth=5, linestyle='--',label='Vandermonde-like')
+        ax.plot(v_params, v['acc'], linewidth=3, linestyle='-', marker='d', label='Vandermonde-like')
     if h is not None:
         h_params = list(map(lambda r: 2*n*r, h['r']))
         h_params = normalize(h_params,n)
         minp, maxp = update_minmax(minp, maxp, h_params)
         mina, maxa = update_minmax(mina, maxa, h['acc'])
-        ax.plot(h_params, h['acc'], linewidth=5, linestyle='--',label='Hankel-like')
+        ax.plot(h_params, h['acc'], linewidth=3, linestyle='-', marker='d', label='Hankel-like')
     if lr is not None:
         lr_params = list(map(lambda r: 2*n*r, lr['r']))
         lr_params = normalize(lr_params,n)
         minp, maxp = update_minmax(minp, maxp, lr_params)
         mina, maxa = update_minmax(mina, maxa, lr['acc'])
-        ax.plot(lr_params, lr['acc'], linewidth=5, linestyle='--',label='Low Rank')
+        ax.plot(lr_params, lr['acc'], linewidth=3, linestyle='-', marker='d', label='Low Rank')
     if u is not None:
         u_params = list(map(lambda h: n*h, u['h']))
         u_params = normalize(u_params,n)
         minp, maxp = update_minmax(minp, maxp, u_params)
         mina, maxa = update_minmax(mina, maxa, u['acc'])
-        ax.plot(u_params, u['acc'], linewidth=5, linestyle='--', label='Unconstrained')
+        ax.plot(u_params, u['acc'], linewidth=3, linestyle='-', label='Unconstrained')
     if fc is not None:
         mina, maxa = update_minmax(mina, maxa, [fc[0]])
-        ax.plot([minp, maxp], [fc[0], fc[0]], label='Fully Connected', color='black', linewidth=5, linestyle=':')
+        ax.plot([minp, maxp], [fc[0], fc[0]], label='Fully Connected', color='black', linewidth=3, linestyle='-.')
 
+    # ax.set_xticks(t_params_, ['1/'+str(n**2/p) for p in t_params])
+    # ax.set_xticks(t_params_)
     ax.set_aspect('auto', adjustable='box')
     ax.set_xlim([minp, maxp])
     ax.set_ylim([mina-(maxa-mina)*0.1, maxa+(maxa-mina)*0.1])
+    ticks = np.linspace(minp, maxp, num=7)
+    ax.set_xticks(ticks)
+    # ax.set_xticklabels([f'1/{n**2/p:.1f}' for p in t_params])
+    ax.set_xticklabels([f'{1./p:.1f}' for p in ticks])
     # ax.set_xlabel('Total number of parameters')
     # ax.set_ylabel('Test accuracy')
     # if legend == True:
     #     ax.legend(loc='lower right')
 
 
+plt.close()
 fig = plt.figure(figsize=(20,5))
 
 # SHL MNIST noise
@@ -109,7 +121,7 @@ lr = {
 }
 fc = (.6875, 0)
 plt.subplot(1,3,1)
-plt.title("MNIST noise")
+plt.title("MNIST-noise")
 plot_all(fig.axes[0], 784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
 fig.axes[0].set_ylabel('Test accuracy')
 # plt.show()
@@ -150,9 +162,9 @@ lr = {
 fc = (0.4708, 0)
 # plt.figure()
 plt.subplot(1,3,2)
-plt.title("CIFAR-10 mono")
+plt.title("CIFAR-10")
 plot_all(fig.axes[1], 1024, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
-fig.axes[1].set_xlabel('Compression Factor of Hidden Layer')
+fig.axes[1].set_xlabel('Compression Ratio of Hidden Layer')
 # fig.axes[1].legend(loc='lower right')
 # plt.show()
 # plt.savefig('params_shl_cifar_mono.pdf', bbox_inches='tight')
@@ -201,6 +213,8 @@ fig.axes[2].legend(loc='lower right')
 
 
 # plt.show()
+plt.tight_layout()
+# plt.show()
 plt.savefig('acc_vs_params_shl.pdf', bbox_inches='tight')
 plt.clf()
 
@@ -241,7 +255,7 @@ lr = {
 }
 fc = (0.903, 0)
 plt.subplot(1,3,1)
-plt.title("MNIST noise")
+plt.title("MNIST-noise")
 plot_all(fig.axes[0], 784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
 fig.axes[0].set_ylabel('Test accuracy')
 
@@ -278,7 +292,7 @@ lr = {
 }
 fc = (0.6528, 0)
 plt.subplot(1,3,2)
-plt.title("CIFAR-10 mono")
+plt.title("CIFAR-10")
 plot_all(fig.axes[1], 1024, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
 fig.axes[1].set_xlabel('Compression Factor of CNN Last Layer')
 # fig.axes[1].legend(loc='lower right')
@@ -322,4 +336,7 @@ plot_all(fig.axes[2], 784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
 fig.axes[2].legend(loc='lower right')
 
 
+plt.tight_layout()
 plt.savefig('acc_vs_params_cnn.pdf', bbox_inches='tight')
+# plt.show()
+plt.clf()
