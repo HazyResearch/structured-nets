@@ -35,31 +35,32 @@ def plot_all(ax, n, sd, td, t=None, v=None, h=None, lr=None, u=None, fc=None):
     learned_std = [t['std'][0]] + sd['std'] + td['std']
     minp, maxp = min(learned_params), max(learned_params)
     mina, maxa = min(learned_acc), max(learned_acc)
-    ax.plot(learned_params, learned_acc, linewidth=3, marker='d',  label=r'\textbf{Learned operators}')
+    # ax.plot(learned_params, learned_acc, linewidth=3, marker='d',  label=r"\textbf{Learned operators}")
+    ax.plot(learned_params, learned_acc, linewidth=3, marker='d',  label=r"Learned operators (ours)")
     if t is not None:
         t_params = list(map(lambda r: 2*n*r, t['r']))
         t_params_ = normalize(t_params,n)
         minp, maxp = update_minmax(minp, maxp, t_params_)
         mina, maxa = update_minmax(mina, maxa, t['acc'])
-        ax.plot(t_params_, t['acc'], linewidth=3, linestyle='-', marker='d', label='Toeplitz-like')
+        ax.plot(t_params_, t['acc'], linewidth=3, linestyle='-', marker='.', label='Toeplitz-like')
     if v is not None:
         v_params = list(map(lambda r: 2*n*r, v['r'])) # should be +n but looks weird for visualization
         v_params = normalize(v_params,n)
         minp, maxp = update_minmax(minp, maxp, v_params)
         mina, maxa = update_minmax(mina, maxa, v['acc'])
-        ax.plot(v_params, v['acc'], linewidth=3, linestyle='-', marker='d', label='Vandermonde-like')
+        ax.plot(v_params, v['acc'], linewidth=3, linestyle='-', marker='.', label='Vandermonde-like')
     if h is not None:
         h_params = list(map(lambda r: 2*n*r, h['r']))
         h_params = normalize(h_params,n)
         minp, maxp = update_minmax(minp, maxp, h_params)
         mina, maxa = update_minmax(mina, maxa, h['acc'])
-        ax.plot(h_params, h['acc'], linewidth=3, linestyle='-', marker='d', label='Hankel-like')
+        ax.plot(h_params, h['acc'], linewidth=3, linestyle='-', marker='.', label='Hankel-like')
     if lr is not None:
         lr_params = list(map(lambda r: 2*n*r, lr['r']))
         lr_params = normalize(lr_params,n)
         minp, maxp = update_minmax(minp, maxp, lr_params)
         mina, maxa = update_minmax(mina, maxa, lr['acc'])
-        ax.plot(lr_params, lr['acc'], linewidth=3, linestyle='-', marker='d', label='Low Rank')
+        ax.plot(lr_params, lr['acc'], linewidth=3, linestyle='-', marker='.', label='Low Rank')
     if u is not None:
         u_params = list(map(lambda h: n*h, u['h']))
         u_params = normalize(u_params,n)
