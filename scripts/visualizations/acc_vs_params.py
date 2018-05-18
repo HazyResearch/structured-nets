@@ -87,7 +87,7 @@ def plot_all(ax, n, sd, td, t=None, v=None, h=None, lr=None, u=None, fc=None):
 
 
 plt.close()
-fig = plt.figure(figsize=(20,5))
+fig = plt.figure(figsize=(12,3))
 
 # SHL MNIST noise
 sd = {
@@ -207,7 +207,7 @@ fc = (0.6041038, 0)
 plt.subplot(1,3,3)
 plt.title("NORB")
 plot_all(fig.axes[2], 784, sd, td, t=t, v=v, h=h, lr=lr, u=None, fc=fc)
-fig.axes[2].legend(loc='lower right')
+# fig.axes[2].legend(loc='lower right')
 # plt.show()
 # plt.savefig('params_shl_norb.pdf', bbox_inches='tight')
 # plt.clf()
@@ -220,7 +220,7 @@ plt.savefig('acc_vs_params_shl.pdf', bbox_inches='tight')
 plt.clf()
 
 # CNN last layer
-fig = plt.figure(figsize=(20,5))
+fig = plt.figure(figsize=(12,3))
 
 
 # CNN MNIST-noise
