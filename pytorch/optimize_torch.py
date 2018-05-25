@@ -98,33 +98,41 @@ def optimize_torch(dataset, params, seed=None):
 
         optimizer.step()
 
-        if step % steps_in_epoch == 0:
+        # log training every 100
+        # params.log_freq?
+        if step % 100 == 0:
             epochs += 1
             # lr_scheduler.step()
 
-        # if step % params.test_freq == 0:
             print(('Time: ', time.time() - t1))
             t1 = time.time()
             print(('Training step: ', step))
 
             log_stats('Train', 'Train', train_loss.data.item(), train_accuracy.data.item(), step)
 
+        # validate and checkpoint by epoch
+        if step % steps_in_epoch == 0:
             # Test on validation set
             val_loss, val_accuracy = test_split(net, val_X, val_Y, params, loss_fn, batch_size=params.batch_size)
             log_stats('Validation', 'Val', val_loss.item(), val_accuracy.item(), step)
 
-        # if step % params.checkpoint_freq == 0:
-        # checkpoint by epoch
-        if step % steps_in_epoch == 0:
-            save_path = os.path.join(params.checkpoint_path, str(step))
-            with open(save_path, 'wb') as f:
-                torch.save(net.state_dict(), f)
-            print(("Model saved in file: %s" % save_path))
-
             # record best model
             if val_accuracy.item() > best_val_acc:
+                # save_path = os.path.join(params.checkpoint_path, str(step))
+                save_path = os.path.join(params.checkpoint_path, 'best')
+                with open(save_path, 'wb') as f:
+                    torch.save(net.state_dict(), f)
+                print(("Best model saved in file: %s" % save_path))
+
                 best_val_acc = val_accuracy.item()
                 best_val_save = save_path
+
+    # save last checkpoint
+    save_path = os.path.join(params.checkpoint_path, 'last')
+    with open(save_path, 'wb') as f:
+        torch.save(net.state_dict(), f)
+    print(("Last model saved in file: %s" % save_path))
+
 
     # Test trained model
     if params.test:
