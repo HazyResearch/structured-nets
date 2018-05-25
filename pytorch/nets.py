@@ -29,6 +29,8 @@ def construct_net(params):
         return LDRFat(params)
     elif params.model == 'LDRLDR':
         return LDRLDR(params)
+    elif params.model == 'LDRLDR2':
+        return LDRLDR2(params)
     elif params.model == 'RNN':
         return RNN(params)
     elif params.model == 'Attention':
@@ -225,7 +227,7 @@ class LDRNet(nn.Module):
     def loss(self):
         return self.LDR1.loss()
 
-# LDR layer with channels, followed by another LDR layer, then softmax
+# LDR layer with 3 channels, followed by another LDR layer, then softmax
 class LDRLDR(nn.Module):
     def __init__(self, params):
         super(LDRLDR, self).__init__()
@@ -236,8 +238,8 @@ class LDRLDR(nn.Module):
 
         rank1 = 48
         rank2 = 16
-        class1 = 'subdiagonal'
-        class2 = 'subdiagonal'
+        class1 = 'toep_nocorn'
+        class2 = 'toep_nocorn'
 
         if self.channels:
             self.LDR1 = ldr.LDR(class1, 3, 3, rank1, self.n, bias=True)
@@ -286,11 +288,11 @@ class LDRLDR(nn.Module):
 
 class LDRLDR2(nn.Module):
     def __init__(self, params):
-        super(LDRLDR, self).__init__()
+        super(LDRLDR2, self).__init__()
 
         self.n = 1024
-        channels = 4
-        fc_size = 512
+        self.channels = 4
+        self.fc_size = 512
 
         rank1 = 48
         rank2 = 16
@@ -299,13 +301,14 @@ class LDRLDR2(nn.Module):
 
         self.LDR1 = StructuredLinear(class_type=class1, layer_size=self.channels*self.n, init_stddev=params.init_stddev, r=rank1, bias=True)
         self.LDR2 = StructuredLinear(class_type=class2, layer_size=self.channels*self.n, init_stddev=params.init_stddev, r=rank2, bias=True)
-        self.logits = nn.Linear(fc_size, 10)
+        self.logits = nn.Linear(self.fc_size, 10)
 
     def forward(self, x):
-        batch_size = x.shape[0]
-        x = torch.cat((x, torch.zeros(batch_size, self.channels*self.n).cuda()), dim=-1)
+        batch_size, n = x.shape[0], x.shape[1]
+        x = torch.cat((x, torch.zeros(batch_size, self.channels*self.n-n).cuda()), dim=-1)
         x = F.relu(self.LDR1(x))
         x = F.relu(self.LDR2(x))
+        x = x[:,:self.fc_size]
         x = self.logits(x)
         return x
 

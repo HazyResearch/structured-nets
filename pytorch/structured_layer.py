@@ -21,6 +21,7 @@ class StructuredLinear(nn.Module):
             self.r = r
             self.tie_operators = tie_operators
         else:
+            # TODO use defaults if params doesn't have it
             self.class_type = params.class_type
             self.layer_size = params.layer_size
             self.init_stddev = params.init_stddev
