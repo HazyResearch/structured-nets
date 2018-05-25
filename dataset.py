@@ -176,8 +176,8 @@ class Dataset:
             self.train_Y = train_Y[train_idx, :]
 
             # post-processing transforms
-            self.train_X = self.postprocess(self.train_X)
-            self.val_X = self.postprocess(self.val_X)
+            self.train_X, _ = self.postprocess(self.train_X)
+            self.val_X, _ = self.postprocess(self.val_X)
 
         elif self.name == 'smallnorb':
             data_loc = '/dfs/scratch1/thomasat/datasets/smallnorb/processed_py2.pkl'
@@ -215,6 +215,9 @@ class Dataset:
             self.val_Y = self.mnist.validation.labels
             self.test_X = self.mnist.test.images
             self.test_Y = self.mnist.test.labels
+            # postprocess
+            self.train_X, self.train_Y = self.augment(self.train_X, self.train_Y)
+            # self.test_X, self.test_Y = self.augment(self.test_X, self.test_Y)
         elif self.name == 'mnist_rot':
             self.load_train_data()
         elif self.name in ['swap_mnist_bg_rot']:
@@ -248,8 +251,8 @@ class Dataset:
             self.val_Y = Y[val_idx, :]
 
             # post-processing transforms
-            self.train_X = self.postprocess(self.train_X)
-            self.val_X = self.postprocess(self.val_X)
+            self.train_X, _ = self.postprocess(self.train_X)
+            self.val_X, _ = self.postprocess(self.val_X)
         elif self.name == 'mnist_rand_bg':
             self.load_train_data()
         elif self.name == 'rect_images':
@@ -303,7 +306,7 @@ class Dataset:
 
         print('Training set X,Y: ', self.train_X.shape, self.train_Y.shape)
         print('Validation set X,Y: ', self.val_X.shape, self.val_Y.shape)
-        self.print_dataset_stats()
+        # self.print_dataset_stats()
 
     def print_dataset_stats(self,test=False):
         print('Train X mean, std: ', np.mean(self.train_X,axis=0), np.std(self.train_X,axis=0))
@@ -377,14 +380,50 @@ class Dataset:
             print('Name not recognized: ', name)
             assert 0
 
-    def postprocess(self, X):
+    def postprocess(self, X, Y=None):
         # pad from 784 to 1024
         if 'pad' in self.transform:
             X = np.pad(X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
             # self.train_X = np.pad(self.train_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
             # self.val_X = np.pad(self.val_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
             # self.test_X = np.pad(self.test_X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
-        return X
+        return X, Y
+
+    def augment(self, X, Y=None):
+        if 'contrast' in self.transform:
+            def scale_patch(X):
+                patch = ((9, 19), (9, 19))
+                X_ = X.copy()
+                X_[:, patch[0][0]:patch[0][1], patch[1][0]:patch[1][1]] *= 2
+                return X_
+            # subsample
+            idx = np.arange(X.shape[0])
+            np.random.shuffle(idx)
+            X = X[idx,...]
+            Y = Y[idx,...]
+
+            X1 = X.reshape((-1,28,28))
+            X2 = scale_patch(X1)
+            X3 = scale_patch(X2)
+            X4 = scale_patch(X3)
+            # X5 = scale_patch(X4)
+            X = np.concatenate([X1, X2, X3, X4], axis=0).reshape(-1, 28*28)
+            Y = np.concatenate([Y, Y, Y, Y], axis=0)
+
+        if 'patch' in self.transform:
+            def add_patch(X):
+                patch = ((0, 4), (10, 18))
+                X_ = X.copy()
+                X_[:, patch[0][0]:patch[0][1], patch[1][0]:patch[1][1]] += 3.0
+                return X_
+            X1 = X.reshape((-1,28,28))
+            X2 = add_patch(X1)
+            X3 = add_patch(X2)
+            X4 = add_patch(X3)
+            X = np.concatenate([X1, X2, X3, X4], axis=0).reshape(-1, 28*28)
+            Y = np.concatenate([Y, Y, Y, Y], axis=0)
+
+        return X, Y
 
     def out_size(self):
         if self.name in ['convex', 'rect', 'rect_images']:
@@ -401,7 +440,9 @@ class Dataset:
             return self.input_size
 
     def load_test_data(self):
-        if self.name == 'timit':
+        if self.name == 'mnist':
+            pass
+        elif self.name == 'timit':
             test_feat_loc = '../../../timit/timit_heldout_feat.mat'
             test_lab_loc = '../../../timit/timit_heldout_lab.mat'
             test_X = sio.loadmat(test_feat_loc)['fea']
@@ -430,10 +471,10 @@ class Dataset:
             # Y must be one-hot
             enc = OneHotEncoder()
             self.test_Y = enc.fit_transform(self.test_Y).todense()
-        self.test_X = self.postprocess(self.test_X)
+        self.test_X, _ = self.postprocess(self.test_X)
         print('Loaded test data: ')
         print('Test X,Y:', self.test_X.shape, self.test_Y.shape)
-        self.print_dataset_stats(test=True)
+        # self.print_dataset_stats(test=True)
 
     def load_train_data(self):
         train_data = np.genfromtxt(self.train_loc)
@@ -473,10 +514,10 @@ class Dataset:
             return self.sample_without_replacement(batch_size, step)
 
     def sample_with_replacement(self, batch_size, step):
-        if self.name == 'mnist':
-            batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
-            return batch_xs, batch_ys
-        elif self.name.startswith('mnist') \
+        # if self.name == 'mnist':
+        #     batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
+        #     return batch_xs, batch_ys
+        if self.name.startswith('mnist') \
              or self.name.startswith('swap_mnist') \
              or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'norb_val', 'cifar10', 'timit']:
             #Randomly sample batch_size from train_X and train_Y
@@ -492,11 +533,11 @@ class Dataset:
             assert 0
 
     def sample_without_replacement(self, batch_size, step):
-        if self.name == 'mnist':
-            batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
-            return batch_xs, batch_ys
+        # if self.name == 'mnist':
+        #     batch_xs, batch_ys = self.mnist.train.next_batch(batch_size)
+        #     return batch_xs, batch_ys
         # elif self.name.startswith('mnist') or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'cifar10']:
-        elif self.name.startswith('mnist') \
+        if self.name.startswith('mnist') \
              or self.name.startswith('swap_mnist') \
              or self.name in ['convex', 'rect', 'rect_images', 'smallnorb', 'norb', 'norb_val', 'cifar10', 'timit']:
             return self.next_batch(batch_size)
