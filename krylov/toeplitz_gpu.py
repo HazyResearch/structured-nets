@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.autograd import Variable
 
-from complex_utils import complex_mult_
+from complex_utils import complex_mult
 
 
 class KT_Toeplitz():
@@ -38,15 +38,15 @@ class KT_Toeplitz():
         if self.eta is not None: # cycle version
             u_ = torch.ifft(self.ieta * u[..., np.newaxis], 1)
             v_ = torch.fft(self.eta * v[..., np.newaxis], 1)
-            uv_ = complex_mult_(u_[:, np.newaxis], v_[np.newaxis])
+            uv_ = complex_mult(u_[:, np.newaxis], v_[np.newaxis])
             uv = torch.fft(uv_, 1)
-            # We only need the real part of complex_mult_(self.eta, uv)
+            # We only need the real part of complex_mult(self.eta, uv)
             return self.eta[..., 0] * uv[..., 0] - self.eta[..., 1] * uv[..., 1]
         else:
             reverse_index = torch.arange(n-1, -1, -1, dtype=torch.long, device=u.device)
             u_ = torch.rfft(torch.cat((u[...,reverse_index], torch.zeros_like(u)), dim=-1), 1)
             v_ = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
-            uv_ = complex_mult_(u_[:, np.newaxis], v_[np.newaxis])
+            uv_ = complex_mult(u_[:, np.newaxis], v_[np.newaxis])
             return torch.irfft(uv_, 1, signal_sizes=(2 * n, ))[..., reverse_index]
         return ans
 
@@ -81,14 +81,14 @@ class K_Toeplitz():
         if self.eta is not None:
             w_ = torch.fft(self.eta * w[..., np.newaxis], 1)
             v_ = torch.fft(self.eta * v[..., np.newaxis], 1)
-            wv_sum_ = complex_mult_(w_, v_).sum(dim=1)
+            wv_sum_ = complex_mult(w_, v_).sum(dim=1)
             wv_sum = torch.ifft(wv_sum_, 1)
-            # We only need the real part of complex_mult_(self.ieta, wv_sum)
+            # We only need the real part of complex_mult(self.ieta, wv_sum)
             ans = self.ieta[..., 0] * wv_sum[..., 0] - self.ieta[..., 1] - wv_sum[..., 1]
         else:
             w_ = torch.rfft(torch.cat((w, torch.zeros_like(w)), dim=-1), 1)
             v_ = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
-            wv_sum_ = complex_mult_(w_, v_).sum(dim=1)
+            wv_sum_ = complex_mult(w_, v_).sum(dim=1)
             ans = torch.irfft(wv_sum_, 1, signal_sizes=(2 * n, ))[..., :n]
         return ans
 

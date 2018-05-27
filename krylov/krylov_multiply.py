@@ -6,7 +6,7 @@ import torch
 from triextrafat import krylov_construct
 # from triXXF import KrylovTransposeMultiply
 
-from complex_utils import complex_mult_, conjugate
+from complex_utils import complex_mult, conjugate
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -43,10 +43,10 @@ def krylov_transpose_multiply(subdiag, v, u):
         # polynomial multiplications
         S_f = torch.rfft(S, 1)
         S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
-        T_00_f = complex_mult_(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        T_01_f = complex_mult_(S1_01_f, S0_11_f)
-        T_10_f = complex_mult_(S1_11_f, S0_10_f)
-        T_11_f = complex_mult_(S1_11_f, S0_11_f)
+        T_00_f = complex_mult(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        T_01_f = complex_mult(S1_01_f, S0_11_f)
+        T_10_f = complex_mult(S1_11_f, S0_10_f)
+        T_11_f = complex_mult(S1_11_f, S0_11_f)
 
         T_f = torch.cat((torch.cat((T_00_f, T_01_f[:, np.newaxis]), dim=1),
                          torch.cat((T_10_f[np.newaxis], T_11_f[np.newaxis, np.newaxis]), dim=1)))
@@ -109,8 +109,8 @@ def krylov_multiply_forward_(subdiag, v):
         S0_10_f, S0_11_f, S1_11_f = S_f[:rank], S_f[-2], S_f[-1]
         save_for_backward[d] = (S0_10_f, S0_11_f)
 
-        T_10_f = complex_mult_(S1_11_f, S0_10_f)
-        T_11_f = complex_mult_(S1_11_f, S0_11_f)
+        T_10_f = complex_mult(S1_11_f, S0_10_f)
+        T_11_f = complex_mult(S1_11_f, S0_11_f)
 
         T_f = torch.cat((T_10_f, T_11_f[np.newaxis]))
 
@@ -158,7 +158,7 @@ def krylov_multiply(subdiag, v, w):
         dT_00_f, dT_01_f = dT_f[:, :rank], dT_f[:, -1]
 
         S0_10_f, S0_11_f = save_for_backward[d]
-        dS1_01_f = complex_mult_(conjugate(S0_10_f)[np.newaxis], dT_00_f).sum(dim=1) + complex_mult_(conjugate(S0_11_f), dT_01_f)
+        dS1_01_f = complex_mult(conjugate(S0_10_f)[np.newaxis], dT_00_f).sum(dim=1) + complex_mult(conjugate(S0_11_f), dT_01_f)
 
         dS1_01 = torch.irfft(dS1_01_f, 1, signal_sizes=(2 * n2, )) * (2 * n2)
         dS_01[:, 1::2] = dS1_01[:, :, :n2]
@@ -227,8 +227,8 @@ def trid_mult_slow(subd_A, diag_A, supd_A, subd_B, diag_B, supd_B, G, H, x, corn
 def test_transpose_multiply():
     m = 12
     n = 1<<m
-    batch_size = 512
-    rank = 3
+    batch_size = 50
+    rank = 16
     subdiag = torch.rand(n-1, requires_grad=True, device=device)
     A = np.diag(subdiag.data.cpu().numpy(), -1)
     u = torch.rand((batch_size, n), requires_grad=True, device=device)
@@ -255,7 +255,6 @@ def test_transpose_multiply():
     Ks_gpu = [krylov_construct_fast(subdiag, v_, f=0.0) for v_ in v]
     result5 = torch.stack([u @ K for K in Ks_gpu])
     result5 = result5.data.cpu().numpy().swapaxes(0, 1).squeeze()
-    # np.allclose(result_mine, result2)
     print(np.max(abs(result - result2)))
     print(np.mean(abs(result - result2)))
     print(np.max(abs(result3 - result2)))
@@ -288,15 +287,10 @@ def test_multiply():
     w_cpu = w.data.cpu().numpy()
     result2 = np.stack([w_cpu[:, i] @ Ks[i] for i in range(rank)]).sum(axis=0)
     result2 = result2.squeeze()
-    assert np.allclose(result_mine, result)
     assert np.allclose(result, result1)
     assert np.allclose(result1, result2)
-    print(np.max(abs(result_mine - result)))
-    print(np.mean(abs(result_mine - result)))
-    print(np.max(abs(grad_mine - grad)))
-    print(np.mean(abs(grad_mine - grad)))
-    print(np.max(abs(result_mine - result1)))
-    print(np.mean(abs(result_mine - result1)))
+    print(np.max(abs(result - result1)))
+    print(np.mean(abs(result - result1)))
     print(np.max(abs(result1 - result2)))
     print(np.mean(abs(result1 - result2)))
 
@@ -316,10 +310,16 @@ def test_multiply():
     grad_slow,  = torch.autograd.grad(result_slow.sum(), subdiag, retain_graph=True)
     print(torch.max(torch.abs(result - result_slow_old)).item())
     print(torch.mean(torch.abs(result - result_slow_old)).item())
+    print((grad - grad_slow_old).abs().max().item())
+    print((grad - grad_slow_old).abs().mean().item())
     print(torch.max(torch.abs(result - result_slow)).item())
     print(torch.mean(torch.abs(result - result_slow)).item())
+    print((grad - grad_slow).abs().max().item())
+    print((grad - grad_slow).abs().mean().item())
     print(torch.max(torch.abs(result_slow_fast - result)).item())
     print(torch.mean(torch.abs(result_slow_fast - result)).item())
+    print((grad - grad_slow_fast).abs().max().item())
+    print((grad - grad_slow_fast).abs().mean().item())
 
     trid_slow = trid_mult_slow(subdiag, diag, superdiag, subdiag, diag, superdiag, v, v, u)
 

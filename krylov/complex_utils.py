@@ -1,23 +1,19 @@
 import torch
-import cupy as cp
 
+# Check if cupy is available
 use_cupy = True
+try:
+    import cupy as cp
+    # Check if cupy works (If it's installed with the wrong version of CUDA, it can be imported but doesn't work)
+    a = cp.ndarray(1, 'complex64')
+    a = a * a
+except:
+    use_cupy = False
+    print("Cupy isn't installed or isn't working properly. Will use Pytorch's complex multiply, which is much slower.")
+
 
 if use_cupy:
     CUPY_MEM = cp.ndarray(1, dtype='float32').data.mem
-
-
-def torch_to_cupy(tensor):
-    '''Super hacky way to convert torch.cuda.FloatTensor to CuPy array.
-    Probably not safe, since we're manipulating GPU memory addresses directly.
-    '''
-    assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
-    # assert tensor.is_contiguous(), 'Input must be contiguous'
-    offset = tensor.data_ptr() - CUPY_MEM.ptr
-    array_mem = cp.cuda.memory.MemoryPointer(CUPY_MEM, offset)
-    array = cp.ndarray(tensor.shape, dtype='float32', memptr=array_mem)
-    array._strides = [4 * s for s in tensor.stride()]
-    return array
 
 
 def conjugate(X):
@@ -33,8 +29,21 @@ def complex_mult_torch(X, Y):
         dim=-1)
 
 
-def complex_mult_cupy(X, Y):
+def torch_to_cupy(tensor):
+    '''Hacky way to convert torch.cuda.FloatTensor to CuPy array.
+    Probably not safe, since we're manipulating GPU memory addresses directly.
+    '''
+    assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
+    offset = tensor.data_ptr() - CUPY_MEM.ptr
+    array_mem = cp.cuda.memory.MemoryPointer(CUPY_MEM, offset)
+    array = cp.ndarray(tensor.shape, dtype='float32', memptr=array_mem)
+    array._strides = [4 * s for s in tensor.stride()]
+    return array
+
+
+def complex_mult_cupy_raw(X, Y):
     '''X and Y are complex64 tensors but stored as torch.cuda.FloatTensor, with last dimension = 2.
+    Multiply X and Y using Cupy. Operation is not differentiable.
     '''
     assert isinstance(X, torch.cuda.FloatTensor) and isinstance(Y, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
     assert X.shape[-1] == 2 and Y.shape[-1] == 2, 'Last dimension must be 2'
@@ -46,16 +55,18 @@ def complex_mult_cupy(X, Y):
     return out
 
 
-class ComplexMult(torch.autograd.Function):
+class ComplexMultCupy(torch.autograd.Function):
+    '''X and Y are complex64 tensors but stored as torch.cuda.FloatTensor, with last dimension = 2.
+    '''
     @staticmethod
     def forward(ctx, X, Y):
         ctx.save_for_backward(X, Y)
-        return complex_mult_cupy(X, Y)
+        return complex_mult_cupy_raw(X, Y)
 
     @staticmethod
     def backward(ctx, grad):
         X, Y = ctx.saved_tensors
-        grad_X, grad_Y = complex_mult_cupy(grad.data, conjugate(Y)), complex_mult_cupy(grad.data, conjugate(X))
+        grad_X, grad_Y = complex_mult_cupy_raw(grad.data, conjugate(Y)), complex_mult_cupy_raw(grad.data, conjugate(X))
         # Need to sum over dimensions that were broadcasted
         dims_to_sum_X = [grad.dim() - i for i in range(1, X.dim() + 1) if X.shape[-i] != grad.shape[-i]]
         dims_to_sum_Y = [grad.dim() - i for i in range(1, Y.dim() + 1) if Y.shape[-i] != grad.shape[-i]]
@@ -70,4 +81,4 @@ class ComplexMult(torch.autograd.Function):
         return grad_X, grad_Y
 
 
-complex_mult_ = ComplexMult.apply if use_cupy else complex_mult_torch
+complex_mult = ComplexMultCupy.apply if use_cupy and torch.cuda.is_available() else complex_mult_torch
