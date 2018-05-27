@@ -328,25 +328,38 @@ def subd_mult(subd_A, subd_B, G, H, x):
     K_out = krylov_multiply(subd_A, G, KT_out)
     return K_out
 
-def subd_mult_slow(subd_A, subd_B, G, H, x):
+def subd_mult_slow_old(subd_A, subd_B, G, H, x):
     rank, n = G.shape
-    batch_size = x.shape[0]
     linear_map_A = functools.partial(shift_subdiag, subd_A)
     linear_map_B = functools.partial(shift_subdiag, subd_B)
     krylovs = [(Krylov(linear_map_A, G[i]), Krylov(linear_map_B, H[i]).t()) for i in range(rank)]
     prods = [K[0] @ (K[1] @ x.t()) for K in krylovs]
     return sum(prods).t()
 
+def subd_mult_slow(subd_A, subd_B, G, H, x, corner_A=0.0, corner_B=0.0):
+    if G.shape[0] == 1:  # specialized code for rank=1, giving 2x speedup.
+        K_G = Krylov(subdiag_linear_map(subd_A, corner_A), G[0])
+        K_H = Krylov(subdiag_linear_map(subd_B, corner_B), H[0])
+        return (x @ K_H) @ K_G.t()
+    else:
+        K_G = Krylov(subdiag_linear_map(subd_A, corner_A), G)
+        K_H = Krylov(subdiag_linear_map(subd_B, corner_B), H)
+        return ((x @ K_H) @ K_G.transpose(1, 2)).sum(dim=0)
 
 def subd_mult_slow_fast(subd_A, subd_B, G, H, x):
-    rank, n = G.shape
-    batch_size = x.shape[0]
-    K_G, K_H = krylov_construct_subdiag(subd_A, G), krylov_construct_subdiag(subd_B, H)
-    temp = (K_H.transpose(1, 2) @ x.t())
-    # result = K_G @ temp3
-    # For some reason K_G @ temp3 gives less accurate results than this
-    result = torch.stack([K_G_ @ temp_ for K_G_, temp_ in zip(K_G, temp)])
-    return result.sum(dim=0).t()
+    K_G, K_H = krylov_subdiag_fast(subd_A, G), krylov_subdiag_fast(subd_B, H)
+    return ((x @ K_H) @ K_G.transpose(1, 2)).sum(dim=0)
+
+def trid_mult_slow(subd_A, diag_A, supd_A, subd_B, diag_B, supd_B, G, H, x, corners_A=(0.0, 0.0), corners_B=(0.0, 0.0)):
+    if G.shape[0] == 1:  # specialized code for rank=1, giving 2x speedup.
+        K_G = Krylov(tridiag_linear_map(subd_A, diag_A, supd_A, *corners_A), G[0])
+        K_H = Krylov(tridiag_linear_map(subd_B, diag_B, supd_B, *corners_B), H[0])
+        return (x @ K_H) @ K_G.t()
+    else:
+        K_G = Krylov(tridiag_linear_map(subd_A, diag_A, supd_A, *corners_A), G)
+        K_H = Krylov(tridiag_linear_map(subd_B, diag_B, supd_B, *corners_B), H)
+        return ((x @ K_H) @ K_G.transpose(1, 2)).sum(dim=0)
+
 
 def test_transpose_multiply():
     m = 12
@@ -441,14 +454,25 @@ def test_multiply():
     # Combine transpose multiply follow by non-transpose multiply
     result = krylov_multiply_mine(subdiag, v, krylov_transpose_multiply_mine(subdiag, v, u))
 
+    diag = torch.rand(n, requires_grad=True, device=device)
+    superdiag = torch.rand(n-1, requires_grad=True, device=device)
+
     result = subd_mult(subdiag, subdiag, v, v, u)
-    result_slow = subd_mult_slow(subdiag, subdiag, v, v, u)
+    grad,  = torch.autograd.grad(result.sum(), subdiag, retain_graph=True)
+    result_slow_old = subd_mult_slow_old(subdiag, subdiag, v, v, u)
+    grad_slow_old,  = torch.autograd.grad(result_slow_old.sum(), subdiag, retain_graph=True)
     result_slow_fast = subd_mult_slow_fast(subdiag, subdiag, v, v, u)
+    grad_slow_fast,  = torch.autograd.grad(result_slow_fast.sum(), subdiag, retain_graph=True)
+    result_slow = subd_mult_slow(subdiag, subdiag, v, v, u)
+    grad_slow,  = torch.autograd.grad(result_slow.sum(), subdiag, retain_graph=True)
+    print(torch.max(torch.abs(result - result_slow_old)).item())
+    print(torch.mean(torch.abs(result - result_slow_old)).item())
     print(torch.max(torch.abs(result - result_slow)).item())
     print(torch.mean(torch.abs(result - result_slow)).item())
-    print(torch.max(torch.abs(result_slow_fast - result_slow)).item())
-    print(torch.mean(torch.abs(result_slow_fast - result_slow)).item())
+    print(torch.max(torch.abs(result_slow_fast - result)).item())
+    print(torch.mean(torch.abs(result_slow_fast - result)).item())
 
+    trid_slow = trid_mult_slow(subdiag, diag, superdiag, subdiag, diag, superdiag, v, v, u)
 
 def test_misc():
     pass
@@ -460,22 +484,40 @@ def test_misc():
     #     u_new_minus = u - one_hot
     #     print((torch.sum(cf.Rfft_slow(u_new)[0]) - torch.sum(cf.Rfft_slow(u_new_minus)[0])) / (2 * epsilon))
 
-def shift(v, f=1):
-    return torch.cat((f * v[[v.size(0) - 1]], v[:-1]))
-
-def shift_subdiag(subdiag, v, f=0.0):
-    return torch.cat((f * v[[-1]], subdiag * v[:-1]))
-
 def Krylov(linear_map, v, n=None):
     if n is None:
-        n = v.size(0)
+        n = v.size(-1)
     cols = [v]
     for _ in range(n - 1):
         v = linear_map(v)
         cols.append(v)
     return torch.stack(cols, dim=-1)
 
-def krylov_construct_subdiag(subdiag, v, f=0.0):
+def shift_subdiag(subdiag, v, f=0.0):
+    return torch.cat((f * v[[-1]], subdiag * v[:-1]))
+
+def subdiag_linear_map(subdiag, upper_right_corner=0.0):
+    n = subdiag.size(0) + 1
+    shift_down = torch.arange(-1, n - 1, dtype=torch.long, device=v.device) % n
+    subdiag_extended = torch.cat((torch.tensor([upper_right_corner], dtype=subdiag.dtype, device=subdiag.device), subdiag))
+    return lambda v: subdiag_extended * v[..., shift_down]
+
+def tridiag_linear_map(subdiag, diag, superdiag, upper_right_corner=0.0, lower_left_corner=0.0):
+    n = diag.size(0)
+    shift_none = torch.arange(n, dtype=torch.long, device=v.device)
+    shift_down = (shift_none - 1) % n
+    shift_up = (shift_none + 1) % n
+    shifts = torch.stack((shift_down, shift_none, shift_up))
+    subdiag_extended = torch.cat((torch.tensor([upper_right_corner], dtype=subdiag.dtype, device=subdiag.device), subdiag))
+    superdiag_extended = torch.cat((superdiag, torch.tensor([lower_left_corner], dtype=subdiag.dtype, device=subdiag.device)))
+    diags = torch.stack((subdiag_extended, diag, superdiag_extended))
+    return lambda v: (diags * v[..., shifts]).sum(dim=-2)
+
+def tridiag_linear_map_slow(subdiag, diag, superdiag, upper_right_corner=0.0, lower_left_corner=0.0):
+    return lambda v: torch.cat((upper_right_corner * v[..., -1:], subdiag * v[..., :-1]), dim=-1) + diag * v + torch.cat((superdiag * v[..., 1:], lower_left_corner * v[..., :1]), dim=-1)
+
+
+def krylov_subdiag_fast(subdiag, v, f=0.0):
     rank, n  = v.shape
     a = torch.arange(n, dtype=torch.long, device=v.device)
     b = -a
@@ -483,14 +525,35 @@ def krylov_construct_subdiag(subdiag, v, f=0.0):
     # So we have to make the indices positive.
     indices = (a[:, np.newaxis] + b[np.newaxis]) % n
     v_circulant = v[:, indices]
-    subdiag_extended = torch.cat((torch.tensor([f], dtype=v.dtype, device=v.device), subdiag))
+    subdiag_extended = torch.cat((torch.tensor([f], dtype=subdiag.dtype, device=subdiag.device), subdiag))
     subdiag_circulant = subdiag_extended[indices]
     subdiag_cumprod = subdiag_circulant.cumprod(dim=1)
     K = v_circulant
     K[:, :, 1:] *= subdiag_cumprod[:, :-1]
     return K
 
+def krylov_subdiag_test():
+    m = 10
+    n = 1 << m
+    subdiag = torch.rand(n - 1, requires_grad=True, device=device)
+    v = torch.rand((16, n), requires_grad=True, device=device)
+    K = Krylov(subdiag_linear_map(subdiag, 1.0), v)
+    K_fast = krylov_subdiag_fast(subdiag, v, f=1.0)
+    print((K - K_fast).abs().max().item())
+
+def krylov_tridiag_test():
+    m = 10
+    n = 1 << m
+    subdiag = torch.rand(n-1, requires_grad=True, device=device) / 2
+    diag = torch.rand(n, requires_grad=True, device=device) / 2
+    superdiag = torch.rand(n-1, requires_grad=True, device=device) / 2
+    v = torch.rand((3, n), requires_grad=True, device=device)
+    K = Krylov(tridiag_linear_map(subdiag, diag, superdiag, 0.5, 0.5), v)
+    K_old = Krylov(tridiag_linear_map_slow(subdiag, diag, superdiag, 0.5, 0.5), v)
+    print((K - K_old).abs().max().item())
+
 if __name__ == "__main__":
     test_transpose_multiply()
     test_multiply()
-
+    # krylov_subdiag_test()
+    # krylov_tridiag_test()
