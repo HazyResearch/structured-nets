@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from torch.autograd import Variable
 
-import cufat as cf
 from complex_utils import complex_mult_
 
 
@@ -47,62 +46,9 @@ class KT_Toeplitz():
             reverse_index = torch.arange(n-1, -1, -1, dtype=torch.long, device=u.device)
             u_ = torch.rfft(torch.cat((u[...,reverse_index], torch.zeros_like(u)), dim=-1), 1)
             v_ = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
-            uv_ = cf.complex_mult_(u_[:, np.newaxis], v_[np.newaxis])
+            uv_ = complex_mult_(u_[:, np.newaxis], v_[np.newaxis])
             return torch.irfft(uv_, 1, signal_sizes=(2 * n, ))[..., reverse_index]
         return ans
-
-
-class KT_Toeplitz_mine():
-    """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
-    Use my own wrapper of CuFFT.
-    """
-
-    def __init__(self, n, f=0, batch_size=1, rank=1):
-        # m = int(np.log2(n))
-        # assert n == 1 << m, 'n must be a power of 2'
-        self.n = n
-        # self.m = m
-        self.batch_size = batch_size
-        self.rank = rank
-
-        self.eta = None
-        if f != 0:
-            mod = np.power(np.abs(f), np.arange(n)/n)
-            if f > 0:
-                arg = np.ones(n)
-            else:
-                arg = np.fft.fft(np.eye(1,2*n,2*n-1))[0,:n]
-            # self.eta = mod * arg
-            self.eta = Variable(torch.Tensor((mod * arg).astype('complex64').view('float32')), requires_grad=False).cuda()
-            self.ieta = Variable(torch.Tensor((1/(mod * arg)).astype('complex64').view('float32')), requires_grad=False).cuda()
-
-
-    def __call__(self, v, u):
-        """
-        Multiply Krylov(Z_f, v)^T @ u
-        v: (rank, n)
-        u: (batch, n)
-        out: (batch, rank, n)
-        """
-        n, batch_size, rank = self.n, self.batch_size, self.rank
-
-        if self.eta is not None: # cycle version
-            u_ = cf.Ifft.apply((self.ieta.view(n,2) * u.view(batch_size,n,1)).view(batch_size,2*n))
-            v_ = cf.Fft.apply((self.eta.view(n,2) * v.view(rank,n,1)).view(rank,2*n))
-            uv_ = cf.complex_mult_(u_.view(batch_size, 1, 2*n), v_.view(1, rank, 2*n))
-            ans = cf.complex_mult_(self.eta, cf.Fft.apply(uv_))
-            ans = ans[..., ::2]
-        else:
-            rev_idx_n = torch.arange(n-1, -1, -1, out=torch.cuda.LongTensor())
-            # output of rfft has size (2n/2)+1 = n+1 complex numbers, so 2n+2 real comps
-            rev_idx_2n = torch.arange(2*n+1, -1, -1, out=torch.cuda.LongTensor())
-
-            u_ = cf.Rfft.apply(torch.cat((u[...,rev_idx_n], torch.zeros_like(u)), dim=-1))
-            v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
-            uv_ = cf.complex_mult_(u_.view(batch_size, 1, -1), v_.view(1, rank, -1))
-            ans = cf.Irfft.apply(uv_)[..., rev_idx_n]
-        return ans.contiguous()
-    # TODO can this be done with rfft
 
 
 class K_Toeplitz():
@@ -145,54 +91,6 @@ class K_Toeplitz():
             wv_sum_ = complex_mult_(w_, v_).sum(dim=1)
             ans = torch.irfft(wv_sum_, 1, signal_sizes=(2 * n, ))[..., :n]
         return ans
-
-
-class K_Toeplitz_mine():
-    """Multiply Krylov(A, v) @ w when A is zero except on the subdiagonal.
-    Use my own wrapper of CuFFT
-    """
-
-    def __init__(self, n, f, batch_size=1, rank=1):
-        # m = int(np.log2(n))
-        # assert n == 1 << m, 'n must be a power of 2'
-        self.n = n
-        # self.m = m
-        self.batch_size = batch_size
-        self.rank = rank
-
-        self.eta = None
-        if f != 0:
-            mod = np.power(np.abs(f), np.arange(n)/n)
-            if f > 0:
-                arg = np.ones(n)
-            else:
-                arg = np.fft.fft(np.eye(1,2*n,2*n-1))[0,:n]
-            # self.eta = mod * arg
-            self.eta = Variable(torch.Tensor((mod * arg).astype('complex64').view('float32')), requires_grad=False).cuda()
-            self.ieta = Variable(torch.Tensor((1/(mod * arg)).astype('complex64').view('float32')), requires_grad=False).cuda()
-
-    def __call__(self, v, w):
-        """
-        v: (rank, n)
-        w: (batch_size, rank, n)
-        out: (batch_size, n)
-        """
-        n, batch_size, rank = self.n, self.batch_size, self.rank
-        if self.eta is not None:
-            weta = self.eta.view(n,2) * w.view(batch_size, rank, n, 1)
-            veta = self.eta.view(n,2) * v.view(rank, n, 1)
-            w_ = cf.Fft.apply(weta.view(batch_size, rank, -1))
-            v_ = cf.Fft.apply(veta.view(rank, -1))
-            wv_ = cf.complex_mult_(w_, v_)
-            ans = cf.complex_mult_(self.ieta, cf.Ifft.apply(torch.sum(wv_, dim=1)))
-
-            ans = ans[..., ::2]
-        else:
-            w_ = cf.Rfft.apply(torch.cat((w, torch.zeros_like(w)), dim=-1))
-            v_ = cf.Rfft.apply(torch.cat((v, torch.zeros_like(v)), dim=-1))
-            wv_ = cf.complex_mult_(w_, v_.view((1, rank, -1)))
-            ans = cf.Irfft.apply(torch.sum(wv_, dim=1))[..., :n]
-        return ans.contiguous()
 
 
 def toeplitz_mult(G, H, x, cycle=True):
@@ -326,5 +224,3 @@ def mem_test():
         b = Variable(torch.cuda.FloatTensor((2,4096)), requires_grad=True)
         c = toeplitz_mult(a,a,b)
         g, = torch.autograd.grad(torch.sum(c), a, retain_graph=True)
-        # a_ = cf.Rfft.apply(a)
-        # g, = torch.autograd.grad(torch.sum(a_), a, retain_graph=True)

@@ -7,10 +7,10 @@ from triextrafat import krylov_construct
 # from triXXF import KrylovTransposeMultiply
 
 from complex_utils import complex_mult_, conjugate
-import fft_utils as fu
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 def krylov_transpose_multiply(subdiag, v, u):
     """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
@@ -66,62 +66,6 @@ def krylov_transpose_multiply(subdiag, v, u):
     return T_00[:, :, :, reverse_index].squeeze(dim=2)
 
 
-def krylov_transpose_multiply_mine(subdiag, v, u):
-    """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
-    Use my own CuFFT wrapper, so it's about 5% faster than pytorch's FFT.
-
-    Parameters:
-        subdiag: Tensor of shape (n - 1, )
-        v: Tensor of shape (rank, n)
-        u: Tensor of shape (batch_size, n)
-    Returns:
-        product: Tensor of shape (batch_size, rank, n)
-    """
-    batch_size, n = u.shape
-    rank, n_ = v.shape
-    assert n == n_, 'u and v must have the same last dimension'
-    m = int(np.log2(n))
-    assert n == 1 << m, 'n must be a power of 2'
-
-    T_00 = u[:, np.newaxis, ..., np.newaxis] * v[np.newaxis, ..., np.newaxis]
-    T_01 = u[..., np.newaxis]
-    T_10 = v[..., np.newaxis]
-    T_11 = torch.ones((n, 1), device=T_00.device)
-    for d in range(m)[::-1]:
-        n1, n2 = 1 << d, 1 << (m - d - 1)
-        S_00, S_01, S_10, S_11 = T_00, T_01, T_10, T_11
-        S0_10 = torch.cat((S_10[:, ::2], torch.zeros_like(S_10[:, ::2])), dim=-1)
-        S1_01 = torch.cat((S_01[:, 1::2], torch.zeros_like(S_01[:, 1::2])), dim=-1)
-        S0_11 = torch.cat((S_11[::2], torch.zeros_like(S_11[::2])), dim=-1)
-        S1_11 = torch.cat((S_11[1::2], torch.zeros_like(S_11[1::2])), dim=-1)
-        S = torch.cat((S0_10, S0_11[np.newaxis], S1_01, S1_11[np.newaxis]))
-
-        # polynomial multiplications
-        S_f = fu.rfft(S)
-        S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
-        T_00_f = complex_mult_(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        T_01_f = complex_mult_(S1_01_f, S0_11_f)
-        T_10_f = complex_mult_(S1_11_f, S0_10_f)
-        T_11_f = complex_mult_(S1_11_f, S0_11_f)
-
-        T_f = torch.cat((torch.cat((T_00_f, T_01_f[:, np.newaxis]), dim=1),
-                         torch.cat((T_10_f[np.newaxis], T_11_f[np.newaxis, np.newaxis]), dim=1)))
-
-        T = fu.irfft(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
-        T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
-
-        # polynomial additions
-        T_00 = torch.cat((T_00[:, :, :, :n2], T_00[:, :, :, n2:] + S_00[:, :, ::2] + S_00[:, :, 1::2]), dim=-1)
-        T_01 = torch.cat((T_01[:, :, :n2], T_01[:, :, n2:] + S_01[:, ::2]), dim=-1)
-        T_10 = torch.cat((T_10[:, :, :n2], T_10[:, :, n2:] + S_10[:, 1::2]), dim=-1)
-
-    # Negative step isn't supported by Pytorch
-    # (https://github.com/pytorch/pytorch/issues/229) so we have to construct
-    # the index explicitly.
-    reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=T_00.device)
-    return T_00[:, :, :, reverse_index].squeeze(dim=2)
-
-
 def krylov_multiply_by_autodiff(subdiag, v, w):
     """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal, using Pytorch's autodiff.
     Parameters:
@@ -144,7 +88,7 @@ def krylov_multiply_by_autodiff(subdiag, v, w):
     return result
 
 
-def krylov_multiply_forward(subdiag, v):
+def krylov_multiply_forward_(subdiag, v):
     rank, n = v.shape
     m = int(np.log2(n))
     assert n == 1 << m, 'n must be a power of 2'
@@ -194,7 +138,7 @@ def krylov_multiply(subdiag, v, w):
     m = int(np.log2(n))
     assert n == 1 << m, 'n must be a power of 2'
 
-    save_for_backward = krylov_multiply_forward_mine(subdiag, v)
+    save_for_backward = krylov_multiply_forward_(subdiag, v)
     reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=w.device)
     w = w[:, :, np.newaxis, :]
     dT_00, dT_01 = w[:, :, :, reverse_index], torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
@@ -217,87 +161,6 @@ def krylov_multiply(subdiag, v, w):
         dS1_01_f = complex_mult_(conjugate(S0_10_f)[np.newaxis], dT_00_f).sum(dim=1) + complex_mult_(conjugate(S0_11_f), dT_01_f)
 
         dS1_01 = torch.irfft(dS1_01_f, 1, signal_sizes=(2 * n2, )) * (2 * n2)
-        dS_01[:, 1::2] = dS1_01[:, :, :n2]
-
-        dT_00, dT_01 = dS_00, dS_01
-
-    du = ((dT_00 * v[np.newaxis, :, :, np.newaxis]).sum(dim=1) + dT_01).squeeze(dim=-1)
-    return du
-
-def krylov_multiply_forward_mine(subdiag, v):
-    rank, n = v.shape
-    m = int(np.log2(n))
-    assert n == 1 << m, 'n must be a power of 2'
-
-    save_for_backward = [None] * m
-    T_10 = v[..., np.newaxis]
-    T_11 = torch.ones((n, 1), device=T_10.device)
-    for d in range(m)[::-1]:
-        n1, n2 = 1 << d, 1 << (m - d - 1)
-        S_10, S_11 = T_10, T_11
-        S0_10 = torch.cat((S_10[:, ::2], torch.zeros_like(S_10[:, ::2])), dim=-1)
-        S0_11 = torch.cat((S_11[::2], torch.zeros_like(S_11[::2])), dim=-1)
-        S1_11 = torch.cat((S_11[1::2], torch.zeros_like(S_11[1::2])), dim=-1)
-        S = torch.cat((S0_10, S0_11[np.newaxis], S1_11[np.newaxis]))
-
-        # polynomial multiplications
-        S_f = fu.rfft(S)
-        S0_10_f, S0_11_f, S1_11_f = S_f[:rank], S_f[-2], S_f[-1]
-        save_for_backward[d] = (S0_10_f, S0_11_f)
-
-        T_10_f = complex_mult_(S1_11_f, S0_10_f)
-        T_11_f = complex_mult_(S1_11_f, S0_11_f)
-
-        T_f = torch.cat((T_10_f, T_11_f[np.newaxis]))
-
-        T = fu.irfft(T_f) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
-        T_10, T_11 = T[:rank], T[-1]
-
-        # polynomial additions
-        T_10 = torch.cat((T_10[:, :, :n2], T_10[:, :, n2:] + S_10[:, 1::2]), dim=-1)
-
-    return save_for_backward
-
-def krylov_multiply_mine(subdiag, v, w):
-    """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal.
-    Use my own CuFFT wrapper, so it's about 5% faster than pytorch's FFT.
-    Parameters:
-        subdiag: Tensor of shape (n - 1, )
-        v: Tensor of shape (rank, n)
-        w: Tensor of shape (batch_size, rank, n)
-    Returns:
-        product: Tensor of shape (batch_size, n)
-    """
-    batch_size, rank, n = w.shape
-    rank_, n_ = v.shape
-    assert n == n_, 'w and v must have the same last dimension'
-    assert rank == rank_, 'w and v must have the same rank'
-    m = int(np.log2(n))
-    assert n == 1 << m, 'n must be a power of 2'
-
-    save_for_backward = krylov_multiply_forward_mine(subdiag, v)
-    reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=w.device)
-    w = w[:, :, np.newaxis, :]
-    dT_00, dT_01 = w[:, :, :, reverse_index], torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
-
-    for d in range(m):
-        n1, n2 = 1 << d, 1 << (m - d - 1)
-        dS_00 = torch.empty((batch_size, rank, 2 * n1, n2), device=w.device)
-        dS_00[:, :, ::2] = dT_00[:, :, :, n2:]
-        dS_00[:, :, 1::2] = dT_00[:, :, :, n2:]
-        dS_01 = torch.empty((batch_size, 2 * n1, n2), device=w.device)
-        dS_01[:, ::2] = dT_01[:, :, n2:]
-
-        dT = torch.cat((dT_00, dT_01[:, np.newaxis]), dim=1)
-        dT = dT * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
-
-        dT_f = fu.rfft(dT) / (2 * n2)
-        dT_00_f, dT_01_f = dT_f[:, :rank], dT_f[:, -1]
-
-        S0_10_f, S0_11_f = save_for_backward[d]
-        dS1_01_f = complex_mult_(conjugate(S0_10_f)[np.newaxis], dT_00_f).sum(dim=1) + complex_mult_(conjugate(S0_11_f), dT_01_f)
-
-        dS1_01 = fu.irfft(dS1_01_f) * (2 * n2)
         dS_01[:, 1::2] = dS1_01[:, :, :n2]
 
         dT_00, dT_01 = dS_00, dS_01
@@ -374,11 +237,6 @@ def test_transpose_multiply():
     grad,  = torch.autograd.grad(torch.sum(result), v, retain_graph=True)
     grad = grad.data.cpu().numpy()
     result = result.data.cpu().numpy()
-    # Use my own CuFFT wrapper
-    result_mine = krylov_transpose_multiply_mine(subdiag, v, u)
-    grad_mine, = torch.autograd.grad(torch.sum(result_mine), v, retain_graph=True)
-    grad_mine = grad_mine.data.cpu().numpy()
-    result_mine = result_mine.data.cpu().numpy()
     # CPU dense multiply
     Ks = [krylov_construct(A, v.data.cpu().numpy()[i], n) for i in range(rank)]
     u_cpu = u.data.cpu().numpy()
@@ -398,10 +256,6 @@ def test_transpose_multiply():
     result5 = torch.stack([u @ K for K in Ks_gpu])
     result5 = result5.data.cpu().numpy().swapaxes(0, 1).squeeze()
     # np.allclose(result_mine, result2)
-    print(np.max(abs(result - result_mine)))
-    print(np.mean(abs(result - result_mine)))
-    print(np.max(abs(grad - grad_mine)))
-    print(np.mean(abs(grad - grad_mine)))
     print(np.max(abs(result - result2)))
     print(np.mean(abs(result - result2)))
     print(np.max(abs(result3 - result2)))
@@ -426,11 +280,6 @@ def test_multiply():
     grad, = torch.autograd.grad(torch.sum(result), v, retain_graph=True)
     grad = grad.data.cpu().numpy()
     result = result.data.cpu().numpy()
-    # Use my own wrapper of CuFFT
-    result_mine = krylov_multiply_mine(subdiag, v, w)
-    grad_mine,  = torch.autograd.grad(torch.sum(result_mine), v, retain_graph=True)
-    grad_mine = grad_mine.data.cpu().numpy()
-    result_mine = result_mine.data.cpu().numpy()
     # Using autodiff
     result1 = krylov_multiply_by_autodiff(subdiag, v, w)
     result1 = result1.data.cpu().numpy()
