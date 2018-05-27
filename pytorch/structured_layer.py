@@ -122,9 +122,9 @@ class StructuredLinear(nn.Module):
             out = toep.toeplitz_mult(self.G, self.H, x, self.cycle)
             # out = toep.toeplitz_mult(self.G, self.G, x, self.cycle)
         elif self.class_type == 'subdiagonal':
-            out = subd.subd_mult(self.subd_A, self.subd_B, self.G, self.H, x)
+            out = subd.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
             #print('subdiagonal mult slow fast')
-            # out = subd.subd_mult_slow_fast(self.subd_A, self.subd_B, self.G, self.H, x)
+            # out = subd.subdiag_mult_slow_fast(self.subd_A, self.subd_B, self.G, self.H, x)
         elif self.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
             'circulant_sparsity', 'tridiagonal_corner']:
 

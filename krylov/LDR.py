@@ -58,7 +58,7 @@ class LDR(nn.Module):
                     fat = x[i]
                     comps[i,j] = toep.toeplitz_mult(self.G[i,j], self.H[i,j], x[i], self.corner)
                 elif self.displacement == 'subdiagonal':
-                    comps[i,j] = subd.subd_mult(self.subd_A[i,j], self.subd_B[i,j], self.G[i,j], self.H[i,j], x[i])
+                    comps[i,j] = subd.subdiag_mult(self.subd_A[i,j], self.subd_B[i,j], self.G[i,j], self.H[i,j], x[i])
         out = torch.sum(comps, dim=0)
         if self.bias is not None:
             out += self.bias

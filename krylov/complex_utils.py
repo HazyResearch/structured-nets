@@ -1,3 +1,11 @@
+''' Utility functions for handling complex tensors: conjugate and complex_mult.
+Pytorch (as of 0.4.0) does not support complex tensors, so we store them as
+float tensors where the last dimension is 2 (real and imaginary parts).
+Cupy does support complex arrays, so we can cast Pytorch tensor to Cupy array
+and use the multiplication function there. If Cupy isn't available, we use our
+own complex multiplication implemented in Pytorch, which is about 6x slower.
+'''
+
 import torch
 
 # Check if cupy is available
@@ -43,7 +51,9 @@ def torch_to_cupy(tensor):
 
 def complex_mult_cupy_raw(X, Y):
     '''X and Y are complex64 tensors but stored as torch.cuda.FloatTensor, with last dimension = 2.
-    Multiply X and Y using Cupy. Operation is not differentiable.
+    Multiply X and Y using Cupy. Operation as implemented is not
+    differentiable. Need to use ComplexMultCupy for both the forward and
+    backward pass.
     '''
     assert isinstance(X, torch.cuda.FloatTensor) and isinstance(Y, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
     assert X.shape[-1] == 2 and Y.shape[-1] == 2, 'Last dimension must be 2'
@@ -66,7 +76,7 @@ class ComplexMultCupy(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         X, Y = ctx.saved_tensors
-        grad_X, grad_Y = complex_mult_cupy_raw(grad.data, conjugate(Y)), complex_mult_cupy_raw(grad.data, conjugate(X))
+        grad_X, grad_Y = ComplexMultCupy.apply(grad, conjugate(Y)), ComplexMultCupy.apply(grad, conjugate(X))
         # Need to sum over dimensions that were broadcasted
         dims_to_sum_X = [grad.dim() - i for i in range(1, X.dim() + 1) if X.shape[-i] != grad.shape[-i]]
         dims_to_sum_Y = [grad.dim() - i for i in range(1, Y.dim() + 1) if Y.shape[-i] != grad.shape[-i]]
