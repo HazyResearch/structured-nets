@@ -1,4 +1,4 @@
-''' Functions to multiply by an LDR matrix with subdiagonal and tridiagonal
+'''Functions to multiply by an LDR matrix with subdiagonal and tridiagonal
 operator matrices.
 
 We implement the fast multiplication for the subdiagonal case.
@@ -7,7 +7,6 @@ transpose multiply and Krylov multiply.
 
 For tridiagonal case, we implement the slow multiplication algorithm: construct
 the Krylov matrix then call regular matrix multiply.
-
 '''
 
 import functools
@@ -224,19 +223,19 @@ def subdiag_mult(subdiag_A, subdiag_B, G, H, x):
 
 ##### Slow multiplication for the subdiagonal case
 
-def Krylov(linear_map, v, n=None):
-    """Explicit construction of Krylov matrix [v  A @ v  A^2 @ v  ...  A^{n-1} @ v].
+def Krylov(linear_map, v, m=None):
+    """Explicit construction of Krylov matrix [v  A @ v  A^2 @ v  ...  A^{m-1} @ v].
     Parameters:
-        linear_map: a function v -> A @ v that takes a vector of size p and returns a vector of size p.
-        v: the starting vector of size p or (rank, p).
-        n: max power of A.
+        linear_map: a function v -> A @ v that takes a vector of size m and returns a vector of size m.
+        v: the starting vector of size m or (rank, m).
+        m: max power of A.
     Returns:
-        K: Krylov matrix of size (p, n) or (rank, p, n).
+        K: Krylov matrix of size (m, m) or (rank, m, m).
     """
-    if n is None:
-        n = v.size(-1)
+    if m is None:
+        m = v.size(-1)
     cols = [v]
-    for _ in range(n - 1):
+    for _ in range(m - 1):
         v = linear_map(v)
         cols.append(v)
     return torch.stack(cols, dim=-1)
@@ -275,8 +274,8 @@ def subdiag_linear_map(subdiag, upper_right_corner=0.0):
 
 
 def krylov_subdiag_fast(subdiag, v, upper_right_corner=0.0):
-    """Explicit construction of Krylov matrix [v  A @ v  A^2 @ v  ...  A^{n-1}
-    @ v] where A is a subdiagonal matrix (possibly with an upper right corner).
+    """Explicit construction of Krylov matrix [v  A @ v  A^2 @ v  ...  A^{n-1} @ v]
+    where A is a subdiagonal matrix (possibly with an upper right corner).
     This uses vectorized indexing and cumprod so it's much faster than using
     the Krylov function. However, the backward pass is slow because of
     inefficient implementation of cumprod_backward in Pytorch.
