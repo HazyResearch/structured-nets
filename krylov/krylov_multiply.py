@@ -34,8 +34,8 @@ def krylov_transpose_multiply(subdiag, v, u):
         product: Tensor of shape (batch_size, rank, n)
     """
     batch_size, n = u.shape
-    rank, n_extended = v.shape
-    assert n == n_extended, 'u and v must have the same last dimension'
+    rank, n_ = v.shape
+    assert n == n_, 'u and v must have the same last dimension'
     m = int(np.log2(n))
     assert n == 1 << m, 'n must be a power of 2'
 
@@ -88,8 +88,8 @@ def krylov_multiply_by_autodiff(subdiag, v, w):
         product: Tensor of shape (batch_size, n)
     """
     batch_size, rank, n = w.shape
-    rank_, n_extended = v.shape
-    assert n == n_extended, 'w and v must have the same last dimension'
+    rank_, n_ = v.shape
+    assert n == n_, 'w and v must have the same last dimension'
     assert rank == rank_, 'w and v must have the same rank'
     m = int(np.log2(n))
     assert n == 1 << m, 'n must be a power of 2'
@@ -157,8 +157,8 @@ def krylov_multiply(subdiag, v, w):
         product: Tensor of shape (batch_size, n)
     """
     batch_size, rank, n = w.shape
-    rank_, n_extended = v.shape
-    assert n == n_extended, 'w and v must have the same last dimension'
+    rank_, n_ = v.shape
+    assert n == n_, 'w and v must have the same last dimension'
     assert rank == rank_, 'w and v must have the same rank'
     m = int(np.log2(n))
     assert n == 1 << m, 'n must be a power of 2'
