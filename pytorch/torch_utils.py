@@ -54,19 +54,20 @@ def get_std_opt(model):
     return NoamOpt(model.src_embed[0].d_model, 2, 4000,
             torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
 
+# TODO AG: are the non cross-entropy cases even used?
 def get_loss(params, generator=None, model_opt=None):
+    loss_fn = None
     if params.dataset_name.startswith('true'):
         assert params.loss == 'mse'
-        return nn.MSELoss()
+        loss_fn = nn.MSELoss()
     elif params.dataset_name.startswith('copy'):
         assert params.loss == 'label_smoothing'
         ls = LabelSmoothing(params.ls_size, params.ls_padding_idx, params.ls_smoothing)
-        return SimpleLossCompute(generator, ls, model_opt)
-
+        loss_fn = SimpleLossCompute(generator, ls, model_opt)
     else:
         assert params.loss == 'cross_entropy'
-        return nn.CrossEntropyLoss()
-
+        loss_fn = nn.CrossEntropyLoss()
+    return params.loss, loss_fn
 
 class SimpleLossCompute:
     "A simple loss compute and train function."
@@ -109,13 +110,14 @@ class LabelSmoothing(nn.Module):
         return self.criterion(x, Variable(true_dist, requires_grad=False))
 
 # y_: One hot. y: vector of predicted class probabilities.
-def compute_loss_and_accuracy_(pred, true, params, loss_fn, ntokens=None):
-    if params.loss == 'mse':
+def compute_loss_and_accuracy(pred, true, loss_name_fn, ntokens=None):
+    loss_name, loss_fn = loss_name_fn
+    if loss_name == 'mse':
         mse = loss_fn(pred, true)
         accuracy = torch.FloatTensor([0])
 
         return mse, accuracy
-    elif params.loss == 'cross_entropy':
+    elif loss_name == 'cross_entropy':
         _, true_argmax = torch.max(true, 1)
         cross_entropy = loss_fn(pred, true_argmax)
 
@@ -125,30 +127,11 @@ def compute_loss_and_accuracy_(pred, true, params, loss_fn, ntokens=None):
 
         return cross_entropy, accuracy
 
-    elif params.loss == 'label_smoothing':
+    elif loss_name == 'label_smoothing':
         loss = loss_fn(pred, true, ntokens)
         accuracy = torch.FloatTensor([0])
         return loss, accuracy
 
     else:
-        print(('Not supported: ', params.loss))
+        print(('Not supported: ', loss_name))
         assert 0
-
-# version with optional batching (to save memory)
-def compute_loss_and_accuracy(pred, true, params, loss_fn, ntokens=None, batch=None):
-    # print("pred, true shape: ", pred.shape, true.shape)
-    assert(pred.shape[0] == true.shape[0])
-    if batch is None:
-        return compute_loss_and_accuracy_(pred, true, params, loss_fn, ntokens)
-
-    total_loss = 0.0
-    total_acc = 0.0
-    n = pred.shape[0]
-    for b in range(0, n, batch):
-        b_ = min(b+batch, n)
-        pred_batch = pred[b:b_, ...]
-        true_batch = true[b:b_, ...]
-        loss_batch, acc_batch = compute_loss_and_accuracy_(pred_batch, true_batch, params, loss_fn, ntokens)
-        total_loss += (b_-b)*loss_batch
-        total_acc += (b_-b)*acc_batch
-    return total_loss/n, total_acc/n
