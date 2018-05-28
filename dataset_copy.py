@@ -145,7 +145,7 @@ class Dataset:
             train_Y = train_Y[idx,:]
 
             # Downsample for sample complexity experiments
-            if self.train_fraction < 1.0:
+            if self.train_fraction is not None:
                 num_samples = int(self.train_fraction*train_X.shape[0])
                 train_X = train_X[0:num_samples,:]
                 train_Y = train_Y[0:num_samples,:]

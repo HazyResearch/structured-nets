@@ -47,7 +47,7 @@ def optimize_torch(dataset, params, seed=None):
 
     writer = SummaryWriter(params.log_path)
     net = construct_net(params)
-    net.cuda()
+    net.cuda() # TODO: to device?
 
     print((torch.cuda.get_device_name(0)))
 
