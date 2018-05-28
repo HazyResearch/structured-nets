@@ -13,24 +13,23 @@ from tensorboardX import SummaryWriter
 #from optimize_iwslt import optimize_iwslt
 from optimize_vae import optimize_vae
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def test_split(net, data_X, data_Y, params, loss_fn, batch_size=None):
-    assert data_X.shape[0] == data_Y.shape[0]
-    n = data_X.shape[0]
-    if batch_size is None:
-        batch_size = n
-
+# TODO: get rid of params here
+def test_split(net, dataloader, params, loss_fn):
+    # assert data_X.shape[0] == data_Y.shape[0]
+    n = len(dataloader.dataset)
     total_loss = 0.0
     total_acc = 0.0
-    for b in range(0, n, batch_size):
-        b_ = min(b+batch_size, n)
-        batch_X = data_X[b:b_, ...]
-        batch_Y = data_Y[b:b_, ...]
+    for data in dataloader:
+        batch_X, batch_Y = data
+        batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
+        # print("lengths: ", len(dataloader), len(batch_X), len(batch_Y))
 
-        output = net.forward(batch_X)
+        output = net(batch_X)
         loss_batch, acc_batch = compute_loss_and_accuracy(output, batch_Y, params, loss_fn)
-        total_loss += (b_-b)*loss_batch.data
-        total_acc += (b_-b)*acc_batch.data
+        total_loss += len(batch_X)*loss_batch.data.item()
+        total_acc += len(batch_X)*acc_batch.data.item()
     return total_loss/n, total_acc/n
 
 
@@ -59,13 +58,13 @@ def optimize_torch(dataset, params, seed=None):
     optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
     # optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom, weight_decay=1e-5)
     # optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
-    steps_in_epoch = int(np.ceil(dataset.train_X.shape[0] / params.batch_size))
+    # steps_in_epoch = int(np.ceil(dataset.train_X.shape[0] / params.batch_size))
     lr_scheduler = StepLR(optimizer, step_size=50, gamma=0.5)
 
     losses = {'Train': [], 'Val': [], 'DR': [], 'ratio': [], 'Test':[]}
     accuracies = {'Train': [], 'Val': [], 'Test':[]}
 
-    val_X, val_Y = Variable(torch.FloatTensor(dataset.val_X).cuda()), Variable(torch.FloatTensor(dataset.val_Y).cuda())
+    # val_X, val_Y = Variable(torch.FloatTensor(dataset.val_X).cuda()), Variable(torch.FloatTensor(dataset.val_Y).cuda())
     best_val_acc = 0.0
     best_val_save = None
 
@@ -82,50 +81,56 @@ def optimize_torch(dataset, params, seed=None):
 
     # compute initial stats
     t1 = time.time()
-    init_loss, init_accuracy = test_split(net, val_X, val_Y, params, loss_fn, batch_size=params.batch_size)
-    log_stats('Initial', 'Val', init_loss.item(), init_accuracy.item(), 0)
+    init_loss, init_accuracy = test_split(net, dataset.val_loader, params, loss_fn)
+    log_stats('Initial', 'Val', init_loss, init_accuracy, 0)
 
     epochs = 0
-    for step in range(1, params.steps+1):
-        batch_xs, batch_ys = dataset.batch(params.batch_size, step)
-        batch_xs, batch_ys = Variable(torch.FloatTensor(batch_xs).cuda()), Variable(torch.FloatTensor(batch_ys).cuda())
-        optimizer.zero_grad()   # zero the gradient buffers
+    for epoch in range(1):
+    # for step in range(1, params.steps+1):
+        for step, data in enumerate(dataset.train_loader, 0):
+        # get the inputs
+            batch_xs, batch_ys = data
+            batch_xs, batch_ys = batch_xs.to(device), batch_ys.to(device)
 
-        output = net.forward(batch_xs)
-        train_loss, train_accuracy = compute_loss_and_accuracy(output, batch_ys, params, loss_fn)
-        train_loss += net.loss()
-        train_loss.backward()
+            # batch_xs, batch_ys = dataset.batch(params.batch_size, step)
+            # batch_xs, batch_ys = Variable(torch.FloatTensor(batch_xs).cuda()), Variable(torch.FloatTensor(batch_ys).cuda())
+            optimizer.zero_grad()   # zero the gradient buffers
 
-        optimizer.step()
+            # output = net.forward(batch_xs)
+            output = net(batch_xs)
+            train_loss, train_accuracy = compute_loss_and_accuracy(output, batch_ys, params, loss_fn)
+            train_loss += net.loss()
+            train_loss.backward()
 
-        # log training every 100
-        # params.log_freq?
-        if step % 100 == 0:
-            epochs += 1
-            # lr_scheduler.step()
+            optimizer.step()
 
-            print(('Time: ', time.time() - t1))
-            t1 = time.time()
-            print(('Training step: ', step))
+            # log training every 100
+            # params.log_freq?
+            if step % 100 == 0:
+                epochs += 1
+                # lr_scheduler.step()
 
-            log_stats('Train', 'Train', train_loss.data.item(), train_accuracy.data.item(), step)
+                print(('Time: ', time.time() - t1))
+                t1 = time.time()
+                print(('Training step: ', step))
+
+                log_stats('Train', 'Train', train_loss.data.item(), train_accuracy.data.item(), step)
 
         # validate and checkpoint by epoch
-        if step % steps_in_epoch == 0:
-            # Test on validation set
-            val_loss, val_accuracy = test_split(net, val_X, val_Y, params, loss_fn, batch_size=params.batch_size)
-            log_stats('Validation', 'Val', val_loss.item(), val_accuracy.item(), step)
+        # Test on validation set
+        val_loss, val_accuracy = test_split(net, dataset.val_loader, params, loss_fn)
+        log_stats('Validation', 'Val', val_loss, val_accuracy, step)
 
-            # record best model
-            if val_accuracy.item() > best_val_acc:
-                # save_path = os.path.join(params.checkpoint_path, str(step))
-                save_path = os.path.join(params.checkpoint_path, 'best')
-                with open(save_path, 'wb') as f:
-                    torch.save(net.state_dict(), f)
-                print(("Best model saved in file: %s" % save_path))
+        # record best model
+        if val_accuracy > best_val_acc:
+            # save_path = os.path.join(params.checkpoint_path, str(step))
+            save_path = os.path.join(params.checkpoint_path, 'best')
+            with open(save_path, 'wb') as f:
+                torch.save(net.state_dict(), f)
+            print(("Best model saved in file: %s" % save_path))
 
-                best_val_acc = val_accuracy.item()
-                best_val_save = save_path
+            best_val_acc = val_accuracy
+            best_val_save = save_path
 
     # save last checkpoint
     save_path = os.path.join(params.checkpoint_path, 'last')
@@ -137,18 +142,18 @@ def optimize_torch(dataset, params, seed=None):
     # Test trained model
     if params.test:
         # Load test
-        dataset.load_test_data()
-        test_X, test_Y = Variable(torch.FloatTensor(dataset.test_X).cuda()), Variable(torch.FloatTensor(dataset.test_Y).cuda())
+        # dataset.load_test_data()
+        # test_X, test_Y = Variable(torch.FloatTensor(dataset.test_X).cuda()), Variable(torch.FloatTensor(dataset.test_Y).cuda())
 
         # Load net from best validation
         if best_val_save is not None: net.load_state_dict(torch.load(best_val_save))
         print(f'Loaded best validation checkpoint from: {best_val_save}')
 
-        test_loss, test_accuracy = test_split(net, test_X, test_Y, params, loss_fn, batch_size=params.batch_size)
-        log_stats('Test', 'Test', test_loss.item(), test_accuracy.item(), 0)
+        test_loss, test_accuracy = test_split(net, dataset.test_loader, params, loss_fn)
+        log_stats('Test', 'Test', test_loss, test_accuracy, 0)
 
-        train_X, train_Y = Variable(torch.FloatTensor(dataset.train_X).cuda()), Variable(torch.FloatTensor(dataset.train_Y).cuda())
-        train_loss, train_accuracy = test_split(net, train_X, train_Y, params, loss_fn, batch_size=params.batch_size)
+        # train_X, train_Y = Variable(torch.FloatTensor(dataset.train_X).cuda()), Variable(torch.FloatTensor(dataset.train_Y).cuda())
+        train_loss, train_accuracy = test_split(net, dataset.train_loader, params, loss_fn)
 
         # Log best validation accuracy and training acc for that model
         writer.add_scalar('MaxAcc/Val', best_val_acc)

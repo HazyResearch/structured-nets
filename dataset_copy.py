@@ -12,9 +12,7 @@ from torch.autograd import Variable
 sys.path.insert(0, '../../pytorch/')
 from torch_utils import *
 from torchtext import data
-from torchvision import datasets, transforms
 
-# TODO put this in separate file for attention codepath
 class MyIterator(data.Iterator):
     def create_batches(self):
         if self.train:
@@ -82,163 +80,10 @@ def batch_size_fn(new, count, sofar):
 
 
 
-def get_dataset(dataset_name):
-    """
-    dataset specific parameters: the actual data (as Tensor), validation size
-    TODO: output size should be readable from data
-    """
-    prefix = '/dfs/scratch1/thomasat/datasets/'
-    if dataset_name == 'cifar10':
-        train_loc = os.path.join(prefix, 'cifar10_combined/train')
-        test_loc = os.path.join(prefix, 'cifar10_combined/test')
-        val_size = 5000
-        out_size = 10
-    elif dataset_name == 'cifar10mono':
-        train_loc = os.path.join(prefix, 'cifar10_combined/train_grayscale')
-        test_loc = os.path.join(prefix, 'cifar10_combined/test_grayscale')
-        val_size = 5000
-        out_size = 10
-    elif dataset_name.startswith('mnist_noise'):
-        idx = dataset_name[-1]
-        train_loc = os.path.join(prefix,'mnist_noise/train_' + str(idx))
-        test_loc = os.path.join(prefix,'mnist_noise/test_' + str(idx))
-        val_size = 2000
-        out_size = 10
-    elif dataset_name == 'norb':
-        train_loc = os.path.join(prefix,'norb_full/processed_py2_train_28.pkl')
-        test_loc = os.path.join(prefix,'norb_full/processed_py2_test_28.pkl')
-        val_size = 30000
-        out_size = 6
-    elif dataset_name == 'rect_images': #TODO
-        train_loc = os.path.join(prefix, 'rect_images/rectangles_im_train.amat')
-        test_loc = os.path.join(prefix, 'rect_images/rectangles_im_test.amat')
-        out_size = 2
-    elif dataset_name == 'rect':
-        train_loc = os.path.join(prefix,'rect/train_normalized')
-        test_loc = os.path.join(prefix, 'rect/test_normalized')
-        val_size = 100
-        out_size = 2
-    elif dataset_name == 'convex':
-        train_loc = os.path.join(prefix, 'convex/train_normalized')
-        test_loc = os.path.join(prefix, 'convex/test_normalized')
-        val_size = 800
-        out_size = 2
-    elif dataset_name == 'mnist':
-        # TODO: use pytorch mnist
-        mnist_normalize = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307, ), (0.3081, ))
-        ])
-        mnist_train = datasets.MNIST(
-            '../data', train=True, download=True, transform=mnist_normalize)
-        mnist_test = datasets.MNIST(
-            '../data', train=False, download=True, transform=mnist_normalize)
-        out_size = 10
-    elif dataset_name == 'mnist_rand_bg': #TODO
-        train_loc = os.path.join(prefix, 'mnist_rand_bg/mnist_background_random_train.amat')
-        test_loc = os.path.join(prefix, 'mnist_rand_bg/mnist_background_random_test.amat')
-        val_size = 2000
-        out_size = 10
-    elif dataset_name == 'mnist_bg_rot':
-        train_loc = os.path.join(prefix, 'mnist_bg_rot/train_normalized')
-        test_loc = os.path.join(prefix, 'mnist_bg_rot/test_normalized')
-        val_size = 2000
-        out_size = 10
-    elif dataset_name == 'timit': #TODO
-        out_size = 147
-    #TODO handle iwslt, copy tasks
-    else:
-        print('dataset.py: unknown dataset name')
-
-    # TODO maybe want the .amat if that's standard and do postprocessing in a uniform way
-    train_data = pkl.load(open(train_loc, 'rb'))
-    train_X = train_data['X']
-    train_Y = train_data['Y']
-    test_data = pkl.load(open(test_loc, 'rb'))
-    test_X = test_data['X']
-    test_Y = test_data['Y']
-
-    # print(train_X.dtype)
-    return torch.FloatTensor(train_X), torch.FloatTensor(train_Y), torch.FloatTensor(test_X), torch.FloatTensor(test_Y), val_size, out_size
-
-def split_train_val(train_X, train_Y, val_size, train_fraction=None, val_fraction=None):
-    # Shuffle
-    idx = np.arange(train_X.shape[0])
-    np.random.shuffle(idx)
-    train_X = train_X[idx,:]
-    train_Y = train_Y[idx,:]
-
-    # Downsample for sample complexity experiments
-    if val_fraction is not None:
-        val_size = int(val_fraction*train_X.shape[0])
-    if train_fraction is not None:
-        train_size = int(train_fraction*train_X.shape[0])
-        assert val_size + train_size <= train_X.shape[0]
-    else:
-        train_size = train_X.shape[0] - val_size
-
-    # Shuffle X
-    idx = np.arange(0, train_X.shape[0])
-    np.random.shuffle(idx)
-
-    train_idx = idx[0:train_size]
-    val_idx = idx[-val_size:]
-    val_X = train_X[val_idx, :]
-    val_Y = train_Y[val_idx, :]
-    train_X = train_X[train_idx, :]
-    train_Y = train_Y[train_idx, :]
-    print(type(train_X), type(train_Y))
-    return train_X, train_Y, val_X, val_Y
-    # return torch.FloatTensor(train_X), torch.FloatTensor(train_Y), torch.FloatTensor(val_X), torch.FloatTensor(val_Y)
-
-
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-def create_data_loaders(dataset_name, transform, train_fraction, val_fraction, batch_size):
-    if device.type == 'cuda':
-        loader_args = {'num_workers': 16, 'pin_memory': True}
-    else:
-        loader_args = {'num_workers': 4, 'pin_memory': False}
-
-    # self.input_size = self.get_input_size()
-    # self.set_data_locs()
-    train_X, train_Y, test_X, test_Y, val_size, out_size = get_dataset(dataset_name) # train/test data, val size, input/output size
-
-    # TODO: use torch.utils.data.random_split instead
-    # however, this requires creating the dataset, then splitting, then applying transformations
-    train_X, train_Y, val_X, val_Y = split_train_val(train_X, train_Y, val_size, train_fraction, val_fraction)
-
-    # return train_X, train_Y, val_X, val_Y, test_X, test_Y, out_size
-
-    # postprocessing: normalization, padding
-
-    # post-processing transforms
-    # self.train_X, _ = self.postprocess(self.train_X)
-    # self.val_X, _ = self.postprocess(self.val_X)
-
-
-    # TODO: create dataset with transforms
-    train_dataset = torch.utils.data.TensorDataset(train_X, train_Y)
-    val_dataset = torch.utils.data.TensorDataset(val_X, val_Y)
-    test_dataset = torch.utils.data.TensorDataset(test_X, test_Y)
-    # create dataloaders
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, **loader_args)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, **loader_args)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, **loader_args)
-
-    return train_loader, val_loader, test_loader, out_size
-
-
-class DatasetLoaders:
-    def __init__(self, name, transform=None, train_fraction=None, val_fraction=None, batch_size=50):
-        # self.train_X, self.train_Y, self.val_X, self.val_Y, self.test_X, self.test_Y, self.out_size = create_data_loaders(name, transform, train_fraction, val_fraction, batch_size)
-        self.train_loader, self.val_loader, self.test_loader, self.out_size = create_data_loaders(name, transform, train_fraction, val_fraction, batch_size)
-
-
-
 class Dataset:
     # here n is the input size.
-    def __init__(self, name, layer_size, transform, stochastic_train, replacement, test_size=1000, train_size=10000, train_fraction=1.0, val_fraction=0.15):
+    # true_test: if True, we test on test set. Otherwise, split training set into train/validation.
+    def __init__(self, name, layer_size, num_iters, transform, stochastic_train, replacement, test_size=1000, train_size=10000, true_test=False, train_fraction=1.0, val_fraction=0.15):
         self.name = name
         self.mnist = None
         # train_fraction and val_fraction used only in sample complexity experiments currently
@@ -247,12 +92,14 @@ class Dataset:
         self.transform = transform
         self.replacement = replacement
         self.stochastic_train = stochastic_train
+        self.num_iters = num_iters
         self.layer_size = layer_size
         self.pert = None
         self.current_batch = 0
         self.true_transform = None
         self.test_size = test_size
         self.train_size = train_size
+        self.true_test = true_test
         self.input_size = self.get_input_size()
         self.set_data_locs()
 

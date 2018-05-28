@@ -13,7 +13,7 @@ import numpy as np
 from optimize import optimize
 from utils import *
 from model_params import ModelParams
-from dataset import Dataset, DatasetLoaders
+from dataset import Dataset
 
 seed = 0
 np.random.seed(seed)
@@ -29,7 +29,7 @@ method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'tridiagon
 
 def compare(args, method, rank, lr, decay_rate, mom, train_frac, steps):
     params = ModelParams(args.dataset, args.transform, args.test, log_path,
-            args.layer_size, args.layer_size, dataset.out_size, num_layers,
+            dataset.input_size, args.layer_size, dataset.out_size(), num_layers,
             loss, rank, steps, args.batch_size, lr, mom, init_type,
             method, learn_corner, n_diag_learned, init_stddev, fix_G,
             check_disp, check_disp_freq, checkpoint_freq, checkpoint_path, test_freq, verbose,
@@ -90,7 +90,7 @@ parser.add_argument('--transform', default='none') # Any transform of dataset, e
 parser.add_argument('--torch', type=int) # Pytorch or TF
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 parser.add_argument('--parallel') #
-parser.add_argument('--train_frac')
+parser.add_argument('--train_frac', default='1.0')
 parser.add_argument('--trials', type=int, default=3) #
 parser.add_argument('--restore', type=int, default=0) # Whether to restore from latest checkpoint
 args = parser.parse_args()
@@ -101,10 +101,7 @@ ranks = [int(r) for r in args.r.split(',')]
 lrs = [float(lr) for lr in args.lr.split(',')]
 decay_rates = [float(dr) for dr in args.decay_rate.split(',')]
 moms = [float(mom) for mom in args.mom.split(',')]
-if args.train_frac is not None:
-    train_fracs = [float(train_frac) for train_frac in args.train_frac.split(',')]
-else:
-    train_fracs = [None]
+train_fracs = [float(train_frac) for train_frac in args.train_frac.split(',')]
 
 logging.debug('Testing methods: ' + str(methods))
 logging.debug('Testing ranks: ' + str(ranks))
@@ -117,18 +114,12 @@ logging.debug('Testing train fracs: ' + str(train_fracs))
 num_layers = 1
 out_dir = '../..'
 loss = 'cross_entropy'
-# synthetics parameters
 test_size = 1000
 train_size = 10000
 verbose = False
 replacement = False # If true, sample with replacement when batching
-# checking properties/visuals post-training
 check_disp = False # If true, checks rank of error matrix every check_disp_freq iters
 check_disp_freq = 5000
-viz_freq = -1#1000
-num_pred_plot = 5
-viz_powers = [1,5,10]
-
 fix_G = False
 early_stop_steps = 500000
 fix_A_identity = False
@@ -136,6 +127,9 @@ flip_K_B = False
 init_type = 'toeplitz'
 init_stddev = 0.01 # Random initializations
 test_freq = 100
+viz_freq = -1#1000
+num_pred_plot = 5
+viz_powers = [1,5,10]
 learn_corner = True
 learn_diagonal = False
 stochastic_train = False
@@ -163,11 +157,10 @@ command = ' '.join(sys.argv)
 # TODO use itertools.product to do this
 for train_frac in train_fracs:
     # Scale steps by train_frac
-    # this_steps = int(train_frac*args.steps)
-    this_steps = args.steps
-    dataset = DatasetLoaders(args.dataset, args.transform, train_frac, None, args.batch_size)
-    # stochastic_train, replacement, test_size, train_size, args.test, train_frac)
-    n_diag_learned = 0
+    this_steps = int(train_frac*args.steps)
+    dataset = Dataset(args.dataset, args.layer_size, this_steps, args.transform,
+    stochastic_train, replacement, test_size, train_size, args.test, train_frac)
+    n_diag_learned = dataset.input_size - 1
     for method in methods:
         for rank in ranks:
             for lr in lrs:
