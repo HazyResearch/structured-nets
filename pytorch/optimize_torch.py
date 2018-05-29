@@ -33,20 +33,18 @@ def test_split(net, dataloader, loss_name_fn):
     return total_loss/n, total_acc/n
 
 
-def optimize_torch(dataset, params, seed=None):
-    if seed is not None:
-        torch.manual_seed(seed)
+def optimize_torch(dataset, net, optimizer, log_path, checkpoint_path, test, loss_name_fn):
 
-    if params.model == 'Attention':
-        if dataset.name == 'copy':
-            return optimize_nmt(dataset, params)
-        elif dataset.name == 'iwslt':
-            return optimize_iwslt(dataset, params)
-    elif params.model == 'VAE':
-            return optimize_vae(dataset, params)
+    # if params.model == 'Attention':
+    #     if dataset.name == 'copy':
+    #         return optimize_nmt(dataset, params)
+    #     elif dataset.name == 'iwslt':
+    #         return optimize_iwslt(dataset, params)
+    # elif params.model == 'VAE':
+    #         return optimize_vae(dataset, params)
 
-    writer = SummaryWriter(params.log_path)
-    net = construct_net(params)
+    writer = SummaryWriter(log_path)
+    # net = construct_net(params)
     net.cuda() # TODO: to device?
 
     print((torch.cuda.get_device_name(0)))
@@ -55,7 +53,7 @@ def optimize_torch(dataset, params, seed=None):
         if param.requires_grad:
             print(('Parameter name, shape: ', name, param.data.shape))
 
-    optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
+    # optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
     # optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom, weight_decay=1e-5)
     # optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
     # steps_in_epoch = int(np.ceil(dataset.train_X.shape[0] / params.batch_size))
@@ -68,7 +66,7 @@ def optimize_torch(dataset, params, seed=None):
     best_val_acc = 0.0
     best_val_save = None
 
-    loss_name_fn = get_loss(params) # tuple of (loss name, loss fn)
+    # loss_name_fn = get_loss(params) # tuple of (loss name, loss fn)
 
 
     def log_stats(name, split, loss, acc, step):
@@ -76,7 +74,7 @@ def optimize_torch(dataset, params, seed=None):
         accuracies[split].append(acc)
         writer.add_scalar(split+'/Loss', loss, step)
         writer.add_scalar(split+'/Accuracy', acc, step)
-        print(f"{name} loss, accuracy {params.class_type}: {loss:.6f}, {acc:.6f}")
+        print(f"{name} loss, accuracy: {loss:.6f}, {acc:.6f}")
 
 
     # compute initial stats
@@ -124,7 +122,7 @@ def optimize_torch(dataset, params, seed=None):
         # record best model
         if val_accuracy > best_val_acc:
             # save_path = os.path.join(params.checkpoint_path, str(step))
-            save_path = os.path.join(params.checkpoint_path, 'best')
+            save_path = os.path.join(checkpoint_path, 'best')
             with open(save_path, 'wb') as f:
                 torch.save(net.state_dict(), f)
             print(("Best model saved in file: %s" % save_path))
@@ -133,14 +131,14 @@ def optimize_torch(dataset, params, seed=None):
             best_val_save = save_path
 
     # save last checkpoint
-    save_path = os.path.join(params.checkpoint_path, 'last')
+    save_path = os.path.join(checkpoint_path, 'last')
     with open(save_path, 'wb') as f:
         torch.save(net.state_dict(), f)
     print(("Last model saved in file: %s" % save_path))
 
 
     # Test trained model
-    if params.test:
+    if test:
         # Load test
         # dataset.load_test_data()
         # test_X, test_Y = Variable(torch.FloatTensor(dataset.test_X).cuda()), Variable(torch.FloatTensor(dataset.test_Y).cuda())
@@ -160,7 +158,7 @@ def optimize_torch(dataset, params, seed=None):
         writer.add_scalar('MaxAcc/Train', train_accuracy)
 
 
-    writer.export_scalars_to_json(os.path.join(params.log_path, "all_scalars.json"))
+    writer.export_scalars_to_json(os.path.join(log_path, "all_scalars.json"))
     writer.close()
 
     return losses, accuracies

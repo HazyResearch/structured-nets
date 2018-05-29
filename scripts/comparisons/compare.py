@@ -9,8 +9,8 @@ import argparse
 import threading
 import logging
 import numpy as np
-
 import torch
+
 sys.path.insert(0, '../../pytorch/')
 sys.path.insert(0, '../../krylov/')
 # from optimize import optimize
@@ -18,6 +18,8 @@ sys.path.insert(0, '../../krylov/')
 from model_params import ModelParams
 from dataset import DatasetLoaders
 from dataset_copy import Dataset
+from torch_utils import get_loss
+from nets import construct_net
 
 def get_commit_id():
   return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'])
@@ -199,9 +201,9 @@ def vae(args):
                             compare_old(args, args.method, rank, lr, decay_rate, mom, train_frac,this_steps, training_fn)
 
 
-#### refactoring main code path
+#### REFACTORING MAIN CODE PATH
 
-def compare(args, dataset, method, rank, lr, decay_rate, mom, train_frac, steps, log_path, results_dir, checkpoint_path, vis_path, training_fn):
+def compare(args, dataset, method, rank, lr, decay_rate, mom, train_frac, steps, log_path, results_dir, checkpoint_path, vis_path):
     params = ModelParams(args.dataset, args.transform, args.test, log_path,
             args.layer_size, args.layer_size, dataset.out_size, num_layers,
             loss, rank, steps, args.batch_size, lr, mom, init_type,
@@ -219,8 +221,8 @@ def compare(args, dataset, method, rank, lr, decay_rate, mom, train_frac, steps,
 
     for test_iter in range(args.trials):
         this_iter_name = this_id + '_' + str(test_iter)
-        params.log_path = os.path.join(log_path, this_iter_name)
-        params.checkpoint_path = os.path.join(checkpoint_path, this_iter_name)
+        log_path = os.path.join(log_path, this_iter_name)
+        checkpoint_path = os.path.join(checkpoint_path, this_iter_name)
         params.vis_path = os.path.join(vis_path, this_iter_name)
         params.result_path = os.path.join(this_results_dir,this_iter_name)
 
@@ -236,7 +238,11 @@ def compare(args, dataset, method, rank, lr, decay_rate, mom, train_frac, steps,
         if not os.path.exists(params.vis_path):
             os.makedirs(params.vis_path)
 
-        losses, accuracies = training_fn(dataset, params)
+        from optimize_torch import optimize_torch
+        loss_name_fn = get_loss(params)
+        net = construct_net(params)
+        optimizer = torch.optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
+        losses, accuracies = optimize_torch(dataset, net, optimizer, log_path, checkpoint_path, params.test, loss_name_fn)
         # tf.reset_default_graph()
 
         pkl.dump(losses, open(params.result_path + '_losses.p', 'wb'), protocol=2)
@@ -248,6 +254,8 @@ def compare(args, dataset, method, rank, lr, decay_rate, mom, train_frac, steps,
 
 # TODO: separate into several functions, model() creates model for some subset of params, optimizer() creates optimizer for some subset of params, train(), dataset()
 # have sample() to do something special in the sample complexity case, vae(), etc.
+# code should look like: for dataset: for model: for optimizer: construct training params (paths); train
+# some parts can be shared (e.g. paths)
 def run(args):
     log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
     results_dir = os.path.join(out_dir, 'results', args.result_dir)
@@ -262,8 +270,8 @@ def run(args):
         this_steps = args.steps
         # dispatch dataset and training function based on task
         dataset = DatasetLoaders(args.dataset, args.transform, train_frac, None, args.batch_size)
-        from optimize_torch import optimize_torch
-        training_fn = optimize_torch
+        # from optimize_torch import optimize_torch
+        # training_fn = optimize_torch
 
         n_diag_learned = 0
         for rank in args.r:
@@ -274,7 +282,7 @@ def run(args):
                         #     logging.debug('Starting thread')
                         #     threading.Thread(target=compare,args=(args, args.method, rank, lr, decay_rate, mom, train_frac, this_steps, training_fn),).start()
                         # else:
-                        compare(args, dataset, args.method, rank, lr, decay_rate, mom, train_frac,this_steps, log_path, results_dir, checkpoint_path, vis_path, training_fn)
+                        compare(args, dataset, args.method, rank, lr, decay_rate, mom, train_frac,this_steps, log_path, results_dir, checkpoint_path, vis_path)
 
 
 
