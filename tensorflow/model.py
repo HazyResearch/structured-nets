@@ -111,16 +111,16 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
         assert 0 
     print(E.shape)
     print(('(Displacement) Rank: ', np.linalg.matrix_rank(E)))
-    print(('||E||/||W||: ', norm_res/norm_W))
+    print(('||E||/||W||: ', ratio))
     eigvals_E = np.abs(np.linalg.eigvals(E))
     eigvals_W = np.abs(np.linalg.eigvals(W))
     eigvals_A = np.abs(np.linalg.eigvals(A))
     eigvals_B = np.abs(np.linalg.eigvals(B))
-    print('eigvals_E: ', eigvals_E)
-    print('eigvals_W: ', eigvals_W)
-    print('eigvals_A: ', eigvals_A)
-    print('eigvals_B: ', eigvals_B)
-    return dr, norm_res, norm_W, eigvals_E, eigvals_W, eigvals_A, eigvals_B
+    #print('eigvals_E: ', eigvals_E)
+    #print('eigvals_W: ', eigvals_W)
+    #print('eigvals_A: ', eigvals_A)
+    #print('eigvals_B: ', eigvals_B)
+    return dr, ratio, eigvals_E, eigvals_W, eigvals_A, eigvals_B, E, W, A, B
 
 def get_structured_W(params):
     model = {}

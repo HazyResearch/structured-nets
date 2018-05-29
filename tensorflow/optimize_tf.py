@@ -48,10 +48,10 @@ def optimize_tf(dataset, params):
         val_loss,val_accuracy = restore_from_checkpoint(dataset,params,sess,saver,x,y_,loss,accuracy)
 
     eigvals = {'E': [], 'W': [], 'A': [], 'B': []}
-    losses = {'train': [], 'val': [], 'DR': [], 'norm_res': [], 'norm_W': [], 'eigvals': eigvals}
+    model_params = {'E': [], 'W': [], 'A': [], 'B': []}
+    losses = {'train': [], 'val': [], 'DR': [], 'ratio': [], 'eigvals': eigvals, 'params': model_params}
     accuracies = {'train': [], 'val': [], 'best_val': 0.0, 'best_val_iter': 0}
     t1 = time.time()
-
     for _ in range(params.steps):
         this_step, lr = sess.run([global_step, learning_rate])
         batch_xs, batch_ys = dataset.batch(params.batch_size, this_step)
@@ -71,7 +71,6 @@ def optimize_tf(dataset, params):
                 losses['eigvals']['W'].append(W_ev)
                 losses['eigvals']['A'].append(A_ev)
                 losses['eigvals']['B'].append(B_ev)
-
             train_loss, train_accuracy, train_loss_summ, train_acc_summ, y_pred = sess.run([loss, accuracy, train_loss_summary,
                 train_acc_summary, y], feed_dict={x: batch_xs, y_: batch_ys})
             val_loss, val_accuracy, val_loss_summ, val_acc_summ = sess.run([loss, accuracy, val_loss_summary,
@@ -113,6 +112,16 @@ def optimize_tf(dataset, params):
 
         if this_step > 0 and params.viz_freq > 0 and this_step % params.viz_freq == 0:
             visualize(params,sess,model,x,y_,batch_xs,batch_ys,y_pred,this_step)
+
+    # Get final params
+    if params.check_disp:
+        dr, ratio, E_ev, W_ev, A_ev, B_ev, E, W, A, B = check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
+        losses['DR'].append(dr)
+        losses['ratio'].append(ratio)
+        losses['params']['E'] = E
+        losses['params']['W'] = W
+        losses['params']['A'] = A
+        losses['params']['B'] = B
 
     # Test trained model
     if params.test:
