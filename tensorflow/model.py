@@ -109,6 +109,7 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
     else:
         print('class_type not supported: ', params.class_type)
         assert 0 
+    ratio = norm_res/norm_W
     print(E.shape)
     print(('(Displacement) Rank: ', np.linalg.matrix_rank(E)))
     print(('||E||/||W||: ', ratio))
@@ -120,7 +121,7 @@ def check_rank(sess, x, y_, batch_xs, batch_ys, params, model):
     #print('eigvals_W: ', eigvals_W)
     #print('eigvals_A: ', eigvals_A)
     #print('eigvals_B: ', eigvals_B)
-    return dr, ratio, eigvals_E, eigvals_W, eigvals_A, eigvals_B, E, W, A, B
+    return dr, norm_res, norm_W, eigvals_E, eigvals_W, eigvals_A, eigvals_B, E, W, A, B
 
 def get_structured_W(params):
     model = {}

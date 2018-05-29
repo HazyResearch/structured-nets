@@ -115,9 +115,10 @@ def optimize_tf(dataset, params):
 
     # Get final params
     if params.check_disp:
-        dr, ratio, E_ev, W_ev, A_ev, B_ev, E, W, A, B = check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
+        dr, norm_res, norm_W, E_ev, W_ev, A_ev, B_ev, E, W, A, B = check_rank(sess, x, y_, batch_xs, batch_ys, params, model)
         losses['DR'].append(dr)
-        losses['ratio'].append(ratio)
+        losses['norm_res'].append(norm_res)
+        losses['norm_W'].append(norm_W)
         losses['params']['E'] = E
         losses['params']['W'] = W
         losses['params']['A'] = A
