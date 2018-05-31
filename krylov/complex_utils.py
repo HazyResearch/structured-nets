@@ -40,6 +40,8 @@ def complex_mult_torch(X, Y):
 def torch_to_cupy(tensor):
     '''Hacky way to convert torch.cuda.FloatTensor to CuPy array.
     Probably not safe, since we're manipulating GPU memory addresses directly.
+    We will use the official conversion functions once a new CuPy version
+    (probably 4.2 or 5.0) is release: https://github.com/cupy/cupy/pull/1082
     '''
     assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
     offset = tensor.data_ptr() - CUPY_MEM.ptr
