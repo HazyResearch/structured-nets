@@ -90,6 +90,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--name", default='') # Name of run
 parser.add_argument("--method") # Which methods
 parser.add_argument("--dataset") # Which dataset
+parser.add_argument("--epochs", type=int, default=1)
 parser.add_argument("--result_dir") # Where to save results
 parser.add_argument("--r", nargs='+', type=int, default=[0]) # Rank / displacement ranks
 parser.add_argument('--lr', nargs='+', type=float, default=[1e-3]) # Learning rates
@@ -277,7 +278,7 @@ def compare(args, method, rank, lr, decay_rate, mom, train_frac, steps, log_path
         # loss_name_fn = get_loss(params)
         net = construct_net(params)
         optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=mom)
-        losses, accuracies = optimize_torch(dataset, net, optimizer, log_path, checkpoint_path, args.test)
+        losses, accuracies = optimize_torch(dataset, net, optimizer, args.epochs, log_path, checkpoint_path, args.test)
         # tf.reset_default_graph()
 
         pkl.dump(losses, open(result_path + '_losses.p', 'wb'), protocol=2)

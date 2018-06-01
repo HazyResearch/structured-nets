@@ -33,7 +33,7 @@ def test_split(net, dataloader, loss_name):
     return total_loss/n, total_acc/n
 
 
-def optimize_torch(dataset, net, optimizer, log_path, checkpoint_path, test, loss_name='cross_entropy'):
+def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, test, loss_name='cross_entropy'):
 
     # if params.model == 'Attention':
     #     if dataset.name == 'copy':
@@ -82,8 +82,7 @@ def optimize_torch(dataset, net, optimizer, log_path, checkpoint_path, test, los
     init_loss, init_accuracy = test_split(net, dataset.val_loader, loss_name)
     log_stats('Initial', 'Val', init_loss, init_accuracy, 0)
 
-    epochs = 0
-    for epoch in range(1):
+    for epoch in range(epochs):
     # for step in range(1, params.steps+1):
         for step, data in enumerate(dataset.train_loader, 0):
         # get the inputs
