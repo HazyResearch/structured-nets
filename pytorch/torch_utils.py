@@ -110,14 +110,16 @@ class LabelSmoothing(nn.Module):
         return self.criterion(x, Variable(true_dist, requires_grad=False))
 
 # y_: One hot. y: vector of predicted class probabilities.
-def compute_loss_and_accuracy(pred, true, loss_name_fn, ntokens=None):
-    loss_name, loss_fn = loss_name_fn
+def compute_loss_and_accuracy(pred, true, loss_name):
     if loss_name == 'mse':
+        loss_fn = nn.MSELoss()
         mse = loss_fn(pred, true)
         accuracy = torch.FloatTensor([0])
 
         return mse, accuracy
+
     elif loss_name == 'cross_entropy':
+        loss_fn = nn.CrossEntropyLoss()
         _, true_argmax = torch.max(true, 1)
         cross_entropy = loss_fn(pred, true_argmax)
 
@@ -126,11 +128,6 @@ def compute_loss_and_accuracy(pred, true, loss_name_fn, ntokens=None):
         accuracy = torch.mean(correct_prediction.float())
 
         return cross_entropy, accuracy
-
-    elif loss_name == 'label_smoothing':
-        loss = loss_fn(pred, true, ntokens)
-        accuracy = torch.FloatTensor([0])
-        return loss, accuracy
 
     else:
         print(('Not supported: ', loss_name))

@@ -274,10 +274,10 @@ def compare(args, method, rank, lr, decay_rate, mom, train_frac, steps, log_path
         #     os.makedirs(vis_path)
 
 
-        loss_name_fn = get_loss(params)
+        # loss_name_fn = get_loss(params)
         net = construct_net(params)
         optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=mom)
-        losses, accuracies = optimize_torch(dataset, net, optimizer, log_path, checkpoint_path, args.test, loss_name_fn)
+        losses, accuracies = optimize_torch(dataset, net, optimizer, log_path, checkpoint_path, args.test)
         # tf.reset_default_graph()
 
         pkl.dump(losses, open(result_path + '_losses.p', 'wb'), protocol=2)
