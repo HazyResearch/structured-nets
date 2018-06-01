@@ -105,7 +105,7 @@ parser.add_argument('--transform', default='none') # Any transform of dataset, e
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 parser.add_argument('--parallel') #
 parser.add_argument('--train_frac', nargs='+', default=[None])
-parser.add_argument('--trials', type=int, default=3) #
+parser.add_argument('--trials', type=int, default=1) #
 parser.add_argument('--restore', type=int, default=0) # Whether to restore from latest checkpoint
 
 
@@ -121,9 +121,9 @@ parser.add_argument('--restore', type=int, default=0) # Whether to restore from 
 
 
 
-# Fixed params
-num_layers = 1
 out_dir = '../..'
+# Fixed params
+num_layers = 1 # deprecated
 loss = 'cross_entropy'
 # synthetics parameters
 test_size = 1000

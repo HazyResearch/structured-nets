@@ -21,6 +21,7 @@ class StructuredLinear(nn.Module):
             self.init_stddev = init_stddev
             self.r = r
             self.tie_operators = tie_operators
+            self.bias = bias
         else:
             # TODO use defaults if params doesn't have it
             self.class_type = params.class_type
@@ -28,6 +29,7 @@ class StructuredLinear(nn.Module):
             self.init_stddev = params.init_stddev
             self.r = params.r
             self.tie_operators = params.tie_operators_same_layer
+            self.bias = params.bias
             self.params = params
         if self.class_type == 'unconstrained':
             self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
@@ -62,9 +64,9 @@ class StructuredLinear(nn.Module):
             print((f"{self.__class__.__name__} does not support {self.class_type}"))
             assert 0
 
-        self.bias = None
-        if bias:
-            self.bias = Parameter(torch.zeros(self.layer_size))
+        self.b = None
+        if self.bias:
+            self.b = Parameter(torch.zeros(self.layer_size))
 
     # Assumes Stein displacement.
     def set_mult_fns(self, params):
@@ -138,7 +140,7 @@ class StructuredLinear(nn.Module):
 
             out = torch.matmul(x, W.t())
 
-        if self.bias is not None:
-            return self.bias + out
+        if self.b is not None:
+            return self.b + out
         else:
             return out

@@ -25,8 +25,10 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def construct_net(params):
     if params.model == 'LeNet':
         return LeNet(params)
-    elif params.model == 'MLP':
-        return MLP(params)
+    elif params.model == 'Softmax':
+        return Softmax(params)
+    elif params.model == 'SHL':
+        return SHL(params)
     elif params.model == 'LDRNet':
         return LDRNet(params)
     elif params.model == 'LDRfat':
@@ -322,49 +324,40 @@ class LDRLDR2(nn.Module):
         return lamb*torch.sum(torch.abs(self.LDR1.G)) + lamb*torch.sum(torch.abs(self.LDR1.H))
 
 
-
-class MLP(nn.Module):
+class Softmax(nn.Module):
     def __init__(self, params):
-        super(MLP, self).__init__()
+        super(SHL, self).__init__()
         self.W = StructuredLinear(params)
-
         self.params = params
-
-        if self.params.num_layers==1:
-            self.b1 = torch.zeros(params.layer_size, device=device)
-            if self.params.bias:
-                self.b1 = Parameter(torch.Tensor(params.layer_size))
-            self.W2 = Parameter(torch.Tensor(params.layer_size, params.out_size))
-            self.b2 = Parameter(torch.Tensor(params.out_size))
-            # Note in TF it used to be truncated normal
-            torch.nn.init.normal_(self.b1,std=params.init_stddev)
-            torch.nn.init.normal_(self.b2,std=params.init_stddev)
-            torch.nn.init.normal_(self.W2,std=params.init_stddev)
 
     def forward(self, x):
         xW = self.W(x)
-
-        if self.params.num_layers==0:
-            return xW
-        elif self.params.num_layers==1:
-            h = F.relu(xW + self.b1)
-            y = torch.matmul(h, self.W2) + self.b2
-            return y
-        else:
-            print(('Not supported: ', params.num_layers))
-            assert 0
+        return xW
 
     def loss(self):
         return 0
 
-class Attention(nn.Module):
+class SHL(nn.Module):
     def __init__(self, params):
-        super(Attention, self).__init__()
-        self.model = make_model(10, 10, 2)#(params.src_vocab, params.tgt_vocab,
-            #params.N, params.d_model, params.d_ff, params.h, params.dropout)
+        super(SHL, self).__init__()
+        self.W = StructuredLinear(params)
+
+        self.params = params
+
+        self.b1 = Parameter(torch.Tensor(params.layer_size))
+        self.W2 = Parameter(torch.Tensor(params.layer_size, params.out_size))
+        self.b2 = Parameter(torch.Tensor(params.out_size))
+        # Note in TF it used to be truncated normal
+        torch.nn.init.normal_(self.b1,std=params.init_stddev)
+        torch.nn.init.normal_(self.b2,std=params.init_stddev)
+        torch.nn.init.normal_(self.W2,std=params.init_stddev)
 
     def forward(self, x):
-        return self.model.forward(x)
+        xW = self.W(x)
+
+        h = F.relu(xW + self.b1)
+        y = torch.matmul(h, self.W2) + self.b2
+        return y
 
     def loss(self):
         return 0
