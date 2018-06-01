@@ -8,6 +8,13 @@ pytorch>=0.4.0
 
 cupy>=4.0.0
 
+## Installing CUDA extensions
+Some of the functions are written in CUDA for speed. To install them:
+```
+cd krylov/cuda_extension
+python setup.py install
+```
+
 
 ## Example Usage
 ```
