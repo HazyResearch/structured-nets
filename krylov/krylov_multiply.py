@@ -362,6 +362,67 @@ def subdiag_mult_slow_fast(subdiag_A, subdiag_B, G, H, x):
     K_G, K_H = krylov_subdiag_fast(subdiag_A, G), krylov_subdiag_fast(subdiag_B, H)
     return ((x @ K_H) @ K_G.transpose(1, 2)).sum(dim=0)
 
+
+class CycleDownMultCuda(torch.autograd.Function):
+    '''Cycle v down and do pointwise multiplication with subdiag.
+    '''
+    @staticmethod
+    def forward(ctx, subdiag, v):
+        ctx.save_for_backward(subdiag, v)
+        return cuda_extension.cycle_mult(subdiag, v, 0, -1)
+
+    @staticmethod
+    def backward(ctx, grad):
+        subdiag, v = ctx.saved_tensors
+        return cuda_extension.cycle_mult(grad, v, 0, -1).sum(dim=0), cuda_extension.cycle_mult(subdiag, grad, 1, 1)
+
+cycle_down_mult = CycleDownMultCuda.apply
+
+def test_cycle_down_mult():
+    n = 1 << 10
+    rank = 16
+    subdiag = torch.rand(n, requires_grad=True, device=device)
+    v = torch.rand((rank, n), requires_grad=True, device=device)
+    z = cycle_down_mult(subdiag, v)
+    y = torch.cat((subdiag[0] * v[..., -1:], subdiag[1:] * v[..., :-1]), dim=-1)
+    print((z - y).abs().max().item())
+
+    grad_output = torch.rand_like(y)
+    gs, gv = torch.autograd.grad(y, (subdiag, v), grad_output, retain_graph=True)
+    zs, zv = torch.autograd.grad(z.sum(), (subdiag, v), grad_output, retain_graph=True)
+    print((zs - gs).abs().max().item())
+    print((zv - gv).abs().max().item())
+
+
+def subdiag_linear_map_cuda(subdiag, upper_right_corner=0.0):
+    """Construct the linear map for multiplying with a subdiagonal matrix (possibly with an upper right corner).
+    Uses the construction in CUDA, so it's pretty fast.
+    Parameters:
+        subdiag: (n - 1, )
+        upper_right_corner: real number
+    Returns:
+        linear_map: v -> product, with v of shape either (n, ) or (rank, n)
+    """
+    subdiag_extended = torch.cat((torch.tensor([upper_right_corner], dtype=subdiag.dtype, device=subdiag.device), subdiag))
+    return lambda v: cycle_down_mult(subdiag_extended, v)
+
+
+def subdiag_mult_cuda(subdiag_A, subdiag_B, G, H, x, corner_A=0.0, corner_B=0.0):
+    """Multiply \sum_i Krylov(A, G_i) @ Krylov(B, H_i) @ x when A and B are zero except on the subdiagonal.
+    Uses the explicit Krylov construction in CUDA.
+    Parameters:
+        subdiag_A: Tensor of shape (n - 1, )
+        subdiag_B: Tensor of shape (n - 1, )
+        G: Tensor of shape (rank, n)
+        H: Tensor of shape (rank, n)
+        x: Tensor of shape (batch_size, n)
+    Returns:
+        product: Tensor of shape (batch_size, n)
+    """
+    K_G = Krylov(subdiag_linear_map_cuda(subdiag_A, corner_A), G)
+    K_H = Krylov(subdiag_linear_map_cuda(subdiag_B, corner_B), H)
+    return ((x @ K_H) @ K_G.transpose(1, 2)).sum(dim=0)
+
 ##### Slow multiplication for the tridiagonal case
 
 def tridiag_linear_map(subdiag, diag, superdiag, upper_right_corner=0.0, lower_left_corner=0.0):
@@ -548,6 +609,8 @@ def test_subdiag_mult():
     grad_slow,  = torch.autograd.grad(result_slow.sum(), subdiag, retain_graph=True)
     result_slow_fast = subdiag_mult_slow_fast(subdiag, subdiag, v, v, u)
     grad_slow_fast,  = torch.autograd.grad(result_slow_fast.sum(), subdiag, retain_graph=True)
+    result_cuda = subdiag_mult_cuda(subdiag, subdiag, v, v, u)
+    grad_cuda,  = torch.autograd.grad(result_cuda.sum(), subdiag, retain_graph=True)
     # These max and mean differences should be small
     print((result - result_slow_old).abs().max().item())
     print((result - result_slow_old).abs().mean().item())
@@ -561,6 +624,10 @@ def test_subdiag_mult():
     print((result - result_slow_fast).abs().mean().item())
     print((grad - grad_slow_fast).abs().max().item())
     print((grad - grad_slow_fast).abs().mean().item())
+    print((result - result_cuda).abs().max().item())
+    print((result - result_cuda).abs().mean().item())
+    print((grad - grad_cuda).abs().max().item())
+    print((grad - grad_cuda).abs().mean().item())
 
 
 def test_tridiag_mult():

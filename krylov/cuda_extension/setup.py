@@ -8,8 +8,11 @@ ext_modules = []
 if torch.cuda.is_available() and CUDA_HOME is not None:
     extension = CUDAExtension(
         'cuda_extension', [
+            'extension.cpp',
             'hadamard_cuda.cpp',
-            'hadamard_cuda_kernel.cu'
+            'hadamard_cuda_kernel.cu',
+            'diag_mult_cuda.cpp',
+            'diag_mult_cuda_kernel.cu'
         ],
         extra_compile_args={'cxx': ['-g'],
                             'nvcc': ['-O2']})
