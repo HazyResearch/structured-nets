@@ -9,12 +9,13 @@ import sys
 sys.path.insert(0, '../krylov/')
 import toeplitz_gpu as toep
 import krylov_multiply as subd
+import circulant as circ
 
 class StructuredLinear(nn.Module):
-    def __init__(self, params=None, class_type=None, layer_size=None, init_stddev=None, r=None, tie_operators=False, bias=False):
+    def __init__(self, params=None, class_type=None, layer_size=None, init_stddev=0.01, r=1, tie_operators=False, bias=False):
         super(StructuredLinear,self).__init__()
         if params is None:
-            assert None not in (class_type, layer_size, init_stddev, r, tie_operators)
+            assert None not in (class_type, layer_size)
             self.class_type = class_type
             self.layer_size = layer_size
             self.init_stddev = init_stddev
@@ -31,6 +32,9 @@ class StructuredLinear(nn.Module):
         if self.class_type == 'unconstrained':
             self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
             torch.nn.init.normal_(self.W, std=self.init_stddev)
+        elif self.class_type == 'circulant':
+            self.c = Parameter(torch.Tensor(self.layer_size))
+            torch.nn.init.normal_(self.c, std=self.init_stddev)
         elif self.class_type in ['low_rank', 'toeplitz_like', 'vandermonde_like', 'hankel_like',
                                         'circulant_sparsity', 'tridiagonal_corner', 'toep_corner', 'toep_nocorn', 'subdiagonal']:
             self.G = Parameter(torch.Tensor(self.r, self.layer_size))
@@ -55,7 +59,7 @@ class StructuredLinear(nn.Module):
                 self.fn_A = fn_A
                 self.fn_B_T = fn_B_T
         else:
-            print((f"{self.__class__.__name__} does not support {self.params.class_type}"))
+            print((f"{self.__class__.__name__} does not support {self.class_type}"))
             assert 0
 
         self.bias = None
@@ -115,6 +119,8 @@ class StructuredLinear(nn.Module):
         #print('class_type: ', self.class_type)
         if self.class_type == 'unconstrained':
             out = torch.matmul(x, self.W)
+        elif self.class_type == 'circulant':
+            out = circ.circulant_multiply(self.c, x, self.layer_size)
         elif self.class_type == 'low_rank':
             xH = torch.matmul(x, self.H.t())
             out = torch.matmul(xH, self.G)

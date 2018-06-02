@@ -35,7 +35,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadNa
 # python compare.py --name=test --methods=tridiagonal_corner,toeplitz_like --dataset=true_toeplitz --result_dir=2_25_18 --r=1 --lr=1e-3 --decay_rate=1.0 --decay_steps=0.1 --mom=0.9 --steps=50000 --batch_size=1024 --test=0 --layer_size=50 --transform=none --torch=1 --model=Attention
 
 method_map = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tc', 'tridiagonal_corners': 'tcs', 'low_rank': 'lr', 'unconstrained': 'u',
-              'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'subdiagonal': 'sd', 'hankel_like': 'h', 'vandermonde_like': 'v'}
+        'toeplitz_like': 't', 'toep_corner': 't1', 'toep_nocorn': 't0', 'subdiagonal': 'sd', 'hankel_like': 'h', 'vandermonde_like': 'v', 'circulant': 'c'}
 
 def compare_old(args, method, rank, lr, decay_rate, mom, train_frac, steps, training_fn):
     params = ModelParams(args.dataset, args.transform, args.test, log_path,
@@ -47,7 +47,7 @@ def compare_old(args, method, rank, lr, decay_rate, mom, train_frac, steps, trai
             stochastic_train, flip_K_B, num_conv_layers, True, args.model,
             viz_freq, num_pred_plot, viz_powers, early_stop_steps, replacement,
             test_best_val_checkpoint, args.restore, num_structured_layers,
-            tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B, train_frac)
+            tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B, train_frac, bias)
 
     # Save params + git commit ID
     this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size) + '_tf' + str(train_frac) + '_steps' + str(steps)
@@ -142,6 +142,7 @@ init_stddev = 0.01 # Random initializations
 learn_corner = True
 learn_diagonal = False
 num_conv_layers = 2
+bias = True # To compare with Sindhwani, set to False. MLP only
 
 # other optimizer parameters
 stochastic_train = False
@@ -210,7 +211,7 @@ def compare(args, dataset, method, rank, lr, decay_rate, mom, train_frac, steps,
             stochastic_train, flip_K_B, num_conv_layers, True, args.model,
             viz_freq, num_pred_plot, viz_powers, early_stop_steps, replacement,
             test_best_val_checkpoint, args.restore, num_structured_layers,
-            tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B, train_frac)
+            tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B, train_frac, bias)
 
     # Save params + git commit ID
     this_id = args.name + '_' + method_map[method] + '_r' + str(rank) + '_lr' + str(lr) + '_dr' + str(decay_rate) + '_mom' + str(mom) + '_bs' + str(args.batch_size) + '_tf' + str(train_frac) + '_steps' + str(steps)

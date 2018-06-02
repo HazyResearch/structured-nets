@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import copy
 import sys
+import numpy as np
 sys.path.insert(0, '../../krylov/')
 # sys.path.insert(0, '../../pytorch/attention/')
 
@@ -17,6 +18,9 @@ import LDR as ldr
 #from krylov_multiply import *
 from structured_layer import StructuredLinear # this is already in attention
 # TODO fix the 'import *'s
+
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def construct_net(params):
     if params.model == 'LeNet':
@@ -327,7 +331,9 @@ class MLP(nn.Module):
         self.params = params
 
         if self.params.num_layers==1:
-            self.b1 = Parameter(torch.Tensor(params.layer_size))
+            self.b1 = torch.zeros(params.layer_size, device=device)
+            if self.params.bias:
+                self.b1 = Parameter(torch.Tensor(params.layer_size))
             self.W2 = Parameter(torch.Tensor(params.layer_size, params.out_size))
             self.b2 = Parameter(torch.Tensor(params.out_size))
             # Note in TF it used to be truncated normal
