@@ -17,6 +17,10 @@ import torch
 from triextrafat import krylov_construct
 from complex_utils import complex_mult, conjugate
 
+try:
+    import cuda_extension
+except ImportError:
+    print("CUDA version of Hadamard transform isn't installed. Will use Pytorch's version, which is much slower.")
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
