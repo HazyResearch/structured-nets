@@ -5,6 +5,7 @@ Compare methods and hyperparameter settings sequentially.
 import sys, os, datetime, subprocess
 import pickle as pkl
 sys.path.insert(0, '../../')
+import itertools
 import argparse
 import argh
 import threading
@@ -90,25 +91,25 @@ def compare_old(args, method, rank, lr, decay_rate, mom, train_frac, steps, trai
 # Command line params
 parser = argparse.ArgumentParser()
 parser.add_argument("--name", default='') # Name of run
-parser.add_argument("--method") # Which methods
+# parser.add_argument("--method") # Which methods
 parser.add_argument("--dataset") # Which dataset
-parser.add_argument("--epochs", type=int, default=1)
+parser.add_argument('--transform', default='none') # Any transform of dataset, e.g. grayscale
+parser.add_argument('--train_frac', nargs='+', default=[None])
 parser.add_argument("--result_dir") # Where to save results
-parser.add_argument("--r", nargs='+', type=int, default=[0]) # Rank / displacement ranks
+parser.add_argument('--restore', type=int, default=0) # Whether to restore from latest checkpoint
+# parser.add_argument("--r", nargs='+', type=int, default=[0]) # Rank / displacement ranks
+parser.add_argument('--parallel') #
+parser.add_argument('--trials', type=int, default=1) #
+parser.add_argument('--batch_size', type=int) # Batch size
+parser.add_argument("--epochs", type=int, default=1)
 parser.add_argument('--lr', nargs='+', type=float, default=[1e-3]) # Learning rates
 parser.add_argument('--decay_rate', type=float, nargs='+', default=[1.0]) # Decay rates of learning rate
-parser.add_argument('--decay_freq', type=float) # Decay steps
+# parser.add_argument('--decay_freq', type=float) # Decay steps
 parser.add_argument('--mom', nargs='+', type=float, default=[0.9]) # Momentums
-parser.add_argument('--steps', type=int) # Steps
-parser.add_argument('--batch_size', type=int) # Batch size
+# parser.add_argument('--steps', type=int) # Steps
 parser.add_argument('--test', action='store_true') # Test on test set
-parser.add_argument('--layer_size', type=int) # Size of hidden layer
-parser.add_argument('--transform', default='none') # Any transform of dataset, e.g. grayscale
+# parser.add_argument('--layer_size', type=int) # Size of hidden layer
 # parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
-parser.add_argument('--parallel') #
-parser.add_argument('--train_frac', nargs='+', default=[None])
-parser.add_argument('--trials', type=int, default=1) #
-parser.add_argument('--restore', type=int, default=0) # Whether to restore from latest checkpoint
 
 
 # methods = args.methods.split(',')
@@ -234,17 +235,6 @@ def compare(args, method, lr, decay_rate, mom, train_frac, log_path, results_dir
 
     dataset = DatasetLoaders(args.dataset, args.transform, train_frac, None, args.batch_size)
 
-    # params = ModelParams(args.dataset, args.transform, args.test, log_path,
-    #         args.layer_size, args.layer_size, dataset.out_size, num_layers,
-    #         loss, rank, steps, args.batch_size, lr, mom, init_type,
-    #         method, learn_corner, 0, init_stddev, fix_G,
-    #         check_disp, check_disp_freq, checkpoint_freq, checkpoint_path, test_freq, verbose,
-    #         decay_rate, args.decay_freq, learn_diagonal, fix_A_identity,
-    #         stochastic_train, flip_K_B, num_conv_layers, True, args.model,
-    #         viz_freq, num_pred_plot, viz_powers, early_stop_steps, replacement,
-    #         test_best_val_checkpoint, args.restore, num_structured_layers,
-    #         tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B, train_frac)
-
     # Save params + git commit ID
                # + '_' + method_map[method] \
                # + '_r' + str(rank) \
@@ -255,7 +245,6 @@ def compare(args, method, lr, decay_rate, mom, train_frac, log_path, results_dir
                + '_bs' + str(args.batch_size) \
                + '_tf' + str(train_frac) \
                # + '_steps' + str(steps)
-    # run_results_dir = params.save(results_dir, run_name, commit_id, command)
     results_dir = os.path.join(results_dir, run_name + '_' + str(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))
     save_args(args, results_dir)
 
@@ -271,8 +260,9 @@ def compare(args, method, lr, decay_rate, mom, train_frac, log_path, results_dir
         # logging.debug('Tensorboard vis path: ' + vis_path)
         logging.debug('Results directory: ' + result_path)
 
-        if not os.path.exists(checkpoint_path):
-            os.makedirs(checkpoint_path)
+        os.makedirs(checkpoint_path, exist_ok=True)
+        # if not os.path.exists(checkpoint_path):
+        #     os.makedirs(checkpoint_path)
         # if not os.path.exists(vis_path):
         #     os.makedirs(vis_path)
 
@@ -298,25 +288,57 @@ def mlp(args):
     # pprint.pprint(args.__dict__)
     # from optimize_torch import optimize_torch
 
-    log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
-    results_dir = os.path.join(out_dir, 'results', args.result_dir)
-    checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
-    vis_path = os.path.join(out_dir, 'vis', args.result_dir)
+    # log_path = os.path.join(out_dir, 'tensorboard', args.result_dir)
+    # results_dir = os.path.join(out_dir, 'results', args.result_dir)
+    # checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
+    # vis_path = os.path.join(out_dir, 'vis', args.result_dir)
 
     model = nets[args.model](args) # TODO: move args out
 
 
     # TODO use itertools.product to do this
     train_frac = None
-    for lr in args.lr:
-        for decay_rate in args.decay_rate:
-            for mom in args.mom:
-                compare(args, args.method, lr, decay_rate, mom, train_frac, log_path, results_dir, checkpoint_path, model)
-                # if args.parallel:
-                #     logging.debug('Starting thread')
-                #     threading.Thread(target=compare,args=(args, args.method, rank, lr, decay_rate, mom, train_frac, this_steps, training_fn),).start()
-                # else:
+    for lr, decay_rate, mom in itertools.product(args.lr, args.decay_rate, args.mom):
+        dataset = DatasetLoaders(args.dataset, args.transform, train_frac, None, args.batch_size)
 
+        run_name = args.name \
+                + '_lr' + str(lr) \
+                + '_dr' + str(decay_rate) \
+                + '_mom' + str(mom) \
+                + '_bs' + str(args.batch_size) \
+                + '_tf' + str(train_frac) \
+                # + '_steps' + str(steps)
+        results_dir = os.path.join(out_dir,
+                                    'results',
+                                    args.result_dir,
+                                    run_name + '_' + str(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))
+        save_args(args, results_dir)
+
+        for trial_iter in range(args.trials):
+            run_iter_name = run_name + '_' + str(trial_iter)
+            log_path = os.path.join(out_dir, 'tensorboard', args.result_dir, run_iter_name)
+            checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir, run_iter_name)
+            result_path = os.path.join(results_dir, str(trial_iter))
+            # vis_path = os.path.join(out_dir, 'vis', args.result_dir, run_iter_name)
+
+            logging.debug('Tensorboard log path: ' + log_path)
+            logging.debug('Tensorboard checkpoint path: ' + checkpoint_path)
+            # logging.debug('Tensorboard vis path: ' + vis_path)
+            logging.debug('Results directory: ' + result_path)
+
+            os.makedirs(checkpoint_path, exist_ok=True)
+            # os.makedirs(vis_path, exist_ok=True)
+
+            # loss_name_fn = get_loss(params)
+            # net = construct_net(params)
+            optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=mom)
+            losses, accuracies = optimize_torch(dataset, model, optimizer, args.epochs, log_path, checkpoint_path, args.test)
+            # tf.reset_default_graph()
+
+            pkl.dump(losses, open(result_path + '_losses.p', 'wb'), protocol=2)
+            pkl.dump(accuracies, open(result_path + '_accuracies.p', 'wb'), protocol=2)
+
+            logging.debug('Saved losses and accuracies to: ' + result_path)
 
 
 
