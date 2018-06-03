@@ -1,7 +1,6 @@
 import numpy as np
 import os, sys
-sys.path.insert(0, '../../pytorch/')
-from nets import construct_net
+import pickle as pkl
 import time
 import torch
 from torch_utils import *
@@ -9,9 +8,13 @@ from torch.autograd import Variable
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from tensorboardX import SummaryWriter
+import logging
+
+sys.path.insert(0, '../../pytorch/')
 #from optimize_nmt import optimize_nmt
 #from optimize_iwslt import optimize_iwslt
 from optimize_vae import optimize_vae
+from nets import construct_net
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -33,25 +36,26 @@ def test_split(net, dataloader, loss_name):
     return total_loss/n, total_acc/n
 
 
-def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, test, loss_name='cross_entropy'):
+# TODO loss type should be moved to model or dataset?
+def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, result_path, test, loss_name='cross_entropy'):
 
-    # if params.model == 'Attention':
-    #     if dataset.name == 'copy':
-    #         return optimize_nmt(dataset, params)
-    #     elif dataset.name == 'iwslt':
-    #         return optimize_iwslt(dataset, params)
-    # elif params.model == 'VAE':
-    #         return optimize_vae(dataset, params)
+    logging.debug('Tensorboard log path: ' + log_path)
+    logging.debug('Tensorboard checkpoint path: ' + checkpoint_path)
+    # logging.debug('Tensorboard vis path: ' + vis_path)
+    logging.debug('Results directory: ' + result_path)
+
+    os.makedirs(checkpoint_path, exist_ok=True)
+    # os.makedirs(vis_path, exist_ok=True)
 
     writer = SummaryWriter(log_path)
     # net = construct_net(params)
     net.cuda() # TODO: to device?
 
-    print((torch.cuda.get_device_name(0)))
+    logging.debug((torch.cuda.get_device_name(0)))
 
     for name, param in net.named_parameters():
         if param.requires_grad:
-            print(('Parameter name, shape: ', name, param.data.shape))
+            logging.debug(('Parameter name, shape: ', name, param.data.shape))
 
     # optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
     # optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom, weight_decay=1e-5)
@@ -74,7 +78,7 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, t
         accuracies[split].append(acc)
         writer.add_scalar(split+'/Loss', loss, step)
         writer.add_scalar(split+'/Accuracy', acc, step)
-        print(f"{name} loss, accuracy: {loss:.6f}, {acc:.6f}")
+        logging.debug(f"{name} loss, accuracy: {loss:.6f}, {acc:.6f}")
 
 
     # compute initial stats
@@ -107,9 +111,9 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, t
                 epochs += 1
                 # lr_scheduler.step()
 
-                print(('Time: ', time.time() - t1))
+                logging.debug(('Time: ', time.time() - t1))
                 t1 = time.time()
-                print(('Training step: ', step))
+                logging.debug(('Training step: ', step))
 
                 log_stats('Train', 'Train', train_loss.data.item(), train_accuracy.data.item(), step)
 
@@ -124,7 +128,7 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, t
             save_path = os.path.join(checkpoint_path, 'best')
             with open(save_path, 'wb') as f:
                 torch.save(net.state_dict(), f)
-            print(("Best model saved in file: %s" % save_path))
+            logging.debug(("Best model saved in file: %s" % save_path))
 
             best_val_acc = val_accuracy
             best_val_save = save_path
@@ -133,7 +137,7 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, t
     save_path = os.path.join(checkpoint_path, 'last')
     with open(save_path, 'wb') as f:
         torch.save(net.state_dict(), f)
-    print(("Last model saved in file: %s" % save_path))
+    logging.debug(("Last model saved in file: %s" % save_path))
 
 
     # Test trained model
@@ -144,7 +148,7 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, t
 
         # Load net from best validation
         if best_val_save is not None: net.load_state_dict(torch.load(best_val_save))
-        print(f'Loaded best validation checkpoint from: {best_val_save}')
+        logging.debug(f'Loaded best validation checkpoint from: {best_val_save}')
 
         test_loss, test_accuracy = test_split(net, dataset.test_loader, loss_name)
         log_stats('Test', 'Test', test_loss, test_accuracy, 0)
@@ -156,8 +160,12 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, t
         writer.add_scalar('MaxAcc/Val', best_val_acc)
         writer.add_scalar('MaxAcc/Train', train_accuracy)
 
-
     writer.export_scalars_to_json(os.path.join(log_path, "all_scalars.json"))
     writer.close()
+
+
+    pkl.dump(losses, open(result_path + '_losses.p', 'wb'), protocol=2)
+    pkl.dump(accuracies, open(result_path + '_accuracies.p', 'wb'), protocol=2)
+    logging.debug('Saved losses and accuracies to: ' + result_path)
 
     return losses, accuracies

@@ -35,7 +35,12 @@ seed = 0
 np.random.seed(seed)
 torch.manual_seed(seed)
 
-logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadName)s %(message)s')
+# logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadName)s %(message)s')
+# logging.basicConfig(level=logging.DEBUG, )
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(message)s',
+                    datefmt='%FT%T',)
+
 
 # Available datasets: norb, cifar10, smallnorb, mnist, mnist_noise_variation_*, mnist_rand_bg, mnist_bg_rot, convex, rect, rect_images
 # Example command:
@@ -321,24 +326,10 @@ def mlp(args):
             result_path = os.path.join(results_dir, str(trial_iter))
             # vis_path = os.path.join(out_dir, 'vis', args.result_dir, run_iter_name)
 
-            logging.debug('Tensorboard log path: ' + log_path)
-            logging.debug('Tensorboard checkpoint path: ' + checkpoint_path)
-            # logging.debug('Tensorboard vis path: ' + vis_path)
-            logging.debug('Results directory: ' + result_path)
-
-            os.makedirs(checkpoint_path, exist_ok=True)
-            # os.makedirs(vis_path, exist_ok=True)
-
             # loss_name_fn = get_loss(params)
             # net = construct_net(params)
             optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=mom)
-            losses, accuracies = optimize_torch(dataset, model, optimizer, args.epochs, log_path, checkpoint_path, args.test)
-            # tf.reset_default_graph()
-
-            pkl.dump(losses, open(result_path + '_losses.p', 'wb'), protocol=2)
-            pkl.dump(accuracies, open(result_path + '_accuracies.p', 'wb'), protocol=2)
-
-            logging.debug('Saved losses and accuracies to: ' + result_path)
+            losses, accuracies = optimize_torch(dataset, model, optimizer, args.epochs, log_path, checkpoint_path, result_path, args.test)
 
 
 
