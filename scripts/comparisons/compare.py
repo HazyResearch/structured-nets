@@ -6,11 +6,13 @@ import sys, os, datetime, subprocess
 import pickle as pkl
 sys.path.insert(0, '../../')
 import argparse
+import argh
 import threading
 import logging
 import pprint
 import numpy as np
 import torch
+from inspect import signature
 
 sys.path.insert(0, '../../pytorch/')
 sys.path.insert(0, '../../krylov/')
@@ -20,7 +22,7 @@ from model_params import ModelParams
 from dataset import DatasetLoaders
 from dataset_copy import Dataset
 from torch_utils import get_loss
-from nets import construct_net
+from nets import ArghModel
 from optimize_torch import optimize_torch
 
 def get_commit_id():
@@ -102,7 +104,7 @@ parser.add_argument('--batch_size', type=int) # Batch size
 parser.add_argument('--test', action='store_true') # Test on test set
 parser.add_argument('--layer_size', type=int) # Size of hidden layer
 parser.add_argument('--transform', default='none') # Any transform of dataset, e.g. grayscale
-parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
+# parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 parser.add_argument('--parallel') #
 parser.add_argument('--train_frac', nargs='+', default=[None])
 parser.add_argument('--trials', type=int, default=1) #
@@ -228,31 +230,31 @@ def save_args(args, results_dir):
     # return results_dir
 
 
-def compare(args, method, rank, lr, decay_rate, mom, train_frac, steps, log_path, results_dir, checkpoint_path, vis_path):
+def compare(args, method, lr, decay_rate, mom, train_frac, log_path, results_dir, checkpoint_path, net):
 
     dataset = DatasetLoaders(args.dataset, args.transform, train_frac, None, args.batch_size)
 
-    params = ModelParams(args.dataset, args.transform, args.test, log_path,
-            args.layer_size, args.layer_size, dataset.out_size, num_layers,
-            loss, rank, steps, args.batch_size, lr, mom, init_type,
-            method, learn_corner, 0, init_stddev, fix_G,
-            check_disp, check_disp_freq, checkpoint_freq, checkpoint_path, test_freq, verbose,
-            decay_rate, args.decay_freq, learn_diagonal, fix_A_identity,
-            stochastic_train, flip_K_B, num_conv_layers, True, args.model,
-            viz_freq, num_pred_plot, viz_powers, early_stop_steps, replacement,
-            test_best_val_checkpoint, args.restore, num_structured_layers,
-            tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B, train_frac, bias)
+    # params = ModelParams(args.dataset, args.transform, args.test, log_path,
+    #         args.layer_size, args.layer_size, dataset.out_size, num_layers,
+    #         loss, rank, steps, args.batch_size, lr, mom, init_type,
+    #         method, learn_corner, 0, init_stddev, fix_G,
+    #         check_disp, check_disp_freq, checkpoint_freq, checkpoint_path, test_freq, verbose,
+    #         decay_rate, args.decay_freq, learn_diagonal, fix_A_identity,
+    #         stochastic_train, flip_K_B, num_conv_layers, True, args.model,
+    #         viz_freq, num_pred_plot, viz_powers, early_stop_steps, replacement,
+    #         test_best_val_checkpoint, args.restore, num_structured_layers,
+    #         tie_operators_same_layer, tie_layers_A_A, tie_layers_A_B, train_frac)
 
     # Save params + git commit ID
+               # + '_' + method_map[method] \
+               # + '_r' + str(rank) \
     run_name = args.name \
-               + '_' + method_map[method] \
-               + '_r' + str(rank) \
                + '_lr' + str(lr) \
                + '_dr' + str(decay_rate) \
                + '_mom' + str(mom) \
                + '_bs' + str(args.batch_size) \
                + '_tf' + str(train_frac) \
-               + '_steps' + str(steps)
+               # + '_steps' + str(steps)
     # run_results_dir = params.save(results_dir, run_name, commit_id, command)
     results_dir = os.path.join(results_dir, run_name + '_' + str(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))
     save_args(args, results_dir)
@@ -276,7 +278,7 @@ def compare(args, method, rank, lr, decay_rate, mom, train_frac, steps, log_path
 
 
         # loss_name_fn = get_loss(params)
-        net = construct_net(params)
+        # net = construct_net(params)
         optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=mom)
         losses, accuracies = optimize_torch(dataset, net, optimizer, args.epochs, log_path, checkpoint_path, args.test)
         # tf.reset_default_graph()
@@ -292,7 +294,7 @@ def compare(args, method, rank, lr, decay_rate, mom, train_frac, steps, log_path
 # have sample() to do something special in the sample complexity case, vae(), etc.
 # code should look like: for dataset: for model: for optimizer: construct training params (paths); train
 # some parts can be shared (e.g. paths)
-def run(args):
+def mlp(args):
     # pprint.pprint(args.__dict__)
     # from optimize_torch import optimize_torch
 
@@ -301,25 +303,19 @@ def run(args):
     checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
     vis_path = os.path.join(out_dir, 'vis', args.result_dir)
 
+    model = nets[args.model](args) # TODO: move args out
+
 
     # TODO use itertools.product to do this
-    for train_frac in args.train_frac:
-        # Scale steps by train_frac
-        # this_steps = int(train_frac*args.steps)
-        this_steps = args.steps
-        # dispatch dataset and training function based on task
-        # from optimize_torch import optimize_torch
-        # training_fn = optimize_torch
-
-        for rank in args.r:
-            for lr in args.lr:
-                for decay_rate in args.decay_rate:
-                    for mom in args.mom:
-                        # if args.parallel:
-                        #     logging.debug('Starting thread')
-                        #     threading.Thread(target=compare,args=(args, args.method, rank, lr, decay_rate, mom, train_frac, this_steps, training_fn),).start()
-                        # else:
-                        compare(args, args.method, rank, lr, decay_rate, mom, train_frac,this_steps, log_path, results_dir, checkpoint_path, vis_path)
+    train_frac = None
+    for lr in args.lr:
+        for decay_rate in args.decay_rate:
+            for mom in args.mom:
+                compare(args, args.method, lr, decay_rate, mom, train_frac, log_path, results_dir, checkpoint_path, model)
+                # if args.parallel:
+                #     logging.debug('Starting thread')
+                #     threading.Thread(target=compare,args=(args, args.method, rank, lr, decay_rate, mom, train_frac, this_steps, training_fn),).start()
+                # else:
 
 
 
@@ -327,11 +323,29 @@ def run(args):
 
 ## parse
 
+# task
 subparsers = parser.add_subparsers()
-run_parser = subparsers.add_parser('run')
-run_parser.set_defaults(function=run)
-vae_parser = subparsers.add_parser('vae')
-vae_parser.set_defaults(function=vae)
+mlp_parser = subparsers.add_parser('MLP')
+mlp_parser.set_defaults(task=mlp)
+vae_parser = subparsers.add_parser('VAE')
+vae_parser.set_defaults(task=vae)
+
+# MLP models
+fats = []
+nets = {}
+for model in ArghModel.__subclasses__():
+    # change the names so argh can create parsers
+    model.init.__name__ = model.__name__
+    fats.append(model.init)
+    print(model.__name__, signature(model.init).parameters)
+    nets[model.__name__] = model
+print('nets: ', nets)
+argh.add_commands(mlp_parser, fats, namespace='model', namespace_kwargs={'dest': 'model'})
+for model in ArghModel.__subclasses__():
+    # change names back
+    model.init.__name__ = 'init'
+
 
 args = parser.parse_args()
-args.function(args)
+print('args: ', args)
+args.task(args)

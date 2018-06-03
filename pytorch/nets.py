@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 import copy
+from inspect import signature
 import sys
 import numpy as np
 sys.path.insert(0, '../../krylov/')
@@ -48,6 +49,30 @@ def construct_net(params):
     else:
         print(('Model not supported: ', params.model))
         assert 0
+
+class ArghModel(nn.Module):
+    def __init__(self, args):
+        super().__init__()
+        # extract parameters from an argumentparser Namespace
+        print(self.init)
+        init = self.__class__.init
+        kwargs = {param: vars(args)[param]
+                  for param in signature(init).parameters}
+        # self.__dict__.update(init(**kwargs))
+        for k, v in init(**kwargs).items():
+            setattr(self, k, v)
+
+    def init():
+        """
+        Main initialization function
+        Input: Parameters for the class
+        Output: Dictionary containing attributes to initialize an instance with
+        """
+        raise NotImplementedError()
+
+    def loss(self):
+        return 0
+
 
 
 # Pytorch tutorial lenet variant
@@ -337,20 +362,21 @@ class Softmax(nn.Module):
     def loss(self):
         return 0
 
-class SHL(nn.Module):
-    def __init__(self, params):
-        super(SHL, self).__init__()
-        self.W = StructuredLinear(params)
+class SHL(ArghModel):
+    def init(class_type='', layer_size=0, r=0, init_stddev=0.01, out_size=0):
+        # super(SHL, self).__init__()
+        W = StructuredLinear(class_type=class_type, layer_size=layer_size, r=r)
 
-        self.params = params
 
-        self.b1 = Parameter(torch.Tensor(params.layer_size))
-        self.W2 = Parameter(torch.Tensor(params.layer_size, params.out_size))
-        self.b2 = Parameter(torch.Tensor(params.out_size))
+        b1 = Parameter(torch.Tensor(layer_size))
+        W2 = Parameter(torch.Tensor(layer_size, out_size))
+        b2 = Parameter(torch.Tensor(out_size))
         # Note in TF it used to be truncated normal
-        torch.nn.init.normal_(self.b1,std=params.init_stddev)
-        torch.nn.init.normal_(self.b2,std=params.init_stddev)
-        torch.nn.init.normal_(self.W2,std=params.init_stddev)
+        torch.nn.init.normal_(b1,std=init_stddev)
+        torch.nn.init.normal_(b2,std=init_stddev)
+        torch.nn.init.normal_(W2,std=init_stddev)
+
+        return {'W': W, 'b1': b1, 'W2': W2, 'b2': b2}
 
     def forward(self, x):
         xW = self.W(x)
@@ -359,5 +385,3 @@ class SHL(nn.Module):
         y = torch.matmul(h, self.W2) + self.b2
         return y
 
-    def loss(self):
-        return 0
