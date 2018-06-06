@@ -363,9 +363,9 @@ class Softmax(nn.Module):
         return 0
 
 class SHL(ArghModel):
-    def init(class_type='', layer_size=0, r=0, init_stddev=0.01, out_size=0):
+    def init(class_type='', layer_size=0, r=0, init_stddev=0.01, out_size=0, bias=True):
         # super(SHL, self).__init__()
-        W = StructuredLinear(class_type=class_type, layer_size=layer_size, r=r)
+        W = StructuredLinear(class_type=class_type, layer_size=layer_size, r=r, bias=bias)
 
 
         b1 = Parameter(torch.Tensor(layer_size))
