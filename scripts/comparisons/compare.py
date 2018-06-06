@@ -23,7 +23,7 @@ from model_params import ModelParams
 from dataset import DatasetLoaders
 from dataset_copy import Dataset
 from torch_utils import get_loss
-from nets import ArghModel
+from nets import ArghModel, construct_model
 from optimize_torch import optimize_torch
 
 def get_commit_id():
@@ -298,8 +298,6 @@ def mlp(args):
     # checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir)
     # vis_path = os.path.join(out_dir, 'vis', args.result_dir)
 
-    model = nets[args.model](args) # TODO: move args out
-
 
     # TODO use itertools.product to do this
     train_frac = None
@@ -328,6 +326,8 @@ def mlp(args):
 
             # loss_name_fn = get_loss(params)
             # net = construct_net(params)
+            # model = nets[args.model](args) # TODO: move args out
+            model = construct_model(nets[args.model], dataset.in_size, dataset.out_size, args) # TODO: move args out
             optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=mom)
             losses, accuracies = optimize_torch(dataset, model, optimizer, args.epochs, log_path, checkpoint_path, result_path, args.test)
 

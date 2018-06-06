@@ -91,9 +91,10 @@ def get_dataset(dataset_name):
     test_data = pkl.load(open(test_loc, 'rb'))
     test_X = test_data['X']
     test_Y = test_data['Y']
+    in_size = train_X.shape[1]
 
-    # print(train_X.dtype)
-    return torch.FloatTensor(train_X), torch.FloatTensor(train_Y), torch.FloatTensor(test_X), torch.FloatTensor(test_Y), val_size, out_size
+    # print("in_size: ", in_size)
+    return torch.FloatTensor(train_X), torch.FloatTensor(train_Y), torch.FloatTensor(test_X), torch.FloatTensor(test_Y), val_size, in_size, out_size
 
 def split_train_val(train_X, train_Y, val_size, train_fraction=None, val_fraction=None):
     # Shuffle
@@ -121,7 +122,7 @@ def split_train_val(train_X, train_Y, val_size, train_fraction=None, val_fractio
     val_Y = train_Y[val_idx, :]
     train_X = train_X[train_idx, :]
     train_Y = train_Y[train_idx, :]
-    print(type(train_X), type(train_Y))
+    # print(type(train_X), type(train_Y))
     return train_X, train_Y, val_X, val_Y
     # return torch.FloatTensor(train_X), torch.FloatTensor(train_Y), torch.FloatTensor(val_X), torch.FloatTensor(val_Y)
 
@@ -135,7 +136,7 @@ def create_data_loaders(dataset_name, transform, train_fraction, val_fraction, b
 
     # self.input_size = self.get_input_size()
     # self.set_data_locs()
-    train_X, train_Y, test_X, test_Y, val_size, out_size = get_dataset(dataset_name) # train/test data, val size, input/output size
+    train_X, train_Y, test_X, test_Y, val_size, in_size, out_size = get_dataset(dataset_name) # train/test data, val size, input/output size
 
     # TODO: use torch.utils.data.random_split instead
     # however, this requires creating the dataset, then splitting, then applying transformations
@@ -159,13 +160,13 @@ def create_data_loaders(dataset_name, transform, train_fraction, val_fraction, b
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=True, **loader_args)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, **loader_args)
 
-    return train_loader, val_loader, test_loader, out_size
+    return train_loader, val_loader, test_loader, in_size, out_size
 
 
 class DatasetLoaders:
     def __init__(self, name, transform=None, train_fraction=None, val_fraction=None, batch_size=50):
         # self.train_X, self.train_Y, self.val_X, self.val_Y, self.test_X, self.test_Y, self.out_size = create_data_loaders(name, transform, train_fraction, val_fraction, batch_size)
-        self.train_loader, self.val_loader, self.test_loader, self.out_size = create_data_loaders(name, transform, train_fraction, val_fraction, batch_size)
+        self.train_loader, self.val_loader, self.test_loader, self.in_size, self.out_size = create_data_loaders(name, transform, train_fraction, val_fraction, batch_size)
 
 
 

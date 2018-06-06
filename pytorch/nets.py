@@ -50,28 +50,56 @@ def construct_net(params):
         print(('Model not supported: ', params.model))
         assert 0
 
-class ArghModel(nn.Module):
-    def __init__(self, args):
-        super().__init__()
-        # extract parameters from an argumentparser Namespace
-        print(self.init)
-        init = self.__class__.init
-        kwargs = {param: vars(args)[param]
-                  for param in signature(init).parameters}
-        # self.__dict__.update(init(**kwargs))
-        for k, v in init(**kwargs).items():
-            setattr(self, k, v)
+def construct_model(cls, in_size, out_size, args):
+    init = cls.init
+    options = {param: vars(args)[param]
+                for param in signature(init).parameters}
+    return cls(in_size=in_size, out_size=out_size, **options)
 
-    def init():
+class ArghModel(nn.Module):
+    # def __init__(self, in_size, out_size, **options):
+    def __init__(self, **options):
+        """"
+        options: dictionary of options/params that init() accepts
+        """
+        super().__init__()
+
+        # self.in_size = in_size
+        # self.out_size = out_size
+        self.__dict__.update(**options)
+
+        # extract parameters from an argumentparser Namespace
+        # print(self.init)
+        # init = self.__class__.init
+        # kwargs = {param: vars(args)[param]
+        #           for param in signature(init).parameters}
+        # self.__dict__.update(init(**kwargs))
+        # for k, v in self.__class__.init(**options).items():
+        #     setattr(self, k, v)
+
+    def init(**kwargs):
         """
         Main initialization function
         Input: Parameters for the class
         Output: Dictionary containing attributes to initialize an instance with
         """
         raise NotImplementedError()
+        # self.__dict__.update(**kwargs)
+
+    def id():
+        """
+        Short string summarizing the main parameters of the class
+        Used to construct a unique identifier for an experiment
+        """
+        raise NotImplementedError()
 
     def loss(self):
+        """
+        Loss function for the model's parameters (e.g. regularization)
+        """
         return 0
+
+    method_map = None # TODO move method map here to help with id()
 
 
 
@@ -363,20 +391,30 @@ class Softmax(nn.Module):
         return 0
 
 class SHL(ArghModel):
-    def init(class_type='', layer_size=0, r=0, init_stddev=0.01, out_size=0, bias=True):
-        # super(SHL, self).__init__()
-        W = StructuredLinear(class_type=class_type, layer_size=layer_size, r=r, bias=bias)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
+        if self.layer_size == -1:
+            self.layer_size = self.in_size
 
-        b1 = Parameter(torch.Tensor(layer_size))
-        W2 = Parameter(torch.Tensor(layer_size, out_size))
-        b2 = Parameter(torch.Tensor(out_size))
+        W = StructuredLinear(class_type=self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias)
+
+        b1 = Parameter(torch.Tensor(self.layer_size))
+        W2 = Parameter(torch.Tensor(self.layer_size, self.out_size))
+        b2 = Parameter(torch.Tensor(self.out_size))
         # Note in TF it used to be truncated normal
-        torch.nn.init.normal_(b1,std=init_stddev)
-        torch.nn.init.normal_(b2,std=init_stddev)
-        torch.nn.init.normal_(W2,std=init_stddev)
+        torch.nn.init.normal_(b1,std=self.init_stddev)
+        torch.nn.init.normal_(b2,std=self.init_stddev)
+        torch.nn.init.normal_(W2,std=self.init_stddev)
 
-        return {'W': W, 'b1': b1, 'W2': W2, 'b2': b2}
+        self.W = W
+        self.b1 = b1
+        self.W2 = W2
+        self.b2 = b2
+        # return {'W': W, 'b1': b1, 'W2': W2, 'b2': b2}
+
+    def init(class_type='unconstrained', layer_size=-1, r=1, init_stddev=0.01, bias=True):
+        pass
 
     def forward(self, x):
         xW = self.W(x)
