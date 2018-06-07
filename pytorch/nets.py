@@ -51,16 +51,17 @@ def construct_net(params):
         assert 0
 
 def construct_model(cls, in_size, out_size, args):
-    init = cls.init
+    args_fn = cls.args
     options = {param: vars(args)[param]
-                for param in signature(init).parameters}
+                for param in signature(args_fn).parameters}
     return cls(in_size=in_size, out_size=out_size, **options)
 
 class ArghModel(nn.Module):
     # def __init__(self, in_size, out_size, **options):
     def __init__(self, **options):
         """"
-        options: dictionary of options/params that init() accepts
+        options: dictionary of options/params that args() accepts
+        If the model if constructed with construct_model(), the options will contain defaults based on its args() function
         """
         super().__init__()
 
@@ -68,20 +69,10 @@ class ArghModel(nn.Module):
         # self.out_size = out_size
         self.__dict__.update(**options)
 
-        # extract parameters from an argumentparser Namespace
-        # print(self.init)
-        # init = self.__class__.init
-        # kwargs = {param: vars(args)[param]
-        #           for param in signature(init).parameters}
-        # self.__dict__.update(init(**kwargs))
-        # for k, v in self.__class__.init(**options).items():
-        #     setattr(self, k, v)
 
-    def init(**kwargs):
+    def args(**kwargs):
         """
-        Main initialization function
-        Input: Parameters for the class
-        Output: Dictionary containing attributes to initialize an instance with
+        Empty function whose signature contains parameters and defaults for the class
         """
         raise NotImplementedError()
         # self.__dict__.update(**kwargs)
@@ -413,7 +404,7 @@ class SHL(ArghModel):
         self.b2 = b2
         # return {'W': W, 'b1': b1, 'W2': W2, 'b2': b2}
 
-    def init(class_type='unconstrained', layer_size=-1, r=1, init_stddev=0.01, bias=True):
+    def args(class_type='unconstrained', layer_size=-1, r=1, init_stddev=0.01, bias=True):
         pass
 
     def forward(self, x):

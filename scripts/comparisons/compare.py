@@ -283,14 +283,14 @@ model_options = []
 nets = {}
 for model in ArghModel.__subclasses__():
     # change the names so argh can create parsers
-    model.init.__name__ = model.__name__
-    model_options.append(model.init)
-    print(model.__name__, signature(model.init).parameters)
+    model.args.__name__ = model.__name__
+    model_options.append(model.args)
+    # print(model.__name__, signature(model.args).parameters)
     nets[model.__name__] = model
 argh.add_commands(mlp_parser, model_options, namespace='model', namespace_kwargs={'dest': 'model'})
 for model in ArghModel.__subclasses__():
     # change names back
-    model.init.__name__ = 'init'
+    model.args.__name__ = 'args'
 
 
 args = parser.parse_args()
