@@ -8,7 +8,7 @@ from torch_reconstruction import *
 import sys
 sys.path.insert(0, '../krylov/')
 import toeplitz_gpu as toep
-import krylov_multiply as subd
+import krylov_multiply as kry
 import circulant as circ
 
 class StructuredLinear(nn.Module):
@@ -56,6 +56,18 @@ class StructuredLinear(nn.Module):
                     self.subd_B = self.subd_A
                 else:
                     self.subd_B = Parameter(torch.ones(self.layer_size))
+            elif self.class_type == 'tridiagonal_corner':
+                self.subd_A = Parameter(torch.ones(self.layer_size-1))
+                self.diag_A = Parameter(torch.zeros(self.layer_size))
+                self.supd_A = Parameter(torch.zeros(self.layer_size-1))
+                if self.tie_operators:
+                    self.subd_B = self.subd_A
+                    self.diag_B = self.diag_A
+                    self.supd_B = self.supd_A
+                else:
+                    self.subd_B = Parameter(torch.ones(self.layer_size-1))
+                    self.diag_B = Parameter(torch.zeros(self.layer_size))
+                    self.supd_B = Parameter(torch.zeros(self.layer_size-1))
             else:
                 fn_A, fn_B_T = self.set_mult_fns(self.params)
                 self.fn_A = fn_A
@@ -130,11 +142,13 @@ class StructuredLinear(nn.Module):
             out = toep.toeplitz_mult(self.G, self.H, x, self.cycle)
             # out = toep.toeplitz_mult(self.G, self.G, x, self.cycle)
         elif self.class_type == 'subdiagonal':
-            out = subd.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
+            out = kry.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
             #print('subdiagonal mult slow fast')
-            # out = subd.subdiag_mult_slow_fast(self.subd_A, self.subd_B, self.G, self.H, x)
+            # out = kry.subdiag_mult_slow_fast(self.subd_A, self.subd_B, self.G, self.H, x)
+        elif self.class_type == 'tridiagonal_corner':
+            out = kry.tridiag_mult_slow(self.subd_A, self.diag_A, self.supd_A, self.subd_B, self.diag_B, self.supd_B, self.G, self.H, x)
         elif self.class_type in ['toeplitz_like', 'vandermonde_like', 'hankel_like',
-            'circulant_sparsity', 'tridiagonal_corner']:
+            'circulant_sparsity']:
 
             W = recon(self)
 
