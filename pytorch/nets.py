@@ -68,7 +68,10 @@ class ArghModel(nn.Module):
         # self.in_size = in_size
         # self.out_size = out_size
         self.__dict__.update(**options)
+        self.init()
 
+    def init(self):
+        raise NotImplementedError()
 
     def args(**kwargs):
         """
@@ -77,7 +80,7 @@ class ArghModel(nn.Module):
         raise NotImplementedError()
         # self.__dict__.update(**kwargs)
 
-    def id():
+    def name():
         """
         Short string summarizing the main parameters of the class
         Used to construct a unique identifier for an experiment
@@ -378,13 +381,17 @@ class Softmax(nn.Module):
         xW = self.W(x)
         return xW
 
+    def name():
+        return ''
+
     def loss(self):
         return 0
 
 class SHL(ArghModel):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    # def __init__(self, **kwargs):
+    #     super().__init__(**kwargs)
 
+    def init(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
 
@@ -406,6 +413,9 @@ class SHL(ArghModel):
 
     def args(class_type='unconstrained', layer_size=-1, r=1, init_stddev=0.01, bias=True):
         pass
+
+    def name(self):
+        return self.W.name()
 
     def forward(self, x):
         xW = self.W(x)

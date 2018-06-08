@@ -12,6 +12,12 @@ import krylov_multiply as kry
 import circulant as circ
 
 class StructuredLinear(nn.Module):
+    abbrev = {'circulant_sparsity': 'cs', 'tridiagonal_corner': 'tdc', 'tridiagonal_corners': 'tcs', 'low_rank': 'lr', 'unconstrained': 'u',
+        'toeplitz_like': 't', 'toeplitz_corner': 'tc', 'toeplitz': 't', 'subdiagonal': 'sd', 'hankel_like': 'h', 'vandermonde_like': 'v', 'circulant': 'c'}
+
+    def name(self):
+        return self.__class__.abbrev[self.class_type] + str(self.r)
+
     def __init__(self, params=None, class_type=None, layer_size=None, init_stddev=0.01, r=1, tie_operators=False, bias=False):
         super(StructuredLinear,self).__init__()
         if params is None:
@@ -38,7 +44,7 @@ class StructuredLinear(nn.Module):
             self.c = Parameter(torch.Tensor(self.layer_size))
             torch.nn.init.normal_(self.c, std=self.init_stddev)
         elif self.class_type in ['low_rank', 'toeplitz_like', 'vandermonde_like', 'hankel_like',
-                                        'circulant_sparsity', 'tridiagonal_corner', 'toep_corner', 'toep_nocorn', 'subdiagonal']:
+                                        'circulant_sparsity', 'tridiagonal_corner', 'toeplitz', 'toeplitz_corner', 'subdiagonal']:
             self.G = Parameter(torch.Tensor(self.r, self.layer_size))
             self.H = Parameter(torch.Tensor(self.r, self.layer_size))
             torch.nn.init.normal_(self.G, std=self.init_stddev)
@@ -46,9 +52,9 @@ class StructuredLinear(nn.Module):
 
             if self.class_type == 'low_rank':
                 pass
-            elif self.class_type == 'toep_corner':
+            elif self.class_type == 'toeplitz_corner':
                 self.cycle = True
-            elif self.class_type == 'toep_nocorn':
+            elif self.class_type == 'toeplitz':
                 self.cycle = False
             elif self.class_type == 'subdiagonal':
                 self.subd_A = Parameter(torch.ones(self.layer_size))
@@ -73,8 +79,9 @@ class StructuredLinear(nn.Module):
                 self.fn_A = fn_A
                 self.fn_B_T = fn_B_T
         else:
-            print((f"{self.__class__.__name__} does not support {self.class_type}"))
-            assert 0
+            # print((f"{self.__class__.__name__} does not support {self.class_type}"))
+            # assert 0
+            assert 0, f"{self.__class__.__name__} does not support {self.class_type}"
 
         self.b = None
         if self.bias:
@@ -138,7 +145,7 @@ class StructuredLinear(nn.Module):
         elif self.class_type == 'low_rank':
             xH = torch.matmul(x, self.H.t())
             out = torch.matmul(xH, self.G)
-        elif self.class_type in ['toep_corner', 'toep_nocorn']:
+        elif self.class_type in ['toeplitz', 'toeplitz_corner']:
             out = toep.toeplitz_mult(self.G, self.H, x, self.cycle)
             # out = toep.toeplitz_mult(self.G, self.G, x, self.cycle)
         elif self.class_type == 'subdiagonal':
@@ -158,3 +165,6 @@ class StructuredLinear(nn.Module):
             return self.b + out
         else:
             return out
+
+    def loss(self):
+        return 0

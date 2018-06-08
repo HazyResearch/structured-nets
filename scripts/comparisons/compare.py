@@ -112,7 +112,7 @@ parser.add_argument('--decay_rate', type=float, nargs='+', default=[1.0]) # Deca
 # parser.add_argument('--decay_freq', type=float) # Decay steps
 parser.add_argument('--mom', nargs='+', type=float, default=[0.9]) # Momentums
 # parser.add_argument('--steps', type=int) # Steps
-parser.add_argument('--test', action='store_true') # Test on test set
+parser.add_argument('--test', action='store_false') # Test on test set
 # parser.add_argument('--layer_size', type=int) # Size of hidden layer
 # parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 
@@ -237,9 +237,10 @@ def save_args(args, results_dir):
 def mlp(args):
     for train_frac in args.train_frac:
         dataset = DatasetLoaders(args.dataset, args.transform, train_frac, None, args.batch_size)
+        model = construct_model(nets[args.model], dataset.in_size, dataset.out_size, args) # TODO: move args out
         for lr, decay_rate, mom in itertools.product(args.lr, args.decay_rate, args.mom):
 
-            run_name = args.name \
+            run_name = args.name + '_' + model.name() \
                     + '_lr' + str(lr) \
                     + '_mom' + str(mom) \
                     + '_bs' + str(args.batch_size) \
@@ -247,7 +248,8 @@ def mlp(args):
                     # + '_dr' + str(decay_rate) \
                     # + '_steps' + str(steps)
             if train_frac is not None:
-                run_name += '_tf' + str(train_frac) \
+                run_name += '_tf' + str(train_frac)
+            # model = construct_model(nets[args.model], dataset.in_size, dataset.out_size, args) # TODO: move args out
 
             results_dir = os.path.join(out_dir,
                                         'results',
@@ -261,7 +263,8 @@ def mlp(args):
                 result_path = os.path.join(results_dir, str(trial_iter))
                 # vis_path = os.path.join(out_dir, 'vis', args.result_dir, run_iter_name)
 
-                model = construct_model(nets[args.model], dataset.in_size, dataset.out_size, args) # TODO: move args out
+                # model = construct_model(nets[args.model], dataset.in_size, dataset.out_size, args) # TODO: move args out
+                model.init()
                 optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=mom)
                 losses, accuracies = optimize_torch(dataset, model, optimizer, args.epochs, log_path, checkpoint_path, result_path, args.test)
 
