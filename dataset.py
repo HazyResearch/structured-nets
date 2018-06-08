@@ -21,6 +21,36 @@ def get_dataset(dataset_name):
     dataset specific parameters: the actual data (as Tensor), validation size
     TODO: output size should be readable from data
     """
+    if dataset_name == 'mnist':
+        mnist_normalize = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307, ), (0.3081, ))
+        ])
+        mnist_train = datasets.MNIST(
+            '../data', train=True, download=True, transform=mnist_normalize)
+        mnist_test = datasets.MNIST(
+            '../data', train=False, download=True, transform=mnist_normalize)
+        val_size = 5000
+        in_size = 784
+        out_size = 10
+
+        train_loader = torch.utils.data.DataLoader(mnist_train, batch_size=len(mnist_train), shuffle=True)
+        for X, Y in train_loader:
+            train_X, train_Y = X, Y
+        test_loader = torch.utils.data.DataLoader(mnist_test, batch_size=len(mnist_test), shuffle=True)
+        for X, Y in test_loader:
+            test_X, test_Y = X, Y
+        train_X = train_X.view(-1, in_size)
+        test_X = test_X.view(-1, in_size)
+        train_Y = torch.zeros(train_X.size(0), out_size)
+        train_Y.scatter_(1, mnist_train.train_labels.unsqueeze(1), 1)
+        # test_X = mnist_test.test_data.view(-1, in_size)
+        test_Y = torch.zeros(test_X.size(0), out_size)
+        test_Y.scatter_(1, mnist_test.test_labels.unsqueeze(1), 1)
+        # return train_X, train_Y, test_X, test_Y, val_size, in_size, out_size
+        return torch.FloatTensor(train_X), torch.FloatTensor(train_Y), torch.FloatTensor(test_X), torch.FloatTensor(test_Y), val_size, in_size, out_size
+        # normalize
+
     prefix = '/dfs/scratch1/thomasat/datasets/'
     if dataset_name == 'cifar10':
         train_loc = os.path.join(prefix, 'cifar10_combined/train')
@@ -57,17 +87,6 @@ def get_dataset(dataset_name):
         test_loc = os.path.join(prefix, 'convex/test_normalized')
         val_size = 800
         out_size = 2
-    elif dataset_name == 'mnist':
-        # TODO: use pytorch mnist
-        mnist_normalize = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.1307, ), (0.3081, ))
-        ])
-        mnist_train = datasets.MNIST(
-            '../data', train=True, download=True, transform=mnist_normalize)
-        mnist_test = datasets.MNIST(
-            '../data', train=False, download=True, transform=mnist_normalize)
-        out_size = 10
     elif dataset_name == 'mnist_rand_bg': #TODO
         train_loc = os.path.join(prefix, 'mnist_rand_bg/mnist_background_random_train.amat')
         test_loc = os.path.join(prefix, 'mnist_rand_bg/mnist_background_random_test.amat')
