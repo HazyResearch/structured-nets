@@ -102,12 +102,23 @@ class ToeplitzLike(LowRank):
     class_type = 'toeplitz'
     abbrev = 't'
 
-    def __init__(self, corner=False, **kwargs):
-        super().__init__(corner=corner, **kwargs)
+    # def __init__(self, corner=False, **kwargs):
+    #     super().__init__(corner=corner, **kwargs)
+    def reset_parameters(self):
+        super().reset_parameters()
+        self.corner = False
 
     def forward(self, x):
         out = toep.toeplitz_mult(self.G, self.H, x, self.corner)
         return self.apply_bias(out)
+
+class ToeplitzLikeC(ToeplitzLike):
+    class_type = 'toeplitz_corner'
+    abbrev = 'tc'
+
+    def reset_parameters(self):
+        super().reset_parameters()
+        self.corner = True
 
 class HankelLike(LowRank):
     pass
@@ -139,11 +150,20 @@ class LDRSubdiagonal(LearnedOperator):
 
     def forward(self, x):
         out = kry.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
-        #print('subdiagonal mult slow fast')
-        # out = kry.subdiag_mult_slow_fast(self.subd_A, self.subd_B, self.G, self.H, x)
-        # out = kry.subdiag_mult_cuda(self.subd_A, self.subd_B, self.G, self.H, x)
         return self.apply_bias(out)
 
+class LDRSubdiagonalC(LDRSubdiagonal):
+    class_type = 'subdiagonal_corner'
+    abbrev = 'sdc'
+
+    def reset_parameters(self):
+        super().reset_parameters()
+        self.corner_A = Parameter(torch.tensor(0.0))
+        self.corner_B = Parameter(torch.tensor(0.0))
+
+    def forward(self, x):
+        out = kry.subdiag_mult_cuda(self.subd_A, self.subd_B, self.G, self.H, x, corner_A=self.corner_A, corner_B=self.corner_B)
+        return self.apply_bias(out)
 
 class LDRTridiagonal(LearnedOperator):
     class_type = 'tridiagonal'
@@ -162,10 +182,26 @@ class LDRTridiagonal(LearnedOperator):
             self.subd_B = Parameter(torch.ones(self.layer_size-1))
             self.diag_B = Parameter(torch.zeros(self.layer_size))
             self.supd_B = Parameter(torch.zeros(self.layer_size-1))
+        self.corners_A = (0.0,0.0)
+        self.corners_B = (0.0,0.0)
 
     def forward(self, x):
-        out = kry.tridiag_mult_slow(self.subd_A, self.diag_A, self.supd_A, self.subd_B, self.diag_B, self.supd_B, self.G, self.H, x)
+        # out = kry.tridiag_mult_slow(self.subd_A, self.diag_A, self.supd_A, self.subd_B, self.diag_B, self.supd_B, self.G, self.H, x)
+        out = kry.tridiag_mult_slow(self.subd_A, self.diag_A, self.supd_A, self.subd_B, self.diag_B, self.supd_B, self.G, self.H, x, corners_A=self.corners_A, corners_B=self.corners_B)
         return self.apply_bias(out)
+
+class LDRTridiagonalC(LDRTridiagonal):
+    class_type = 'tridiagonal_corner'
+    abbrev = 'tdc'
+
+    def reset_parameters(self):
+        super().reset_parameters()
+        self.corners_A = (Parameter(torch.tensor(0.0)), Parameter(torch.tensor(0.0)))
+        self.corners_B = (Parameter(torch.tensor(0.0)), Parameter(torch.tensor(0.0)))
+
+    # def forward(self, x):
+    #     out = kry.tridiag_mult_slow(self.subd_A, self.diag_A, self.supd_A, self.subd_B, self.diag_B, self.supd_B, self.G, self.H, x, corners_A=self.corners_A, corners_B=self.corners_B)
+    #     return self.apply_bias(out)
 
 
 # create a map from class names to the Python class
