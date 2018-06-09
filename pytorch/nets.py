@@ -17,7 +17,8 @@ sys.path.insert(0, '../../krylov/')
 # import krylov_multiply as subd
 import LDR as ldr
 #from krylov_multiply import *
-from structured_layer import StructuredLinear # this is already in attention
+# from structured_layer import StructuredLinear # this is already in attention
+import structured_layer as structured
 # TODO fix the 'import *'s
 
 
@@ -395,7 +396,8 @@ class SHL(ArghModel):
         if self.layer_size == -1:
             self.layer_size = self.in_size
 
-        W = StructuredLinear(class_type=self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias)
+        # W = structured.StructuredLinear(class_type=self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias)
+        W = structured.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
 
         b1 = Parameter(torch.Tensor(self.layer_size))
         W2 = Parameter(torch.Tensor(self.layer_size, self.out_size))
