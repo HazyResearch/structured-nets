@@ -97,6 +97,11 @@ def get_dataset(dataset_name):
         test_loc = os.path.join(prefix, 'mnist_bg_rot/test_normalized')
         val_size = 2000
         out_size = 10
+    elif dataset_name == 'mnist_bg_rot_swap':
+        train_loc = os.path.join(prefix, 'mnist_bg_rot/test_normalized')
+        test_loc = os.path.join(prefix, 'mnist_bg_rot/train_normalized')
+        val_size = 5000
+        out_size = 10
     elif dataset_name == 'timit': #TODO
         out_size = 147
     #TODO handle iwslt, copy tasks
@@ -111,6 +116,9 @@ def get_dataset(dataset_name):
     test_X = test_data['X']
     test_Y = test_data['Y']
     in_size = train_X.shape[1]
+
+    print("Train dataset size: ", train_X.shape[0])
+    print("Test dataset size: ", test_X.shape[0])
 
     # print("in_size: ", in_size)
     return torch.FloatTensor(train_X), torch.FloatTensor(train_Y), torch.FloatTensor(test_X), torch.FloatTensor(test_Y), val_size, in_size, out_size

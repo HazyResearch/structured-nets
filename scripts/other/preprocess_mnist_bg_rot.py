@@ -12,8 +12,8 @@ def process_data(data):
     Y = enc.fit_transform(Y).todense()
     return X,Y
 
-train_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_test.amat'
-test_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat'
+train_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_train_valid.amat'
+test_loc = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/mnist_all_background_images_rotation_normalized_test.amat'
 train_out = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/train_normalized'
 test_out = '/dfs/scratch1/thomasat/datasets/mnist_bg_rot/test_normalized'
 
