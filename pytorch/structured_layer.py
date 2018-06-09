@@ -47,7 +47,8 @@ class Unconstrained(StructuredLinear):
     def reset_parameters(self):
         super().reset_parameters()
         # TODO: initialize based on stddev automatically
-        self.init_stddev = 0.01
+        # self.init_stddev = 0.01
+        self.init_stddev = np.sqrt(1./self.layer_size)
         self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
         torch.nn.init.normal_(self.W, std=self.init_stddev)
 
@@ -67,7 +68,8 @@ class Circulant(StructuredLinear):
     def reset_parameters(self):
         super().reset_parameters()
         self.c = Parameter(torch.Tensor(self.layer_size))
-        self.init_stddev = 0.01 # TODO initialize smartly
+        # self.init_stddev = 0.01 # TODO initialize smartly
+        self.init_stddev = np.sqrt(1./self.layer_size)
         torch.nn.init.normal_(self.c, std=self.init_stddev)
 
     def forward(self, x):
@@ -88,7 +90,8 @@ class LowRank(StructuredLinear):
         self.G = Parameter(torch.Tensor(self.r, self.layer_size))
         self.H = Parameter(torch.Tensor(self.r, self.layer_size))
         # TODO: calculate stddev automatically
-        self.init_stddev = 0.01
+        # self.init_stddev = 0.01
+        self.init_stddev = np.power(1. / (self.r * self.layer_size), 1/2)
         torch.nn.init.normal_(self.G, std=self.init_stddev)
         torch.nn.init.normal_(self.H, std=self.init_stddev)
 
