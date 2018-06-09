@@ -49,7 +49,8 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, r
 
     writer = SummaryWriter(log_path)
     # net = construct_net(params)
-    net.cuda() # TODO: to device?
+    # net.cuda() # TODO: to device?
+    net.to(device)
 
     logging.debug((torch.cuda.get_device_name(0)))
 
@@ -86,7 +87,9 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, r
     init_loss, init_accuracy = test_split(net, dataset.val_loader, loss_name)
     log_stats('Initial', 'Val', init_loss, init_accuracy, 0)
 
+    # print("length of dataloader: ", len(dataset.train_loader))
     for epoch in range(epochs):
+        logging.debug('Starting epoch ' + str(epoch))
     # for step in range(1, params.steps+1):
         for step, data in enumerate(dataset.train_loader, 0):
         # get the inputs
@@ -107,20 +110,21 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, r
 
             # log training every 100
             # params.log_freq?
-            if step % 100 == 0:
+            total_step = epoch*len(dataset.train_loader) + step+1
+            if total_step % 100 == 0:
                 epochs += 1
                 # lr_scheduler.step()
 
                 logging.debug(('Time: ', time.time() - t1))
                 t1 = time.time()
-                logging.debug(('Training step: ', step))
+                logging.debug(('Training step: ', total_step))
 
-                log_stats('Train', 'Train', train_loss.data.item(), train_accuracy.data.item(), step)
+                log_stats('Train', 'Train', train_loss.data.item(), train_accuracy.data.item(), total_step)
 
         # validate and checkpoint by epoch
         # Test on validation set
         val_loss, val_accuracy = test_split(net, dataset.val_loader, loss_name)
-        log_stats('Validation', 'Val', val_loss, val_accuracy, step)
+        log_stats('Validation', 'Val', val_loss, val_accuracy, epoch+1)
 
         # record best model
         if val_accuracy > best_val_acc:
