@@ -264,7 +264,7 @@ def mlp(args):
                 # vis_path = os.path.join(out_dir, 'vis', args.result_dir, run_iter_name)
 
                 # model = construct_model(nets[args.model], dataset.in_size, dataset.out_size, args) # TODO: move args out
-                model.init()
+                model.reset_parameters()
                 optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=mom)
                 losses, accuracies = optimize_torch(dataset, model, optimizer, args.epochs, log_path, checkpoint_path, result_path, args.test)
 

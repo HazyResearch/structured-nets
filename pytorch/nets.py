@@ -69,16 +69,16 @@ class ArghModel(nn.Module):
         # self.in_size = in_size
         # self.out_size = out_size
         self.__dict__.update(**options)
-        self.init()
+        self.reset_parameters()
 
-    def init(self):
+    def reset_parameters(self):
         raise NotImplementedError()
 
     def args(**kwargs):
         """
         Empty function whose signature contains parameters and defaults for the class
         """
-        raise NotImplementedError()
+        pass
         # self.__dict__.update(**kwargs)
 
     def name():
@@ -392,7 +392,7 @@ class SHL(ArghModel):
     # def __init__(self, **kwargs):
     #     super().__init__(**kwargs)
 
-    def init(self):
+    def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
 
