@@ -4,19 +4,16 @@ Compare methods and hyperparameter settings sequentially.
 
 import sys, os, datetime
 import pickle as pkl
-sys.path.insert(0, '../../')
+# sys.path.insert(0, '../')
 import argparse
 import threading
 import logging
 import numpy as np
 
-from optimize import optimize
+from optimize_tf import optimize_tf
 from utils import *
 from model_params import ModelParams
 from dataset import Dataset
-
-seed = 0
-np.random.seed(seed)
 
 logging.basicConfig(level=logging.DEBUG, format='%(relativeCreated)6d %(threadName)s %(message)s')
 
@@ -62,7 +59,7 @@ def compare(args, method, rank, lr, decay_rate, mom, train_frac, steps):
         if not os.path.exists(params.vis_path):
             os.makedirs(params.vis_path)
 
-        losses, accuracies = optimize(dataset, params, seed)
+        losses, accuracies = optimize_tf(dataset, params)
         tf.reset_default_graph()
 
         pkl.dump(losses, open(params.result_path + '_losses.p', 'wb'), protocol=2)
@@ -80,14 +77,14 @@ parser.add_argument("--result_dir") # Where to save results
 parser.add_argument("--r", default='0') # Rank / displacement ranks
 parser.add_argument('--lr') # Learning rates
 parser.add_argument('--decay_rate', default='1.0') # Decay rates of learning rate
-parser.add_argument('--decay_freq', type=float) # Decay steps
+parser.add_argument('--decay_freq', type=float, default=1.0) # Decay steps
 parser.add_argument('--mom', default='0.9') # Momentums
 parser.add_argument('--steps', type=int) # Steps
 parser.add_argument('--batch_size', type=int) # Batch size
 parser.add_argument('--test', type=int, default=1) # Test on test set
 parser.add_argument('--layer_size', type=int) # Size of hidden layer
 parser.add_argument('--transform', default='none') # Any transform of dataset, e.g. grayscale
-parser.add_argument('--torch', type=int) # Pytorch or TF
+parser.add_argument('--torch', type=int, default=0) # Pytorch or TF
 parser.add_argument('--model') # Which model, e.g. CNN, MLP, RNN
 parser.add_argument('--parallel') #
 parser.add_argument('--train_frac', default='1.0')

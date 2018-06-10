@@ -1,6 +1,6 @@
 import sys
 import pickle as pkl
-sys.path.insert(0, '../../')
+# sys.path.insert(0, '../../')
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 from norb import NORBDataset

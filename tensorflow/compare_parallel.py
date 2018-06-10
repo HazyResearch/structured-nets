@@ -5,7 +5,7 @@ Compare methods in parallel, spawning separate thread for each.
 import sys, os, datetime
 import pickle as pkl
 sys.path.insert(0, '../../')
-from optimize import optimize
+# from optimize import optimize
 from utils import *
 from model_params import ModelParams
 from dataset import Dataset
