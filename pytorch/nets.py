@@ -58,28 +58,26 @@ def construct_model(cls, in_size, out_size, args):
     return cls(in_size=in_size, out_size=out_size, **options)
 
 class ArghModel(nn.Module):
-    # def __init__(self, in_size, out_size, **options):
-    def __init__(self, **options):
+    def __init__(self, in_size, out_size, **options):
         """"
         options: dictionary of options/params that args() accepts
         If the model if constructed with construct_model(), the options will contain defaults based on its args() function
         """
         super().__init__()
 
-        # self.in_size = in_size
-        # self.out_size = out_size
+        self.in_size = in_size
+        self.out_size = out_size
         self.__dict__.update(**options)
         self.reset_parameters()
-
-    def reset_parameters(self):
-        raise NotImplementedError()
 
     def args(**kwargs):
         """
         Empty function whose signature contains parameters and defaults for the class
         """
         pass
-        # self.__dict__.update(**kwargs)
+
+    def reset_parameters(self):
+        raise NotImplementedError()
 
     def name():
         """
@@ -90,11 +88,9 @@ class ArghModel(nn.Module):
 
     def loss(self):
         """
-        Loss function for the model's parameters (e.g. regularization)
+        Model-specific loss function (e.g. per-parameter regularization)
         """
         return 0
-
-    method_map = None # TODO move method map here to help with id()
 
 
 
@@ -389,40 +385,19 @@ class Softmax(nn.Module):
         return 0
 
 class SHL(ArghModel):
-    # def __init__(self, **kwargs):
-    #     super().__init__(**kwargs)
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True):
+        pass
 
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
-
-        # W = structured.StructuredLinear(class_type=self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias)
-        W = structured.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
-
-        b1 = Parameter(torch.Tensor(self.layer_size))
-        W2 = Parameter(torch.Tensor(self.layer_size, self.out_size))
-        b2 = Parameter(torch.Tensor(self.out_size))
-        # Note in TF it used to be truncated normal
-        torch.nn.init.normal_(b1,std=self.init_stddev)
-        torch.nn.init.normal_(b2,std=self.init_stddev)
-        torch.nn.init.normal_(W2,std=self.init_stddev)
-
-        self.W = W
-        self.b1 = b1
-        self.W2 = W2
-        self.b2 = b2
-        # return {'W': W, 'b1': b1, 'W2': W2, 'b2': b2}
-
-    def args(class_type='unconstrained', layer_size=-1, r=1, init_stddev=0.01, bias=True):
-        pass
+        self.W = structured.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.W2 = nn.Linear(self.layer_size, self.out_size)
 
     def name(self):
         return self.W.name()
 
     def forward(self, x):
-        xW = self.W(x)
-
-        h = F.relu(xW + self.b1)
-        y = torch.matmul(h, self.W2) + self.b2
-        return y
-
+        x = F.relu(self.W(x))
+        x = self.W2(x)
+        return x
