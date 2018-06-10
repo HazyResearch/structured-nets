@@ -19,7 +19,7 @@ from nets import construct_net
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # TODO: get rid of params here
-def test_split(net, dataloader, loss_name):
+def test_split(net, dataloader, loss_fn):
     # assert data_X.shape[0] == data_Y.shape[0]
     n = len(dataloader.dataset)
     total_loss = 0.0
@@ -30,14 +30,15 @@ def test_split(net, dataloader, loss_name):
         # print("lengths: ", len(dataloader), len(batch_X), len(batch_Y))
 
         output = net(batch_X)
-        loss_batch, acc_batch = compute_loss_and_accuracy(output, batch_Y, loss_name)
+        # loss_batch, acc_batch = compute_loss_and_accuracy(output, batch_Y, loss_name)
+        loss_batch, acc_batch = loss_fn(output, batch_Y)
         total_loss += len(batch_X)*loss_batch.data.item()
         total_acc += len(batch_X)*acc_batch.data.item()
     return total_loss/n, total_acc/n
 
 
 # TODO loss type should be moved to model or dataset?
-def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, result_path, test, loss_name='cross_entropy'):
+def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, result_path, test):
 
     logging.debug('Tensorboard log path: ' + log_path)
     logging.debug('Tensorboard checkpoint path: ' + checkpoint_path)
@@ -84,7 +85,7 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, r
 
     # compute initial stats
     t1 = time.time()
-    init_loss, init_accuracy = test_split(net, dataset.val_loader, loss_name)
+    init_loss, init_accuracy = test_split(net, dataset.val_loader, dataset.loss)
     log_stats('Initial', 'Val', init_loss, init_accuracy, 0)
 
     # print("length of dataloader: ", len(dataset.train_loader))
@@ -102,7 +103,7 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, r
 
             # output = net.forward(batch_xs)
             output = net(batch_xs)
-            train_loss, train_accuracy = compute_loss_and_accuracy(output, batch_ys, loss_name)
+            train_loss, train_accuracy = dataset.loss(output, batch_ys)
             train_loss += net.loss()
             train_loss.backward()
 
@@ -123,7 +124,7 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, r
 
         # validate and checkpoint by epoch
         # Test on validation set
-        val_loss, val_accuracy = test_split(net, dataset.val_loader, loss_name)
+        val_loss, val_accuracy = test_split(net, dataset.val_loader, dataset.loss)
         log_stats('Validation', 'Val', val_loss, val_accuracy, epoch+1)
 
         # record best model
@@ -154,11 +155,11 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, r
         if best_val_save is not None: net.load_state_dict(torch.load(best_val_save))
         logging.debug(f'Loaded best validation checkpoint from: {best_val_save}')
 
-        test_loss, test_accuracy = test_split(net, dataset.test_loader, loss_name)
+        test_loss, test_accuracy = test_split(net, dataset.test_loader, dataset.loss)
         log_stats('Test', 'Test', test_loss, test_accuracy, 0)
 
         # train_X, train_Y = Variable(torch.FloatTensor(dataset.train_X).cuda()), Variable(torch.FloatTensor(dataset.train_Y).cuda())
-        train_loss, train_accuracy = test_split(net, dataset.train_loader, loss_name)
+        train_loss, train_accuracy = test_split(net, dataset.train_loader, dataset.loss)
 
         # Log best validation accuracy and training acc for that model
         writer.add_scalar('MaxAcc/Val', best_val_acc)

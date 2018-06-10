@@ -14,6 +14,8 @@ from torch_utils import *
 from torchtext import data
 from torchvision import datasets, transforms
 
+import utils
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def get_dataset(dataset_name):
@@ -192,8 +194,12 @@ def create_data_loaders(dataset_name, transform, train_fraction, val_fraction, b
 
 class DatasetLoaders:
     def __init__(self, name, transform=None, train_fraction=None, val_fraction=None, batch_size=50):
-        # self.train_X, self.train_Y, self.val_X, self.val_Y, self.test_X, self.test_Y, self.out_size = create_data_loaders(name, transform, train_fraction, val_fraction, batch_size)
-        self.train_loader, self.val_loader, self.test_loader, self.in_size, self.out_size = create_data_loaders(name, transform, train_fraction, val_fraction, batch_size)
+        if name.startswith('true'):
+            # TODO: Add support for synthetic datasets back. Possibly should be split into separate class
+            self.loss = utils.mse_loss
+        else:
+            self.train_loader, self.val_loader, self.test_loader, self.in_size, self.out_size = create_data_loaders(name, transform, train_fraction, val_fraction, batch_size)
+            self.loss = utils.cross_entropy_loss
 
 
 
