@@ -3,6 +3,7 @@ import os
 import tensorflow as tf
 from utils import *
 from reconstruction import *
+from model import *
 
 def vandermonde_like(dataset, params, test_freq=100, verbose=False):
 	# A is learned, B is fixed

@@ -4,6 +4,7 @@ Compare methods and hyperparameter settings sequentially.
 
 import sys, os, datetime, subprocess
 import pickle as pkl
+sys.path.insert(0, '../')
 sys.path.insert(0, '../../')
 import itertools
 import argparse
