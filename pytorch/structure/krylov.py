@@ -14,8 +14,8 @@ import numpy as np
 
 import torch
 
-from triextrafat import krylov_construct
-from complex_utils import complex_mult, conjugate
+from .triextrafat import krylov_construct
+from .complex_utils import complex_mult, conjugate
 
 try:
     import cuda_extension
@@ -650,6 +650,7 @@ def test_tridiag_mult():
     trid_slow = tridiag_mult_slow(subdiag, diag, superdiag, subdiag, diag, superdiag, v, v, u)
 
 
+# TODO: broken, move test into subpackage
 if __name__ == "__main__":
     test_krylov_transpose_multiply()
     test_krylov_multiply()

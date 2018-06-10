@@ -1,7 +1,7 @@
 import torch
 from scipy.linalg import circulant
 import numpy as np
-from complex_utils import complex_mult
+from .complex_utils import complex_mult
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -19,5 +19,6 @@ def test_circulant_multiply(n):
     fast = circulant_multiply(c, x, n)
     print('Error compared to slow multiply: ', np.linalg.norm(slow-fast))
 
+# TODO: move test into subpackage
 if __name__ == '__main__':
     test_circulant_multiply(100)

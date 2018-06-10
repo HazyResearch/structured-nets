@@ -1,15 +1,16 @@
+import numpy as np
 import torch
-from torch.autograd import Variable
+# from torch.autograd import Variable
 import torch.nn as nn
 from torch.nn.parameter import Parameter
 
-from torch_krylov import *
-from torch_reconstruction import *
-import sys
-sys.path.insert(0, '../krylov/')
-import toeplitz_gpu as toep
-import krylov_multiply as kry
-import circulant as circ
+# from torch_krylov import *
+# from torch_reconstruction import *
+# import sys
+# sys.path.insert(0, '../krylov/')
+from . import toeplitz as toep
+from . import krylov as kry
+from . import circulant as circ
 
 class StructuredLinear(nn.Module):
     class_type = None

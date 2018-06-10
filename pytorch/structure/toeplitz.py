@@ -3,8 +3,8 @@
 import numpy as np
 import torch
 
-from complex_utils import complex_mult, conjugate
-from krylov_multiply import Krylov
+from .complex_utils import complex_mult, conjugate
+from .krylov import Krylov
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -251,6 +251,7 @@ def test_memory():
         g, = torch.autograd.grad(torch.sum(c), a, retain_graph=True)
 
 
+# TODO: move test into subpackage
 if __name__ == '__main__':
     test_toeplitz_mult()
     # test_memory()

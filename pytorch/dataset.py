@@ -5,13 +5,13 @@ import scipy.io as sio
 from scipy.linalg import solve_sylvester
 import pickle as pkl
 from sklearn.preprocessing import OneHotEncoder
-sys.path.insert(0, '../../../../')
-from utils import *
+# sys.path.insert(0, '../../../../')
+# from utils import *
 import torch
-from torch.autograd import Variable
-sys.path.insert(0, '../../pytorch/')
-from torch_utils import *
-from torchtext import data
+# from torch.autograd import Variable
+# sys.path.insert(0, '../../pytorch/')
+# from torch_utils import *
+# from torchtext import data
 from torchvision import datasets, transforms
 
 import utils

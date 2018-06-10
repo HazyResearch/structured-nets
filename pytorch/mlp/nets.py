@@ -1,13 +1,13 @@
 import torch
-from torch.autograd import Variable
+# from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
-import copy
+# import copy
 from inspect import signature
-import sys
+# import sys
 import numpy as np
-sys.path.insert(0, '../../krylov/')
+# sys.path.insert(0, '../../krylov/')
 # sys.path.insert(0, '../../pytorch/attention/')
 
 # from torch_krylov import *
@@ -15,10 +15,10 @@ sys.path.insert(0, '../../krylov/')
 # from attention import *
 # import toeplitz_gpu as toep
 # import krylov_multiply as subd
-import LDR as ldr
+import structure.LDR as ldr
 #from krylov_multiply import *
 # from structured_layer import StructuredLinear # this is already in attention
-import structured_layer as structured
+import structure.layer as sl
 # TODO fix the 'import *'s
 
 
@@ -391,7 +391,7 @@ class SHL(ArghModel):
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
-        self.W = structured.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
         self.W2 = nn.Linear(self.layer_size, self.out_size)
 
     def name(self):

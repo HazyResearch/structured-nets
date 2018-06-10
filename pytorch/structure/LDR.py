@@ -3,8 +3,8 @@ from torch.autograd import Variable
 import torch.nn as nn
 from torch.nn.parameter import Parameter
 
-import toeplitz_gpu as toep
-import krylov_multiply as subd
+from . import toeplitz as toep
+from . import krylov as kry
 
 # TODO: subclass with each DR type
 class LDR(nn.Module):
@@ -58,7 +58,7 @@ class LDR(nn.Module):
                     fat = x[i]
                     comps[i,j] = toep.toeplitz_mult(self.G[i,j], self.H[i,j], x[i], self.corner)
                 elif self.displacement == 'subdiagonal':
-                    comps[i,j] = subd.subdiag_mult(self.subd_A[i,j], self.subd_B[i,j], self.G[i,j], self.H[i,j], x[i])
+                    comps[i,j] = kry.subdiag_mult(self.subd_A[i,j], self.subd_B[i,j], self.G[i,j], self.H[i,j], x[i])
         out = torch.sum(comps, dim=0)
         if self.bias is not None:
             out += self.bias
