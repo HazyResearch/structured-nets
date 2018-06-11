@@ -1,20 +1,10 @@
 import numpy as np
-import os#, sys
+import os, time, logging
 import pickle as pkl
-import time
 import torch
-# from torch_utils import *
-# from torch.autograd import Variable
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from tensorboardX import SummaryWriter
-import logging
-
-# sys.path.insert(0, '../../pytorch/')
-#from optimize_nmt import optimize_nmt
-#from optimize_iwslt import optimize_iwslt
-# from optimize_vae import optimize_vae
-# from nets import construct_net
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

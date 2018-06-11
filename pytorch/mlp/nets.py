@@ -1,26 +1,12 @@
+from inspect import signature
+import numpy as np
 import torch
-# from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
-# import copy
-from inspect import signature
-# import sys
-import numpy as np
-# sys.path.insert(0, '../../krylov/')
-# sys.path.insert(0, '../../pytorch/attention/')
 
-# from torch_krylov import *
-# from torch_reconstruction import *
-# from attention import *
-# import toeplitz_gpu as toep
-# import krylov_multiply as subd
 import structure.LDR as ldr
-#from krylov_multiply import *
-# from structured_layer import StructuredLinear # this is already in attention
 import structure.layer as sl
-# TODO fix the 'import *'s
-
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

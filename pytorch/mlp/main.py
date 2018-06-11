@@ -4,13 +4,8 @@ Compare methods and hyperparameter settings sequentially.
 
 import sys, os, datetime, subprocess
 import pickle as pkl
-# sys.path.insert(0, '../')
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-print(sys.path)
-# sys.path.insert(0, '../../')
 import itertools
-import argparse
-import argh
+import argparse, argh
 import threading
 import logging
 import pprint
@@ -18,14 +13,10 @@ import numpy as np
 import torch
 from inspect import signature
 
-# sys.path.insert(0, '../../pytorch/')
-# sys.path.insert(0, '../../krylov/')
-# from optimize import optimize
-# from utils import get_commit_id
+ # add parent (pytorch root) to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from model_params import ModelParams
 from dataset import DatasetLoaders
-# from dataset_copy import Dataset
-# from torch_utils import get_loss
 from nets import ArghModel, construct_model
 from optimize_torch import optimize_torch
 
