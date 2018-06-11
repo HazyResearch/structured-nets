@@ -109,9 +109,28 @@ class ToeplitzLikeC(ToeplitzLike):
         self.corner = True
 
 class HankelLike(LowRank):
-    pass
+    class_type = 'hankel'
+    abbrev = 'h'
+
+    def forward(self, x):
+        out = toep.toeplitz_mult(self.G, self.H, x, True)
+        n = out.size(-1)
+        reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=out.device)
+        return self.apply_bias(out[..., reverse_index])
+
 class VandermondeLike(LowRank):
-    pass
+    class_type = 'vandermonde'
+    abbrev = 'v'
+
+    def reset_parameters(self):
+        super().reset_parameters()
+        self.diag = Parameter(torch.ones(self.layer_size))
+
+    def forward(self, x):
+        K_H = kry.Krylov(lambda v: self.diag * v, self.H)
+        out = toep.toeplitz_krylov_multiply(self.G, torch.transpose(x @ K_H, 0,1))
+        return self.apply_bias(out)
+
 
 class LearnedOperator(LowRank):
     """
