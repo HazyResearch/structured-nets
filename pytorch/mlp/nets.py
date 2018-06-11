@@ -103,31 +103,36 @@ class PTLeNet(nn.Module):
         x = self.fc3(x)
         return x
 
-# single channel LeNet
-class LeNet(nn.Module):
-    def __init__(self, params):
-        super(LeNet, self).__init__()
-        self.d = int(np.sqrt(params.layer_size))
+class CNN(ArghModel):
+    """
+    Single channel net where the dense last layer has same dimensions as input
+    """
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True):
+        pass
+
+    def reset_parameters(self):
+        if self.layer_size == -1:
+            self.layer_size = self.in_size
+        assert self.layer_size == self.in_size
+        self.d = int(np.sqrt(self.layer_size))
         # in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True
         self.conv1 = nn.Conv2d(1, 6, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
-        # self.fc = nn.Linear(self.d**2, self.d**2)
-        self.W = StructuredLinear(params)
-        self.b = Parameter(torch.zeros(self.d**2))
-        self.logits = nn.Linear(self.d**2, 10)
+        self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.logits = nn.Linear(self.layer_size, self.out_size)
+
+    def name(self):
+        return self.W.name()
 
     def forward(self, x):
         x = x.view(-1, 1, self.d, self.d)
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, self.d**2)
-        x = F.relu(self.W(x) + self.b)
+        x = x.view(-1, self.layer_size)
+        x = F.relu(self.W(x))
         x = self.logits(x)
         return x
-
-    def loss(self):
-        return 0
 
 # Simple 3 layer CNN with pooling
 class CNNPool(nn.Module):
@@ -156,7 +161,7 @@ class CNNPool(nn.Module):
 
 
 # Simple 2 layer CNN: convolution channels, FC, softmax
-class CNN(nn.Module):
+class TwoLayer(nn.Module):
     def __init__(self, params):
         super(CNN, self).__init__()
         self.noconv = False
