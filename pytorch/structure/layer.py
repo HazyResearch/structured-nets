@@ -42,10 +42,8 @@ class Unconstrained(StructuredLinear):
 
     def reset_parameters(self):
         super().reset_parameters()
-        # TODO: initialize based on stddev automatically
-        # self.init_stddev = 0.01
-        self.init_stddev = np.sqrt(1./self.layer_size)
         self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
+        self.init_stddev = np.sqrt(1./self.layer_size)
         torch.nn.init.normal_(self.W, std=self.init_stddev)
 
     def forward(self, x):
@@ -57,14 +55,9 @@ class Circulant(StructuredLinear):
     class_type = 'circulant'
     abbrev = 'c'
 
-    # def __init__(self, layer_size, init_stddev=0.01, bias=False):
-    #     super().__init__()
-    #     self.bias =
-
     def reset_parameters(self):
         super().reset_parameters()
         self.c = Parameter(torch.Tensor(self.layer_size))
-        # self.init_stddev = 0.01 # TODO initialize smartly
         self.init_stddev = np.sqrt(1./self.layer_size)
         torch.nn.init.normal_(self.c, std=self.init_stddev)
 
@@ -85,8 +78,6 @@ class LowRank(StructuredLinear):
         super().reset_parameters()
         self.G = Parameter(torch.Tensor(self.r, self.layer_size))
         self.H = Parameter(torch.Tensor(self.r, self.layer_size))
-        # TODO: calculate stddev automatically
-        # self.init_stddev = 0.01
         self.init_stddev = np.power(1. / (self.r * self.layer_size), 1/2)
         torch.nn.init.normal_(self.G, std=self.init_stddev)
         torch.nn.init.normal_(self.H, std=self.init_stddev)
@@ -101,8 +92,6 @@ class ToeplitzLike(LowRank):
     class_type = 'toeplitz'
     abbrev = 't'
 
-    # def __init__(self, corner=False, **kwargs):
-    #     super().__init__(corner=corner, **kwargs)
     def reset_parameters(self):
         super().reset_parameters()
         self.corner = False
@@ -185,7 +174,6 @@ class LDRTridiagonal(LearnedOperator):
         self.corners_B = (0.0,0.0)
 
     def forward(self, x):
-        # out = kry.tridiag_mult_slow(self.subd_A, self.diag_A, self.supd_A, self.subd_B, self.diag_B, self.supd_B, self.G, self.H, x)
         out = kry.tridiag_mult_slow(self.subd_A, self.diag_A, self.supd_A, self.subd_B, self.diag_B, self.supd_B, self.G, self.H, x, corners_A=self.corners_A, corners_B=self.corners_B)
         return self.apply_bias(out)
 
@@ -197,10 +185,6 @@ class LDRTridiagonalC(LDRTridiagonal):
         super().reset_parameters()
         self.corners_A = (Parameter(torch.tensor(0.0)), Parameter(torch.tensor(0.0)))
         self.corners_B = (Parameter(torch.tensor(0.0)), Parameter(torch.tensor(0.0)))
-
-    # def forward(self, x):
-    #     out = kry.tridiag_mult_slow(self.subd_A, self.diag_A, self.supd_A, self.subd_B, self.diag_B, self.supd_B, self.G, self.H, x, corners_A=self.corners_A, corners_B=self.corners_B)
-    #     return self.apply_bias(out)
 
 
 # create a map from class names to the Python class
