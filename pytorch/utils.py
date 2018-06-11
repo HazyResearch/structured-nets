@@ -18,3 +18,15 @@ def cross_entropy_loss(pred, true):
     accuracy = torch.mean(correct_prediction.float())
 
     return cross_entropy, accuracy
+
+
+def descendants(cls):
+    """
+    Get all subclasses (recursively) of class cls, not including itself
+    Assumes no multiple inheritance
+    """
+    desc = []
+    for subcls in cls.__subclasses__():
+        desc.append(subcls)
+        desc.extend(descendants(subcls))
+    return desc

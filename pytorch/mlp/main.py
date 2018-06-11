@@ -19,6 +19,7 @@ from model_params import ModelParams
 from dataset import DatasetLoaders
 from nets import ArghModel, construct_model
 from optimize_torch import optimize_torch
+from utils import descendants
 
 def get_commit_id():
   return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'])
@@ -278,7 +279,7 @@ vae_parser.set_defaults(task=vae)
 # MLP models
 model_options = []
 nets = {}
-for model in ArghModel.__subclasses__():
+for model in descendants(ArghModel):
     # change the names so argh can create parsers
     model.args.__name__ = model.__name__
     model_options.append(model.args)
