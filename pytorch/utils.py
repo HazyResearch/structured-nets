@@ -20,6 +20,9 @@ def cross_entropy_loss(pred, true):
     return cross_entropy, accuracy
 
 
+def get_commit_id():
+  return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'])
+
 def descendants(cls):
     """
     Get all subclasses (recursively) of class cls, not including itself
