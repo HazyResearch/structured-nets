@@ -15,7 +15,7 @@ runs a single hidden layer model with a Toeplitz-like matrix of equal dimensions
 - Dataset, training, and optimizer flags are listed with `python mlp/main.py -h`
 - `MLP model {name}` specifies the end-to-end model {name} corresponding to a class in mlp/nets.py
 - Each model has its own parameters, which can be listed with `python mlp/main.py MLP model {name} -h`
-- The class-type flag accepts a name of a structured class (e.g. 'toeplitz' or 'subdiagonal'\_corner) or an abbreviation (e.g. 't' or 'sdc')
+- The class-type flag accepts a name of a structured class (e.g. 'toeplitz' or 'subdiagonal\_corner') or an abbreviation (e.g. 't' or 'sdc')
 
 ### Multiple parameters
 main.py supports passing in multiple parameters for certain optimizer hyperparameters, and it will search over all combinations. For example,
