@@ -10,32 +10,6 @@ import structure.layer as sl
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def construct_net(params):
-    if params.model == 'LeNet':
-        return LeNet(params)
-    elif params.model == 'Softmax':
-        return Softmax(params)
-    elif params.model == 'SHL':
-        return SHL(params)
-    elif params.model == 'LDRNet':
-        return LDRNet(params)
-    elif params.model == 'LDRfat':
-        return LDRFat(params)
-    elif params.model == 'LDRLDR':
-        return LDRLDR(params)
-    elif params.model == 'LDRLDR2':
-        return LDRLDR2(params)
-    elif params.model == 'RNN':
-        return RNN(params)
-    elif params.model == 'Attention':
-        return Attention(params)
-    elif params.model == 'CNN':
-        return CNN(params)
-    elif params.model == 'CNNPool':
-        return CNNPool(params)
-    else:
-        print(('Model not supported: ', params.model))
-        assert 0
 
 def construct_model(cls, in_size, out_size, args):
     args_fn = cls.args
@@ -56,21 +30,21 @@ class ArghModel(nn.Module):
         self.__dict__.update(**options)
         self.reset_parameters()
 
-    def args(**kwargs):
+    def args():
         """
         Empty function whose signature contains parameters and defaults for the class
         """
         pass
 
     def reset_parameters(self):
-        raise NotImplementedError()
+        pass
 
-    def name():
+    def name(self):
         """
         Short string summarizing the main parameters of the class
         Used to construct a unique identifier for an experiment
         """
-        raise NotImplementedError()
+        return ''
 
     def loss(self):
         """
@@ -81,10 +55,9 @@ class ArghModel(nn.Module):
 
 
 # Pytorch tutorial lenet variant
-class PTLeNet(nn.Module):
-    def __init__(self, params):
-        super(LeNet, self).__init__()
-        # self.W1 = get_structured_W(params)
+class Lenet(ArghModel):
+    def reset_parameters(self):
+        # super().__init__()
         # in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True
         self.conv1 = nn.Conv2d(1, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
@@ -107,15 +80,12 @@ class CNN(ArghModel):
     """
     Single channel net where the dense last layer has same dimensions as input
     """
-    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True):
-        pass
-
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True): pass
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
         assert self.layer_size == self.in_size
         self.d = int(np.sqrt(self.layer_size))
-        # in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True
         self.conv1 = nn.Conv2d(1, 6, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
@@ -134,17 +104,21 @@ class CNN(ArghModel):
         x = self.logits(x)
         return x
 
-# Simple 3 layer CNN with pooling
-class CNNPool(nn.Module):
-    def __init__(self, params):
-        super(CNNPool, self).__init__()
+class CNNPool(ArghModel):
+    """
+    Simple 3 layer CNN with pooling for cifar10
+    """
+    def name(self):
+        return 'pool'
+
+    def args(channels=3, fc_size=512): pass
+    def reset_parameters(self):
         self.channels = 3
-        fc_size = 512
         self.conv1 = nn.Conv2d(3, self.channels, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
 
-        self.fc = nn.Linear(self.channels/4*1024, fc_size)
-        self.logits = nn.Linear(fc_size,10)
+        self.fc = nn.Linear(self.channels/4*1024, self.fc_size)
+        self.logits = nn.Linear(self.fc_size,10)
 
     def forward(self, x):
         x = x.view(-1, 3, 32, 32)
@@ -156,17 +130,13 @@ class CNNPool(nn.Module):
         x = self.logits(x)
         return x
 
-    def loss(self):
-        return 0
 
-
-# Simple 2 layer CNN: convolution channels, FC, softmax
-class TwoLayer(nn.Module):
-    def __init__(self, params):
-        super(CNN, self).__init__()
-        self.noconv = False
-        self.pool = True
-        # in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True
+class TwoLayer(ArghModel):
+    """
+    Simple 2 layer CNN: convolution channels, FC, softmax
+    """
+    def args(noconv=False, pool=True): pass
+    def reset_parameters(self):
         if self.noconv:
             self.conv1 = nn.Linear(3*1024, 3*1024)
         else:
@@ -200,18 +170,19 @@ class TwoLayer(nn.Module):
     def loss(self):
         return 0
 
-# LDR layer (single weight matrix), followed by FC and softmax
-class LDRFat(nn.Module):
-    def __init__(self, params):
-        super(LDRFat, self).__init__()
+class LDRFat(ArghModel):
+    """
+    LDR layer (single weight matrix), followed by FC and softmax
+    """
+    def name(self):
+        return self.W.name()
 
-        fc_size = 512
-
-        self.params = params
-
-        self.W = StructuredLinear(class_type=params.class_type, layer_size=3072, init_stddev=params.init_stddev, r=params.r)
-        self.fc = nn.Linear(3072, fc_size)
-        self.logits = nn.Linear(fc_size, 10)
+    def args(class_type='unconstrained', layer_size=-1, r=1, fc_size = 512): pass
+    def reset_parameters(self):
+        if self.layer_size == -1: self.layer_size = self.in_size
+        self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r)
+        self.fc = nn.Linear(3*1024, self.fc_size)
+        self.logits = nn.Linear(self.fc_size, 10)
 
     def forward(self, x):
         x = self.W(x)
@@ -220,47 +191,31 @@ class LDRFat(nn.Module):
         return x
 
     def loss(self):
-        lamb = 0.0001
-        if self.params.class_type == 'unconstrained':
-            return 0 #TODO should probably compare against L2 regularized
-        return lamb*torch.sum(torch.abs(self.W.G)) + lamb*torch.sum(torch.abs(self.W.H))
+        # lamb = 0.0001
+        # if self.class_type != 'unconstrained':
+        #     return lamb*torch.sum(torch.abs(self.W.G)) + lamb*torch.sum(torch.abs(self.W.H))
+        return 0
 
 
 
-# LDR layer with channels, followed by FC and softmax
-class LDRNet(nn.Module):
-    def __init__(self, params):
-        super(LDRNet, self).__init__()
+class LDRFC(ArghModel):
+    """
+    LDR layer with channels, followed by FC and softmax
+    """
+    def args(class_type='t', r=1, channels=3, fc_size=512): pass
+    def reset_parameters(self):
         self.n = 1024
-        channels = 3
-        fc_size = 512
 
-        self.LDR1 = ldr.LDR(params.class_type, 3, 3, params.r, self.n, bias=True)
-        # self.LDR2 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
-        # self.LDR3 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
-        # self.LDR4 = ldr.LDR(params.class_type, 1, 1, params.r, params.layer_size)
-        # self.b1 = Parameter(torch.Tensor(params.layer_size))
-        # torch.nn.init.normal_(self.b1,std=params.init_stddev)
-        # self.W1 = Parameter(torch.Tensor(3*1024, fc_size))
-        self.fc = nn.Linear(3*self.n, fc_size)
-        self.logits = nn.Linear(fc_size, 10)
+        self.LDR1 = ldr.LDR(self.class_type, 3, self.channels, self.r, self.n, bias=True)
+        self.fc = nn.Linear(self.channels*self.n, self.fc_size)
+        self.logits = nn.Linear(self.fc_size, 10)
 
     def forward(self, x):
-        # print("\nx shape", x.shape)
         x = x.view(-1, 3, 1024)
         x = x.transpose(0,1).contiguous().view(3, -1, self.n)
-        # print("x shape", x.shape)
         x = F.relu(self.LDR1(x))
-        # x += self.b1
-        # x = F.relu(self.LDR2(x))
-        # x = F.relu(self.LDR3(x))
-        # x = F.relu(self.LDR4(x))
-        # x = x.view(-1, self.n)
-        # print("x shape", x.shape)
         x = x.transpose(0,1) # swap batches and channels axis
-        # print("x shape", x.shape)
-        x = x.contiguous().view(-1, 3*self.n)
-        # print("x shape", x.shape)
+        x = x.contiguous().view(-1, self.channels*self.n)
         x = F.relu(self.fc(x))
         x = self.logits(x)
         return x
@@ -268,10 +223,11 @@ class LDRNet(nn.Module):
     def loss(self):
         return self.LDR1.loss()
 
-# LDR layer with 3 channels, followed by another LDR layer, then softmax
-class LDRLDR(nn.Module):
-    def __init__(self, params):
-        super(LDRLDR, self).__init__()
+class LDRLDR(ArghModel):
+    """
+    LDR layer with 3 channels, followed by another LDR layer, then softmax
+    """
+    def reset_parameters(self):
         self.channels = False
 
         self.n = 1024
@@ -279,20 +235,20 @@ class LDRLDR(nn.Module):
 
         rank1 = 48
         rank2 = 16
-        class1 = 'toep_nocorn'
-        class2 = 'toep_nocorn'
+        class1 = 'toeplitz'
+        class2 = 'toeplitz'
 
         if self.channels:
-            self.LDR1 = ldr.LDR(class1, 3, 3, rank1, self.n, bias=True)
+            self.LDR1 = ldr.LDR(class1, 3, 3, rank1, self.n)
         else:
-            self.LDR1 = StructuredLinear(class_type=class1, layer_size=3*1024, init_stddev=params.init_stddev, r=rank1)
+            self.LDR1 = sl.class_map[class1](layer_size=3*1024, r=rank1)
 
-        self.LDR211 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
-        self.LDR212 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
-        self.LDR221 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
-        self.LDR222 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
-        self.LDR231 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
-        self.LDR232 = StructuredLinear(class_type=class2, layer_size=fc_size, init_stddev=params.init_stddev, r=rank2)
+        self.LDR211 = sl.class_map[class2](layer_size=fc_size, r=rank2)
+        self.LDR212 = sl.class_map[class2](layer_size=fc_size, r=rank2)
+        self.LDR221 = sl.class_map[class2](layer_size=fc_size, r=rank2)
+        self.LDR222 = sl.class_map[class2](layer_size=fc_size, r=rank2)
+        self.LDR231 = sl.class_map[class2](layer_size=fc_size, r=rank2)
+        self.LDR232 = sl.class_map[class2](layer_size=fc_size, r=rank2)
         self.b = Parameter(torch.zeros(fc_size))
         self.logits = nn.Linear(fc_size, 10)
 
@@ -327,10 +283,11 @@ class LDRLDR(nn.Module):
             return lamb*torch.sum(torch.abs(self.LDR1.G)) + lamb*torch.sum(torch.abs(self.LDR1.H))
 
 
-class LDRLDR2(nn.Module):
-    def __init__(self, params):
-        super(LDRLDR2, self).__init__()
-
+class LDRLDR2(ArghModel):
+    """
+    Same as LDRLDR but use wide matrices to represent rectangular LDR
+    """
+    def reset_parameters(self):
         self.n = 1024
         self.channels = 4
         self.fc_size = 512
@@ -340,8 +297,8 @@ class LDRLDR2(nn.Module):
         class1 = 'subdiagonal'
         class2 = 'subdiagonal'
 
-        self.LDR1 = StructuredLinear(class_type=class1, layer_size=self.channels*self.n, init_stddev=params.init_stddev, r=rank1, bias=True)
-        self.LDR2 = StructuredLinear(class_type=class2, layer_size=self.channels*self.n, init_stddev=params.init_stddev, r=rank2, bias=True)
+        self.LDR1 = sl.class_map[class1](layer_size=self.channels*self.n, r=rank1, bias=True)
+        self.LDR2 = sl.class_map[class2](layer_size=self.channels*self.n, r=rank2, bias=True)
         self.logits = nn.Linear(self.fc_size, 10)
 
     def forward(self, x):
@@ -359,34 +316,38 @@ class LDRLDR2(nn.Module):
         return lamb*torch.sum(torch.abs(self.LDR1.G)) + lamb*torch.sum(torch.abs(self.LDR1.H))
 
 
-class Softmax(nn.Module):
-    def __init__(self, params):
-        super(SHL, self).__init__()
-        self.W = StructuredLinear(params)
-        self.params = params
+class SL(nn.Module):
+    """
+    Single layer linear model (for synthetic regression tests)
+    """
+    def name(self):
+        return self.W.name()
+
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=False): pass
+    def reset_parameters(self):
+        if self.layer_size == -1:
+            self.layer_size = self.in_size
+        self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
 
     def forward(self, x):
-        xW = self.W(x)
-        return xW
-
-    def name():
-        return ''
-
-    def loss(self):
-        return 0
+        return self.W(x)
 
 class SHL(ArghModel):
+    """
+    Single hidden layer
+    """
+    def name(self):
+        return self.W.name()
+
     def args(class_type='unconstrained', layer_size=-1, r=1, bias=True):
         pass
 
+    # TODO: can subclass and share code with SL
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
         self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
         self.W2 = nn.Linear(self.layer_size, self.out_size)
-
-    def name(self):
-        return self.W.name()
 
     def forward(self, x):
         x = F.relu(self.W(x))
