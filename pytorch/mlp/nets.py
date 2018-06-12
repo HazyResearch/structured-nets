@@ -316,7 +316,7 @@ class LDRLDR2(ArghModel):
         return lamb*torch.sum(torch.abs(self.LDR1.G)) + lamb*torch.sum(torch.abs(self.LDR1.H))
 
 
-class SL(nn.Module):
+class SL(ArghModel):
     """
     Single layer linear model (for synthetic regression tests)
     """
@@ -332,24 +332,14 @@ class SL(nn.Module):
     def forward(self, x):
         return self.W(x)
 
-class SHL(ArghModel):
+class SHL(SL):
     """
     Single hidden layer
     """
-    def name(self):
-        return self.W.name()
-
-    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True):
-        pass
-
-    # TODO: can subclass and share code with SL
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True): pass
     def reset_parameters(self):
-        if self.layer_size == -1:
-            self.layer_size = self.in_size
-        self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        super().reset_parameters()
         self.W2 = nn.Linear(self.layer_size, self.out_size)
 
     def forward(self, x):
-        x = F.relu(self.W(x))
-        x = self.W2(x)
-        return x
+        return self.W2(F.relu(self.W(x)))
