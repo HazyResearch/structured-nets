@@ -27,22 +27,21 @@ logging.basicConfig(level=logging.DEBUG,
 
 # Command line params
 parser = argparse.ArgumentParser()
-parser.add_argument("--name", default='') # Name of run
-parser.add_argument("--dataset") # Which dataset
-parser.add_argument('--transform', default='none') # Any transform of dataset, e.g. grayscale
-parser.add_argument('--train_frac', nargs='+', default=[None])
-parser.add_argument("--result_dir") # Where to save results
-# parser.add_argument('--restore', type=int, default=0) # Whether to restore from latest checkpoint
-parser.add_argument('--trials', type=int, default=1) #
-parser.add_argument('--batch_size', type=int, default=50) # Batch size
-parser.add_argument("--epochs", type=int, default=1)
-parser.add_argument('--lr', nargs='+', type=float, default=[1e-3]) # Learning rates
-parser.add_argument('--mom', nargs='+', type=float, default=[0.9]) # Momentums
-parser.add_argument('--val_frac', type=float, default=0.15)
-parser.add_argument('--weight_decay', type=float, default=0.975)
-parser.add_argument('--log_freq', type=float, default=100)
-# parser.add_argument('--steps', type=int) # Steps
-parser.add_argument('--test', action='store_false') # Test on test set
+parser.add_argument("--name", default='', help='Name of run')
+parser.add_argument("--dataset", help='Dataset')
+parser.add_argument('--transform', default='none', help='Any transform of dataset, e.g. padding')
+parser.add_argument('--train-frac', nargs='+', default=[None])
+parser.add_argument("--result-dir", help='Where to save results')
+# parser.add_argument('--restore', type=int, default=0, help='Whether to restore from latest checkpoint')
+parser.add_argument('--trials', type=int, default=1, help='Number of independent runs')
+parser.add_argument('--batch-size', type=int, default=50, help='Batch size')
+parser.add_argument("--epochs", type=int, default=1, help='Number of passes through the training data')
+parser.add_argument('--lr', nargs='+', type=float, default=[1e-3], help='Learning rates')
+parser.add_argument('--mom', nargs='+', type=float, default=[0.9], help='Momentums')
+parser.add_argument('--weight-decay', type=float, default=0.975)
+parser.add_argument('--log-freq', type=int, default=100)
+# parser.add_argument('--steps', type=int, help='Steps')
+parser.add_argument('--test', action='store_false', help='Toggle testing on test set')
 
 out_dir = '../..'
 
