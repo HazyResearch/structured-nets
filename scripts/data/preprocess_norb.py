@@ -8,7 +8,7 @@ from scipy.misc import imresize
 from data_utils import normalize_data, apply_normalization
 
 MAX_VAL = 255.0
-DS_SIZE = (28, 28)
+DS_SIZE = (32, 32)
 N_CATEGORIES = 6
 
 """

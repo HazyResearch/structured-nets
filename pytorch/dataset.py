@@ -70,8 +70,8 @@ def get_dataset(dataset_name, transform):
         val_size = 2000
         out_size = 10
     elif dataset_name == 'norb':
-        train_loc = os.path.join(prefix,'norb_full/processed_py2_train_28.pkl')
-        test_loc = os.path.join(prefix,'norb_full/processed_py2_test_28.pkl')
+        train_loc = os.path.join(prefix,'norb_full/processed_py2_train_32.pkl')
+        test_loc = os.path.join(prefix,'norb_full/processed_py2_test_32.pkl')
         val_size = 30000
         out_size = 6
     elif dataset_name == 'rect_images': #TODO
