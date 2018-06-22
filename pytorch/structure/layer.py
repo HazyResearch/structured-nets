@@ -6,6 +6,7 @@ from torch.nn.parameter import Parameter
 from . import toeplitz as toep
 from . import krylov as kry
 from . import circulant as circ
+from . import fastfood as ff
 
 class StructuredLinear(nn.Module):
     class_type = None
@@ -63,6 +64,27 @@ class Circulant(StructuredLinear):
 
     def forward(self, x):
         return self.apply_bias(circ.circulant_multiply(self.c, x, self.layer_size))
+
+
+class FastFood(StructuredLinear):
+    class_type = 'fastfood'
+    abbrev = 'f'
+
+    def reset_parameters(self):
+        super().reset_parameters()
+        # S,G,B: diagonal, learnable parameters
+        # P: permutation, fixed
+        self.S = Parameter(torch.Tensor(self.layer_size))
+        self.G = Parameter(torch.Tensor(self.layer_size))
+        self.B = Parameter(torch.Tensor(self.layer_size))
+        self.P = torch.tensor(np.random.permutation(self.layer_size))
+        self.init_stddev = np.sqrt(1./self.layer_size)
+        torch.nn.init.normal_(self.S, std=self.init_stddev)
+        torch.nn.init.normal_(self.G, std=self.init_stddev)
+        torch.nn.init.normal_(self.B, std=self.init_stddev)
+
+    def forward(self, x):
+        return self.apply_bias(ff.fastfood_multiply(self.S, self.G, self.B, self.P, x))
 
 class LowRank(StructuredLinear):
     class_type = 'low_rank'
