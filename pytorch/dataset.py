@@ -13,7 +13,7 @@ import utils
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def get_dataset(dataset_name):
+def get_dataset(dataset_name, transform):
     """
     Get dataset specific information: the actual data, validation split size, input/output sizes
     """
@@ -117,7 +117,12 @@ def get_dataset(dataset_name):
     test_data = pkl.load(open(test_loc, 'rb'))
     test_X = test_data['X']
     test_Y = test_data['Y']
+
+    train_X, train_Y = postprocess(transform, train_X, train_Y)
+    test_X, test_Y = postprocess(transform, test_X, test_Y)
+
     in_size = train_X.shape[1]
+    out_size = train_Y.shape[1]
 
     print("Train dataset size: ", train_X.shape[0])
     print("Test dataset size: ", test_X.shape[0])
@@ -163,7 +168,7 @@ def create_data_loaders(dataset_name, transform, train_fraction, val_fraction, b
     else:
         loader_args = {'num_workers': 4, 'pin_memory': False}
 
-    train_X, train_Y, test_X, test_Y, val_size, in_size, out_size = get_dataset(dataset_name) # train/test data, val size, input/output size
+    train_X, train_Y, test_X, test_Y, val_size, in_size, out_size = get_dataset(dataset_name, transform) # train/test data, val size, input/output size
     # train_X, train_Y = postprocess(transform, train_X, train_Y)
     # test_X, test_Y = postprocess(transform, test_X, test_Y)
 
