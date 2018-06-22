@@ -72,6 +72,7 @@ class FastFood(StructuredLinear):
 
     def reset_parameters(self):
         super().reset_parameters()
+        # TODO: should this be initialized as non adaptive Fastfood? http://proceedings.mlr.press/v28/le13.pdf
         # S,G,B: diagonal, learnable parameters
         # P: permutation, fixed
         self.S = Parameter(torch.Tensor(self.layer_size))
