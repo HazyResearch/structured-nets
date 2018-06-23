@@ -49,22 +49,27 @@ def krylov_transpose_multiply(subdiag, v, u):
     for d in range(m)[::-1]:
         n1, n2 = 1 << d, 1 << (m - d - 1)
         S_00_sum, S_01, S_10, S_11 = T_00_sum, T_01, T_10, T_11
-        S0_10 = torch.cat((S_10[:, ::2], torch.zeros_like(S_10[:, ::2])), dim=-1)
-        S1_01 = torch.cat((S_01[:, 1::2], torch.zeros_like(S_01[:, 1::2])), dim=-1)
-        S = torch.cat((S0_10, S1_01))
+        # S0_10 = torch.cat((S_10[:, ::2], torch.zeros_like(S_10[:, ::2])), dim=-1)
+        # S1_01 = torch.cat((S_01[:, 1::2], torch.zeros_like(S_01[:, 1::2])), dim=-1)
+        # S = torch.cat((S0_10, S1_01))
+        S0_10_mult_subdiag = S_10[:, ::2] * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        S = torch.cat((torch.cat((S0_10_mult_subdiag, S_01[:, 1::2])),
+                       torch.zeros((rank + batch_size, n1, n2), dtype=torch.float, device=S_10.device)), dim=-1)
 
         # polynomial multiplications
         S_f = torch.rfft(S, 1)
         S0_10_f, S1_01_f = S_f[:rank], S_f[rank:rank+batch_size]
-        T_00_f = complex_mult(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
-        T_00_f_sum = (T_00_f * subdiag[(n2 - 1)::(2 * n2), np.newaxis, np.newaxis]).sum(dim=2)
+        # T_00_f = complex_mult(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        # T_00_f_sum = (T_00_f * subdiag[(n2 - 1)::(2 * n2), np.newaxis, np.newaxis]).sum(dim=2)
+        T_00_f_sum = complex_mult(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis]).sum(dim=2)
         T_00_sum = torch.irfft(T_00_f_sum, 1, signal_sizes=(2 * n2, ))
 
         # polynomial additions
         T_00_sum[:, :, n2:] += S_00_sum
-        T_01 = torch.cat((S_01[:, 1::2] * (S_11[::2] * subdiag[(n2 - 1)::(2 * n2)])[:, np.newaxis], S_01[:, ::2]), dim=-1)
-        T_10 = torch.cat((S_10[:, ::2] * (S_11[1::2] * subdiag[(n2 - 1)::(2 * n2)])[:, np.newaxis], S_10[:, 1::2]), dim=-1)
-        T_11 = S_11[::2] * S_11[1::2] * subdiag[(n2 - 1)::(2 * n2)]
+        S0_11_mult_subdiag = S_11[::2] * subdiag[(n2 - 1)::(2 * n2)]
+        T_01 = torch.cat((S_01[:, 1::2] * S0_11_mult_subdiag[:, np.newaxis], S_01[:, ::2]), dim=-1)
+        T_10 = torch.cat((S0_10_mult_subdiag * S_11[1::2][:, np.newaxis], S_10[:, 1::2]), dim=-1)
+        T_11 = S0_11_mult_subdiag * S_11[1::2]
 
     # Negative step isn't supported by Pytorch
     # (https://github.com/pytorch/pytorch/issues/229) so we have to construct
