@@ -27,6 +27,61 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 ##### Fast multiplication for the subdiagonal case
 
 
+def krylov_transpose_multiply_sum(subdiag, v, u):
+    """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
+    Parameters:
+        subdiag: Tensor of shape (n - 1, )
+        v: Tensor of shape (rank, n)
+        u: Tensor of shape (batch_size, n)
+    Returns:
+        product: Tensor of shape (batch_size, rank, n)
+    """
+    batch_size, n = u.shape
+    rank, n_ = v.shape
+    assert n == n_, 'u and v must have the same last dimension'
+    m = int(np.log2(n))
+    assert n == 1 << m, 'n must be a power of 2'
+
+    T_00_sum = (u[:, np.newaxis, ..., np.newaxis] * v[np.newaxis, ..., np.newaxis]).sum(dim=2)
+    T_01 = u[..., np.newaxis]
+    T_10 = v[..., np.newaxis]
+    T_11 = torch.ones((n, 1), device=T_00_sum.device)
+    for d in range(m)[::-1]:
+        n1, n2 = 1 << d, 1 << (m - d - 1)
+        S_00_sum, S_01, S_10, S_11 = T_00_sum, T_01, T_10, T_11
+        S0_10 = torch.cat((S_10[:, ::2], torch.zeros_like(S_10[:, ::2])), dim=-1)
+        S1_01 = torch.cat((S_01[:, 1::2], torch.zeros_like(S_01[:, 1::2])), dim=-1)
+        S0_11 = torch.cat((S_11[::2], torch.zeros_like(S_11[::2])), dim=-1)
+        S1_11 = torch.cat((S_11[1::2], torch.zeros_like(S_11[1::2])), dim=-1)
+        S = torch.cat((S0_10, S0_11[np.newaxis], S1_01, S1_11[np.newaxis]))
+
+        # polynomial multiplications
+        S_f = torch.rfft(S, 1)
+        S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
+        T_00_f = complex_mult(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
+        T_00_f_sum = (T_00_f * subdiag[(n2 - 1)::(2 * n2), np.newaxis, np.newaxis]).sum(dim=2)
+        T_01_f = complex_mult(S1_01_f, S0_11_f)
+        T_10_f = complex_mult(S1_11_f, S0_10_f)
+        T_11_f = complex_mult(S1_11_f, S0_11_f)
+
+        T_f = torch.cat((T_01_f, T_10_f, T_11_f[np.newaxis]))
+
+        T_00_sum = torch.irfft(T_00_f_sum, 1, signal_sizes=(2 * n2, ))
+        T = torch.irfft(T_f, 1, signal_sizes=(2 * n2, )) * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T_01, T_10, T_11 = T[:batch_size], T[batch_size:batch_size + rank], T[-1]
+
+        # polynomial additions
+        T_00_sum[:, :, n2:] += S_00_sum
+        T_01 = torch.cat((T_01[:, :, :n2], T_01[:, :, n2:] + S_01[:, ::2]), dim=-1)
+        T_10 = torch.cat((T_10[:, :, :n2], T_10[:, :, n2:] + S_10[:, 1::2]), dim=-1)
+
+    # Negative step isn't supported by Pytorch
+    # (https://github.com/pytorch/pytorch/issues/229) so we have to construct
+    # the index explicitly.
+    reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=T_00_sum.device)
+    return T_00_sum[:, :, reverse_index]
+
+
 def krylov_transpose_multiply(subdiag, v, u):
     """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
     Parameters:
@@ -280,7 +335,7 @@ def subdiag_linear_map(subdiag, upper_right_corner=0.0):
         linear_map: v -> product, with v of shape either (n, ) or (rank, n)
     """
     n = subdiag.size(0) + 1
-    shift_down = torch.arange(-1, n - 1, dtype=torch.long, device=v.device) % n
+    shift_down = torch.arange(-1, n - 1, dtype=torch.long, device=subdiag.device) % n
     subdiag_extended = torch.cat((torch.tensor([upper_right_corner], dtype=subdiag.dtype, device=subdiag.device), subdiag))
     return lambda v: subdiag_extended * v[..., shift_down]
 
@@ -518,6 +573,7 @@ def test_krylov_transpose_multiply():
     v = torch.rand((rank, n), requires_grad=True, device=device)
     # Fast algorithm on GPU
     result = krylov_transpose_multiply(subdiag, v, u)
+    result = krylov_transpose_multiply_sum(subdiag, v, u)
     grad,  = torch.autograd.grad(result.sum(), subdiag, retain_graph=True)
     # CPU dense multiply
     Ks = [krylov_construct(A, v.data.cpu().numpy()[i], n) for i in range(rank)]
