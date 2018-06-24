@@ -13,6 +13,7 @@ import functools
 import numpy as np
 
 import torch
+from torch.nn import functional as F
 
 from .triextrafat import krylov_construct
 from .complex_utils import complex_mult, conjugate
@@ -25,6 +26,42 @@ except ImportError:
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 ##### Fast multiplication for the subdiagonal case
+
+def krylov_transpose_multiply_conv(subdiag, v, u):
+    """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
+    Parameters:
+        subdiag: Tensor of shape (n - 1, )
+        v: Tensor of shape (rank, n)
+        u: Tensor of shape (batch_size, n)
+    Returns:
+        product: Tensor of shape (batch_size, rank, n)
+    """
+    batch_size, n = u.shape
+    rank, n_ = v.shape
+    assert n == n_, 'u and v must have the same last dimension'
+    m = int(np.log2(n))
+    assert n == 1 << m, 'n must be a power of 2'
+
+    result = torch.zeros((batch_size, rank, n), dtype=u.dtype, device=u.device)
+    T_00_sum = (u @ v.t())[..., np.newaxis]
+    result[:, :, :1] += T_00_sum
+    T_01 = u[..., np.newaxis]
+    T_10 = v[..., np.newaxis]
+    T_11 = torch.ones(n, device=T_00_sum.device)
+    for d in range(m)[::-1]:
+        n1, n2 = 1 << d, 1 << (m - d - 1)
+        S_00_sum, S_01, S_10, S_11 = T_00_sum, T_01, T_10, T_11
+        S0_10_mult_subdiag = S_10[:, ::2] * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        # polynomial multiplication
+        T_00_sum = F.conv1d(S_01[:, 1::2], S0_10_mult_subdiag, padding=n2-1)
+        # polynomial additions
+        result[:, :, 1:2*n2] += T_00_sum
+        S0_11_mult_subdiag = S_11[::2] * subdiag[(n2 - 1)::(2 * n2)]
+        T_01 = torch.cat((S_01[:, ::2], S_01[:, 1::2] * S0_11_mult_subdiag[:, np.newaxis]), dim=-1)
+        T_10 = torch.cat((S0_10_mult_subdiag * S_11[1::2][:, np.newaxis], S_10[:, 1::2]), dim=-1)
+        T_11 = S0_11_mult_subdiag * S_11[1::2]
+    return result
+
 
 def krylov_transpose_multiply(subdiag, v, u):
     """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
@@ -568,7 +605,8 @@ def test_krylov_transpose_multiply():
     u = torch.rand((batch_size, n), requires_grad=True, device=device)
     v = torch.rand((rank, n), requires_grad=True, device=device)
     # Fast algorithm on GPU
-    result = krylov_transpose_multiply(subdiag, v, u)
+    # result = krylov_transpose_multiply(subdiag, v, u)
+    result = krylov_transpose_multiply_conv(subdiag, v, u)
     # result = krylov_transpose_multiply_fast_slow(subdiag, v, u)
     grad,  = torch.autograd.grad(result.sum(), subdiag, retain_graph=True)
     # CPU dense multiply
