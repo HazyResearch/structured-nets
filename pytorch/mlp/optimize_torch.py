@@ -28,8 +28,7 @@ def test_split(net, dataloader, loss_fn):
 
 
 # TODO loss type should be moved to model or dataset?
-def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, result_path, test):
-
+def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path, test):
     logging.debug('Tensorboard log path: ' + log_path)
     logging.debug('Tensorboard checkpoint path: ' + checkpoint_path)
     # logging.debug('Tensorboard vis path: ' + vis_path)
@@ -53,7 +52,6 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, r
     # optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom, weight_decay=1e-5)
     # optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
     # steps_in_epoch = int(np.ceil(dataset.train_X.shape[0] / params.batch_size))
-    lr_scheduler = StepLR(optimizer, step_size=50, gamma=0.5)
 
     losses = {'Train': [], 'Val': [], 'DR': [], 'ratio': [], 'Test':[]}
     accuracies = {'Train': [], 'Val': [], 'Test':[]}
@@ -99,13 +97,9 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, r
 
             optimizer.step()
 
-            # log training every 100
-            # params.log_freq?
+            # log training every log_freq steps
             total_step = epoch*len(dataset.train_loader) + step+1
-            if total_step % 100 == 0:
-                epochs += 1
-                # lr_scheduler.step()
-
+            if total_step % log_freq == 0:
                 logging.debug(('Time: ', time.time() - t1))
                 t1 = time.time()
                 logging.debug(('Training step: ', total_step))
@@ -116,6 +110,12 @@ def optimize_torch(dataset, net, optimizer, epochs, log_path, checkpoint_path, r
         # Test on validation set
         val_loss, val_accuracy = test_split(net, dataset.val_loader, dataset.loss)
         log_stats('Validation', 'Val', val_loss, val_accuracy, epoch+1)
+
+        # Update LR
+        lr_scheduler.step()
+
+        for param_group in optimizer.param_groups:
+            logging.debug('Current LR: ' + str(param_group['lr']))
 
         # record best model
         if val_accuracy > best_val_acc:

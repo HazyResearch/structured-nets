@@ -7,6 +7,7 @@ import logging
 import pprint
 import numpy as np
 import torch
+from torch.optim.lr_scheduler import StepLR
 from inspect import signature
 
  # add parent (pytorch root) to path
@@ -38,6 +39,8 @@ parser.add_argument("--epochs", type=int, default=1)
 parser.add_argument('--lr', nargs='+', type=float, default=[1e-3]) # Learning rates
 parser.add_argument('--mom', nargs='+', type=float, default=[0.9]) # Momentums
 parser.add_argument('--val_frac', type=float, default=0.15)
+parser.add_argument('--weight_decay', type=float, default=0.975)
+parser.add_argument('--log_freq', type=float, default=100)
 # parser.add_argument('--steps', type=int) # Steps
 parser.add_argument('--test', action='store_false') # Test on test set
 
@@ -98,7 +101,8 @@ def mlp(args):
 
                 model.reset_parameters()
                 optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=mom)
-                losses, accuracies = optimize_torch(dataset, model, optimizer, args.epochs, log_path, checkpoint_path, result_path, args.test)
+                lr_scheduler = StepLR(optimizer, step_size=1, gamma=args.weight_decay)
+                losses, accuracies = optimize_torch(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq, log_path, checkpoint_path, result_path, args.test)
 
 
 ## parse
