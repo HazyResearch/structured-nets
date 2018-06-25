@@ -37,6 +37,7 @@ parser.add_argument('--batch_size', type=int, default=50) # Batch size
 parser.add_argument("--epochs", type=int, default=1)
 parser.add_argument('--lr', nargs='+', type=float, default=[1e-3]) # Learning rates
 parser.add_argument('--mom', nargs='+', type=float, default=[0.9]) # Momentums
+parser.add_argument('--val_frac', type=float, default=0.15)
 # parser.add_argument('--steps', type=int) # Steps
 parser.add_argument('--test', action='store_false') # Test on test set
 
@@ -69,7 +70,7 @@ def save_args(args, results_dir):
 
 def mlp(args):
     for train_frac in args.train_frac:
-        dataset = DatasetLoaders(args.dataset, args.transform, train_frac, None, args.batch_size)
+        dataset = DatasetLoaders(args.dataset, args.transform, train_frac, args.val_frac, args.batch_size)
         model = construct_model(nets[args.model], dataset.in_size, dataset.out_size, args)
 
         for lr, mom in itertools.product(args.lr, args.mom):

@@ -158,6 +158,13 @@ def split_train_val(train_X, train_Y, val_size, train_fraction=None, val_fractio
     val_Y = train_Y[val_idx, :]
     train_X = train_X[train_idx, :]
     train_Y = train_Y[train_idx, :]
+
+    print('train_X: ', train_X.shape)
+    print('train_Y: ', train_Y.shape)
+    print('val_X: ', val_X.shape)
+    print('val_Y: ', val_Y.shape)
+
+
     return train_X, train_Y, val_X, val_Y
 
 
