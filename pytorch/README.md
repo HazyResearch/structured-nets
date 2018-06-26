@@ -23,7 +23,7 @@ main.py supports passing in multiple parameters for certain optimizer hyperparam
 will search over 4 combinations of parameters.
 
 For general parameters including model params, this feature can be handled with tools such as xargs or GNU Parallel. E.g.
-` parallel python mlp/main.py MLP model SHL --class-type ::: t sd ::: -r ::: 1 4 16 `
+` parallel python mlp/main.py ... MLP model SHL --class-type ::: t sd ::: -r ::: 1 4 16 `
 runs Toeplitz-like and LDR subdiagonal ranks 1,4,16.
 
 
