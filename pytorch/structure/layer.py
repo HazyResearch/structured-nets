@@ -101,6 +101,7 @@ class LowRank(StructuredLinear):
         super().reset_parameters()
         self.G = Parameter(torch.Tensor(self.r, self.layer_size))
         self.H = Parameter(torch.Tensor(self.r, self.layer_size))
+        # self.init_stddev = 0.01
         self.init_stddev = np.power(1. / (self.r * self.layer_size), 1/2)
         torch.nn.init.normal_(self.G, std=self.init_stddev)
         torch.nn.init.normal_(self.H, std=self.init_stddev)

@@ -10,8 +10,9 @@ import torch
 from torch.optim.lr_scheduler import StepLR
 from inspect import signature
 
- # add parent (pytorch root) to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# add parent (pytorch root) to path
+pytorch_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, pytorch_root)
 from model_params import ModelParams
 from dataset import DatasetLoaders
 from nets import ArghModel, construct_model
@@ -36,6 +37,7 @@ parser.add_argument("--result-dir", help='Where to save results')
 parser.add_argument('--trials', type=int, default=1, help='Number of independent runs')
 parser.add_argument('--batch-size', type=int, default=50, help='Batch size')
 parser.add_argument("--epochs", type=int, default=1, help='Number of passes through the training data')
+parser.add_argument('--optim', default='sgd', help='Optimizer')
 parser.add_argument('--lr', nargs='+', type=float, default=[1e-3], help='Learning rates')
 parser.add_argument('--mom', nargs='+', type=float, default=[0.9], help='Momentums')
 parser.add_argument('--weight-decay', type=float, default=0.975)
@@ -43,7 +45,8 @@ parser.add_argument('--log-freq', type=int, default=100)
 # parser.add_argument('--steps', type=int, help='Steps')
 parser.add_argument('--test', action='store_false', help='Toggle testing on test set')
 
-out_dir = '../..'
+# out_dir = '../..'
+out_dir = os.path.dirname(pytorch_root) # repo root
 
 seed = 0
 np.random.seed(seed)
@@ -99,8 +102,16 @@ def mlp(args):
                 # vis_path = os.path.join(out_dir, 'vis', args.result_dir, run_iter_name)
 
                 model.reset_parameters()
-                optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=mom)
+                if args.optim == 'sgd':
+                    optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=mom)
+                elif args.optim == 'adam':
+                    optimizer = torch.optim.Adam(model.parameters(), lr=lr, amsgrad=False)
+                elif args.optim == 'ams':
+                    optimizer = torch.optim.Adam(model.parameters(), lr=lr, amsgrad=True)
+                else:
+                    assert False, "invalid optimizer"
                 lr_scheduler = StepLR(optimizer, step_size=1, gamma=args.weight_decay)
+
                 losses, accuracies = optimize_torch(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq, log_path, checkpoint_path, result_path, args.test)
 
 
