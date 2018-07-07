@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+plt.switch_backend('agg')
 from timeit import default_timer as timer
 
 import sys
@@ -28,7 +29,7 @@ for idx_n, n in enumerate(sizes):
     start = timer()
     A @ v
     end = timer()
-    # print(f"Elapsed time {end-start}")
+    #print(f"Elapsed time {end-start}")
     fc_times[idx_n] = (end-start)
 
     for idx_r, r in enumerate(ranks):
