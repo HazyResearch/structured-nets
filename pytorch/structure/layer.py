@@ -6,7 +6,7 @@ from torch.nn.parameter import Parameter
 from . import toeplitz as toep
 from . import krylov as kry
 from . import circulant as circ
-from . import aastfood as ff
+from . import fastfood as ff
 
 class StructuredLinear(nn.Module):
     class_type = None
