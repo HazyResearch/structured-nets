@@ -80,17 +80,17 @@ class FastFood(StructuredLinear):
         G = np.random.randn(self.layer_size)
         S /= np.linalg.norm(G)
         B = np.random.choice((-1, 1), size=self.layer_size)
-        self.S = Parameter(torch.tensor(S))
-        self.G = Parameter(torch.tensor(G))
-        self.B = Parameter(torch.tensor(B))
-        self.P = torch.tensor(np.random.permutation(self.layer_size))
+        self.S = Parameter(torch.FloatTensor(S))
+        self.G = Parameter(torch.FloatTensor(G))
+        self.B = Parameter(torch.FloatTensor(B))
+        self.P = torch.LongTensor(np.random.permutation(self.layer_size))
         #self.init_stddev = np.sqrt(1./self.layer_size)
         #torch.nn.init.normal_(self.S, std=self.init_stddev)
         #torch.nn.init.normal_(self.G, std=self.init_stddev)
         #torch.nn.init.normal_(self.B, std=self.init_stddev)
 
     def forward(self, x):
-        return self.apply_bias(ff.fcaastfood_multiply(self.S, self.G, self.B, self.P, x))
+        return self.apply_bias(ff.fastfood_multiply(self.S, self.G, self.B, self.P, x))
 
 class LowRank(StructuredLinear):
     class_type = 'low_rank'
