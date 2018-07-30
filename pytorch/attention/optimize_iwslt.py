@@ -28,7 +28,7 @@ def create_src_tgt():
     EOS_WORD = '</s>'
     BLANK_WORD = "<blank>"
     SRC = data.Field(tokenize=tokenize_de, pad_token=BLANK_WORD)
-    TGT = data.Field(tokenize=tokenize_en, init_token = BOS_WORD, 
+    TGT = data.Field(tokenize=tokenize_en, init_token = BOS_WORD,
                      eos_token = EOS_WORD, pad_token=BLANK_WORD)
 
     MAX_LEN = 100

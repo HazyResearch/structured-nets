@@ -8,7 +8,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Multiplies circulant matrix with first column c by x
 def circulant_multiply(c, x, n):
     return torch.irfft(complex_mult(torch.rfft(c, 1), torch.rfft(x, 1)), 1, signal_sizes=(n, ))
-    
+
 def test_circulant_multiply(n):
     c = np.random.random(n)
     x = np.random.random(n)
