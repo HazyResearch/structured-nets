@@ -415,7 +415,7 @@ def subdiag_linear_map(subdiag, upper_right_corner=0.0):
         linear_map: v -> product, with v of shape either (n, ) or (rank, n)
     """
     n = subdiag.size(0) + 1
-    shift_down = torch.arange(-1, n - 1, dtype=torch.long, device=subdiag.device) % n
+    shift_down = torch.arange(-1, n - 1, device=subdiag.device)
     subdiag_extended = torch.cat((torch.tensor([upper_right_corner], dtype=subdiag.dtype, device=subdiag.device), subdiag))
     return lambda v: subdiag_extended * v[..., shift_down]
 
@@ -438,10 +438,7 @@ def krylov_subdiag_fast(subdiag, v, upper_right_corner=0.0):
     rank, n = v.shape
     a = torch.arange(n, dtype=torch.long, device=v.device)
     b = -a
-    # Pytorch's advanced indexing (as of 0.4.0) is wrong for negative indices when combined with basic indexing.
-    # https://github.com/pytorch/pytorch/issues/7156
-    # So we have to make the indices positive.
-    indices = (a[:, np.newaxis] + b[np.newaxis]) % n
+    indices = a[:, np.newaxis] + b[np.newaxis]
     v_circulant = v[:, indices]
     subdiag_extended = torch.cat((torch.tensor([upper_right_corner], dtype=subdiag.dtype, device=subdiag.device), subdiag))
     subdiag_circulant = subdiag_extended[indices]
@@ -588,9 +585,9 @@ def tridiag_linear_map(subdiag, diag, superdiag, upper_right_corner=0.0, lower_l
         linear_map: v -> product, with v of shape either (n, ) or (rank, n)
     """
     n = diag.size(0)
-    shift_none = torch.arange(n, dtype=torch.long, device=diag.device)
-    shift_down = (shift_none - 1) % n
-    shift_up = (shift_none + 1) % n
+    shift_none = torch.arange(n, device=diag.device)
+    shift_down = shift_none - 1
+    shift_up = shift_none + 1
     shifts = torch.stack((shift_down, shift_none, shift_up))
     subdiag_extended = torch.cat((torch.tensor([upper_right_corner], dtype=subdiag.dtype, device=subdiag.device), subdiag))
     superdiag_extended = torch.cat((superdiag, torch.tensor([lower_left_corner], dtype=superdiag.dtype, device=superdiag.device)))

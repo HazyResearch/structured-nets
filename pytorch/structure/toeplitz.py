@@ -145,13 +145,10 @@ def krylov_toeplitz_fast(v, f=0.0):
         K: Krylov matrix of size (n, n) or (rank, n, n).
     """
     rank, n  = v.shape
-    a = torch.arange(n, dtype=torch.long, device=v.device)
+    a = torch.arange(n, device=v.device)
     b = -a
     indices = a[:, np.newaxis] + b[np.newaxis]
-    # Pytorch's advanced indexing (as of 0.4.0) is wrong for negative indices when combined with basic indexing.
-    # https://github.com/pytorch/pytorch/issues/7156
-    # So we have to make the indices positive.
-    K = v[:, indices % n]
+    K = v[:, indices]
     K[:, indices < 0] *= f
     return K
 
