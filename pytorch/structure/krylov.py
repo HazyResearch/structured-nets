@@ -318,7 +318,7 @@ def krylov_multiply(subdiag, v, w):
         T_11 = S0_11_mult_subdiag * S_11[1::2]
 
     # Backward pass
-    dT_00_sum, dT_01 = w.flip(3), torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
+    dT_00_sum, dT_01 = w.flip(2), torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
 
     for d in range(m):
         n1, n2 = 1 << d, 1 << (m - d - 1)
