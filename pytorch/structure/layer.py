@@ -143,9 +143,7 @@ class HankelLike(LowRank):
 
     def forward(self, x):
         out = toep.toeplitz_mult(self.G, self.H, x, True)
-        n = out.size(-1)
-        reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=out.device)
-        return self.apply_bias(out[..., reverse_index])
+        return self.apply_bias(out.flip(out.dim() - 1))
 
 class VandermondeLike(LowRank):
     class_type = 'vandermonde'
