@@ -652,8 +652,8 @@ def test_krylov_transpose_multiply():
     u = torch.rand((batch_size, n), requires_grad=True, device=device)
     v = torch.rand((rank, n), requires_grad=True, device=device)
     # Fast algorithm on GPU
-    # result = krylov_transpose_multiply(subdiag, v, u)
-    result = krylov_transpose_multiply_conv(subdiag, v, u)
+    result = krylov_transpose_multiply(subdiag, v, u)
+    # result = krylov_transpose_multiply_conv(subdiag, v, u)
     # result = krylov_transpose_multiply_fast_slow(subdiag, v, u)
     grad,  = torch.autograd.grad(result.sum(), subdiag, retain_graph=True)
     # CPU dense multiply
