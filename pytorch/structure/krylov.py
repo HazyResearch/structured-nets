@@ -78,8 +78,10 @@ def krylov_transpose_multiply(subdiag, v, u):
     m = int(np.log2(n))
     assert n == 1 << m, 'n must be a power of 2'
 
+    result = torch.zeros((batch_size, rank, n), dtype=u.dtype, device=u.device)
     # T_00_sum = (u[:, np.newaxis, ..., np.newaxis] * v[np.newaxis, ..., np.newaxis]).sum(dim=2)
-    T_00_sum = (u @ v.t())[..., np.newaxis]
+    T_00_sum = u @ v.t()
+    result[:, :, 0] = T_00_sum
     T_01 = u[..., np.newaxis]
     T_10 = v[..., np.newaxis]
     T_11 = torch.ones(n, device=T_00_sum.device)
@@ -91,7 +93,7 @@ def krylov_transpose_multiply(subdiag, v, u):
         # S = torch.cat((S0_10, S1_01))
         S0_10_mult_subdiag = S_10[:, ::2] * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         S = torch.cat((torch.cat((S0_10_mult_subdiag, S_01[:, 1::2])),
-                       torch.zeros((rank + batch_size, n1, n2), dtype=torch.float, device=S_10.device)), dim=-1)
+                       torch.zeros((rank + batch_size, n1, n2), dtype=S_10.dtype, device=S_10.device)), dim=-1)
 
         # polynomial multiplications
         S_f = torch.rfft(S, 1)
@@ -99,16 +101,16 @@ def krylov_transpose_multiply(subdiag, v, u):
         # T_00_f = complex_mult(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis])
         # T_00_f_sum = (T_00_f * subdiag[(n2 - 1)::(2 * n2), np.newaxis, np.newaxis]).sum(dim=2)
         T_00_f_sum = complex_mult(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis]).sum(dim=2)
-        T_00_sum = torch.irfft(T_00_f_sum, 1, signal_sizes=(2 * n2, ))
+        T_00_sum = torch.irfft(T_00_f_sum, 1, signal_sizes=(2 * n2, ))[..., :-1]
 
         # polynomial additions
-        T_00_sum[:, :, n2:] += S_00_sum
+        result[:, :, 1:2*n2] += T_00_sum
         S0_11_mult_subdiag = S_11[::2] * subdiag[(n2 - 1)::(2 * n2)]
-        T_01 = torch.cat((S_01[:, 1::2] * S0_11_mult_subdiag[:, np.newaxis], S_01[:, ::2]), dim=-1)
-        T_10 = torch.cat((S0_10_mult_subdiag * S_11[1::2][:, np.newaxis], S_10[:, 1::2]), dim=-1)
+        T_01 = torch.cat((S_01[:, ::2], S_01[:, 1::2] * S0_11_mult_subdiag[:, np.newaxis]), dim=-1)
+        T_10 = torch.cat((S_10[:, 1::2], S0_10_mult_subdiag * S_11[1::2][:, np.newaxis]), dim=-1)
         T_11 = S0_11_mult_subdiag * S_11[1::2]
 
-    return result.flip(2)
+    return result
 
 
 def krylov_transpose_multiply_fast_slow(subdiag, v, u):
@@ -254,7 +256,7 @@ def krylov_multiply_old(subdiag, v, w):
 
     save_for_backward = krylov_multiply_forward_(subdiag, v)
     w = w[:, :, np.newaxis, :]
-    dT_00, dT_01 = w.flip(3), torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
+    dT_00, dT_01 = w.flip(w.dim() - 1), torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
 
     for d in range(m):
         n1, n2 = 1 << d, 1 << (m - d - 1)
@@ -318,7 +320,7 @@ def krylov_multiply(subdiag, v, w):
         T_11 = S0_11_mult_subdiag * S_11[1::2]
 
     # Backward pass
-    dT_00_sum, dT_01 = w.flip(2), torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
+    dT_00_sum, dT_01 = w.flip(w.dim() - 1), torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
 
     for d in range(m):
         n1, n2 = 1 << d, 1 << (m - d - 1)
