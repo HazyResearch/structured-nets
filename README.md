@@ -4,14 +4,15 @@ Learning with structured matrices
 ## Requirements
 Python 3.6+
 
-pytorch>=0.4.0
+pytorch>=0.4.1
 
-cupy>=4.0.0
+cupy>=5.0.0b3 (optional, used to speed up some CUDA operations). Installed with
+`pip install cupy-cuda90==5.0.0b3` for CUDA 9.0.
 
 ## Installing CUDA extensions
 Some of the functions are written in CUDA for speed. To install them:
 ```
-cd krylov/cuda_extension
+cd pytorch/structure/cuda_extension
 python setup.py install
 ```
 

@@ -7,21 +7,15 @@ own complex multiplication implemented in Pytorch, which is about 6x slower.
 '''
 
 import torch
+from torch.utils.dlpack import to_dlpack, from_dlpack
 
 # Check if cupy is available
 use_cupy = True
 try:
     import cupy as cp
-    # Check if cupy works (If it's installed with the wrong version of CUDA, it can be imported but doesn't work)
-    a = cp.ndarray(1, 'complex64')
-    a = a * a
 except:
     use_cupy = False
     print("Cupy isn't installed or isn't working properly. Will use Pytorch's complex multiply, which is much slower.")
-
-
-if use_cupy:
-    CUPY_MEM = cp.ndarray(1, dtype='float32').data.mem
 
 
 def conjugate(X):
@@ -38,17 +32,11 @@ def complex_mult_torch(X, Y):
 
 
 def torch_to_cupy(tensor):
-    '''Hacky way to convert torch.cuda.FloatTensor to CuPy array.
-    Probably not safe, since we're manipulating GPU memory addresses directly.
-    We will use the official conversion functions once a new CuPy version
-    (probably 4.2 or 5.0) is release: https://github.com/cupy/cupy/pull/1082
-    '''
-    assert isinstance(tensor, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
-    offset = tensor.data_ptr() - CUPY_MEM.ptr
-    array_mem = cp.cuda.memory.MemoryPointer(CUPY_MEM, offset)
-    array = cp.ndarray(tensor.shape, dtype='float32', memptr=array_mem)
-    array._strides = [4 * s for s in tensor.stride()]
-    return array
+    return cp.fromDlpack(to_dlpack(tensor.cuda()))
+
+
+def cupy_to_torch(tensor):
+    return from_dlpack(tensor.toDlpack())
 
 
 def complex_mult_cupy_raw(X, Y):
@@ -59,12 +47,7 @@ def complex_mult_cupy_raw(X, Y):
     '''
     assert isinstance(X, torch.cuda.FloatTensor) and isinstance(Y, torch.cuda.FloatTensor), 'Input must be torch.cuda.FloatTensor'
     assert X.shape[-1] == 2 and Y.shape[-1] == 2, 'Last dimension must be 2'
-    X_cp, Y_cp = torch_to_cupy(X), torch_to_cupy(Y)
-    X_complex, Y_complex = X_cp.view('complex64'), Y_cp.view('complex64')
-    out = torch.cuda.FloatTensor(*cp.broadcast(X_cp, Y_cp).shape)
-    out_complex = torch_to_cupy(out).view('complex64')
-    cp.multiply(X_complex, Y_complex, out_complex)
-    return out
+    return cupy_to_torch((torch_to_cupy(X).view('complex64') * torch_to_cupy(Y).view('complex64')).view('float32'))
 
 
 class ComplexMultCupy(torch.autograd.Function):
