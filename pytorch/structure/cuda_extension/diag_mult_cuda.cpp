@@ -3,8 +3,8 @@
 void subdiagMultGPU(float *d_Subdiag, float *d_Data, float *d_Output, int shiftSubdiag, int shiftV, int batchSize, int N, bool batchedSubdiag);
 
 at::Tensor cycle_mult(at::Tensor subdiag, at::Tensor v, int shiftSubdiag, int shiftV) {
-  AT_ASSERT(subdiag.type().is_cuda(), "subdiag must be a CUDA tensor");
-  AT_ASSERT(v.type().is_cuda(), "v must be a CUDA tensor");
+  AT_CHECK(subdiag.type().is_cuda(), "subdiag must be a CUDA tensor");
+  AT_CHECK(v.type().is_cuda(), "v must be a CUDA tensor");
   // Need to make tensors contiguous before passing to CUDA
   subdiag = subdiag.contiguous();
   v = v.contiguous();

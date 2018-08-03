@@ -590,7 +590,7 @@ def tridiag_linear_map(subdiag, diag, superdiag, upper_right_corner=0.0, lower_l
     n = diag.size(0)
     shift_none = torch.arange(n, device=diag.device)
     shift_down = shift_none - 1
-    shift_up = shift_none + 1
+    shift_up = (shift_none + 1) % n
     shifts = torch.stack((shift_down, shift_none, shift_up))
     subdiag_extended = torch.cat((torch.tensor([upper_right_corner], dtype=subdiag.dtype, device=subdiag.device), subdiag))
     superdiag_extended = torch.cat((superdiag, torch.tensor([lower_left_corner], dtype=superdiag.dtype, device=superdiag.device)))
