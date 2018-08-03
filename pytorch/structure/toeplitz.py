@@ -41,11 +41,10 @@ def toeplitz_krylov_transpose_multiply(v, u, f=0.0):
         # We only need the real part of complex_mult(eta, uv)
         return eta[..., 0] * uv[..., 0] - eta[..., 1] * uv[..., 1]
     else:
-        reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=u.device)
-        u_f = torch.rfft(torch.cat((u[..., reverse_index], torch.zeros_like(u)), dim=-1), 1)
+        u_f = torch.rfft(torch.cat((u.flip(1), torch.zeros_like(u)), dim=-1), 1)
         v_f = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
         uv_f = complex_mult(u_f[:, np.newaxis], v_f[np.newaxis])
-        return torch.irfft(uv_f, 1, signal_sizes=(2 * n, ))[..., reverse_index]
+        return torch.irfft(uv_f, 1, signal_sizes=(2 * n, )).flip(2)
 
 
 def toeplitz_krylov_multiply_by_autodiff(v, w, f=0.0):

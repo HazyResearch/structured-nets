@@ -108,11 +108,7 @@ def krylov_transpose_multiply(subdiag, v, u):
         T_10 = torch.cat((S0_10_mult_subdiag * S_11[1::2][:, np.newaxis], S_10[:, 1::2]), dim=-1)
         T_11 = S0_11_mult_subdiag * S_11[1::2]
 
-    # Negative step isn't supported by Pytorch
-    # (https://github.com/pytorch/pytorch/issues/229) so we have to construct
-    # the index explicitly.
-    reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=T_00_sum.device)
-    return T_00_sum[:, :, reverse_index]
+    return result.flip(2)
 
 
 def krylov_transpose_multiply_fast_slow(subdiag, v, u):
@@ -165,11 +161,7 @@ def krylov_transpose_multiply_fast_slow(subdiag, v, u):
         T_01 = torch.cat((T_01[:, :, :n2], T_01[:, :, n2:] + S_01[:, ::2]), dim=-1)
         T_10 = torch.cat((T_10[:, :, :n2], T_10[:, :, n2:] + S_10[:, 1::2]), dim=-1)
 
-    # Negative step isn't supported by Pytorch
-    # (https://github.com/pytorch/pytorch/issues/229) so we have to construct
-    # the index explicitly.
-    reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=T_00.device)
-    return T_00[:, :, :, reverse_index].squeeze(dim=2)
+    return T_00.squeeze(dim=2).flip(2)
 
 
 def krylov_multiply_by_autodiff(subdiag, v, w):
@@ -261,9 +253,8 @@ def krylov_multiply_old(subdiag, v, w):
     assert n == 1 << m, 'n must be a power of 2'
 
     save_for_backward = krylov_multiply_forward_(subdiag, v)
-    reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=w.device)
     w = w[:, :, np.newaxis, :]
-    dT_00, dT_01 = w[:, :, :, reverse_index], torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
+    dT_00, dT_01 = w.flip(3), torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
 
     for d in range(m):
         n1, n2 = 1 << d, 1 << (m - d - 1)
@@ -327,8 +318,7 @@ def krylov_multiply(subdiag, v, w):
         T_11 = S0_11_mult_subdiag * S_11[1::2]
 
     # Backward pass
-    reverse_index = torch.arange(n - 1, -1, -1, dtype=torch.long, device=w.device)
-    dT_00_sum, dT_01 = w[:, :, reverse_index], torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
+    dT_00_sum, dT_01 = w.flip(3), torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
 
     for d in range(m):
         n1, n2 = 1 << d, 1 << (m - d - 1)
