@@ -43,8 +43,8 @@ def krylov_transpose_multiply_conv(subdiag, v, u):
     assert n == 1 << m, 'n must be a power of 2'
 
     result = torch.zeros((batch_size, rank, n), dtype=u.dtype, device=u.device)
-    T_00_sum = (u @ v.t())[..., np.newaxis]
-    result[:, :, :1] += T_00_sum
+    T_00_sum = u @ v.t()
+    result[:, :, 0] += T_00_sum
     T_01 = u[..., np.newaxis]
     T_10 = v[..., np.newaxis]
     T_11 = torch.ones(n, device=T_00_sum.device)
@@ -87,7 +87,7 @@ def krylov_transpose_multiply(subdiag, v, u):
     T_11 = torch.ones(n, device=T_00_sum.device)
     for d in range(m)[::-1]:
         n1, n2 = 1 << d, 1 << (m - d - 1)
-        S_00_sum, S_01, S_10, S_11 = T_00_sum, T_01, T_10, T_11
+        S_01, S_10, S_11 = T_01, T_10, T_11
         # S0_10 = torch.cat((S_10[:, ::2], torch.zeros_like(S_10[:, ::2])), dim=-1)
         # S1_01 = torch.cat((S_01[:, 1::2], torch.zeros_like(S_01[:, 1::2])), dim=-1)
         # S = torch.cat((S0_10, S1_01))
@@ -114,8 +114,9 @@ def krylov_transpose_multiply(subdiag, v, u):
     return result
 
 
-def krylov_transpose_multiply_fast_slow(subdiag, v, u):
+def krylov_transpose_multiply_old(subdiag, v, u):
     """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
+    Uses the old algorithm that scales worse when batching.
     Parameters:
         subdiag: Tensor of shape (n - 1, )
         v: Tensor of shape (rank, n)
@@ -167,6 +168,65 @@ def krylov_transpose_multiply_fast_slow(subdiag, v, u):
     return T_00.squeeze(dim=2).flip(2)
 
 
+def krylov_multiply(subdiag, v, w):
+    """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal.
+    Since K @ w can be computed by autodiffing K^T @ u, the algorithm is just
+    hand-differentiating the code of @krylov_transpose_multiply.
+    Parameters:
+        subdiag: Tensor of shape (n - 1, )
+        v: Tensor of shape (rank, n)
+        w: Tensor of shape (batch_size, rank, n)
+    Returns:
+        product: Tensor of shape (batch_size, n)
+    """
+    batch_size, rank, n = w.shape
+    rank_, n_ = v.shape
+    assert n == n_, 'w and v must have the same last dimension'
+    assert rank == rank_, 'w and v must have the same rank'
+    m = int(np.log2(n))
+    assert n == 1 << m, 'n must be a power of 2'
+
+    # Forward pass. Since K @ w can be computed by autodiffing K^T @ u, we
+    # carry out the forward pass K^T @ u for u = 0 here to save the
+    # intermediate values. This code is exactly the same as the function
+    # @krylov_transpose_multiply, specialized to the case where u = 0.
+    save_for_backward = [None] * m
+    T_10 = v[..., np.newaxis]
+    T_11 = torch.ones((n), device=T_10.device)
+    for d in range(m)[::-1]:
+        n1, n2 = 1 << d, 1 << (m - d - 1)
+        S_10, S_11 = T_10, T_11
+        S0_10_mult_subdiag = S_10[:, ::2] * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
+        T_10 = torch.cat((S_10[:, 1::2], S0_10_mult_subdiag * S_11[1::2][:, np.newaxis]), dim=-1)
+        S0_11_mult_subdiag = S_11[::2] * subdiag[(n2 - 1)::(2 * n2)]
+        save_for_backward[d] = S0_10_mult_subdiag, S0_11_mult_subdiag
+        T_11 = S0_11_mult_subdiag * S_11[1::2]
+
+    # Backward pass
+    dT_01 = torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
+
+    for d in range(m):
+        n1, n2 = 1 << d, 1 << (m - d - 1)
+        S0_10_mult_subdiag, S0_11_mult_subdiag = save_for_backward[d]
+        dS_01 = torch.empty((batch_size, 2 * n1, n2), device=w.device)
+        dS_01[:, ::2] = dT_01[:, :, :n2]
+        dT_00_sum = torch.cat((w[:, :, 1:2*n2], torch.zeros((batch_size, rank, 1), dtype=w.dtype, device=w.device)), dim=-1)
+
+        dT_00_sum_f = torch.rfft(dT_00_sum, 1)
+        S0_10_f = torch.rfft(torch.cat((S0_10_mult_subdiag, torch.zeros_like(S0_10_mult_subdiag)), dim=-1), 1)
+        # dS1_01_f = complex_mult(conjugate(S0_10_f), dT_00_sum_f[:, :, np.newaxis]).sum(dim=1)
+        # Manually doing complex multiply
+        prod = (S0_10_f[..., np.newaxis] * dT_00_sum_f[:, :, np.newaxis, :, np.newaxis, :]).sum(dim=1)
+        dS1_01_f = torch.stack((prod[..., 0, 0] + prod[..., 1, 1], prod[..., 0, 1] - prod[..., 1, 0]), dim=-1)
+        dS1_01 = torch.irfft(dS1_01_f, 1, signal_sizes=(2 * n2, ))
+        dS_01[:, 1::2] = dT_01[:, :, n2:] * S0_11_mult_subdiag[:, np.newaxis] + dS1_01[:, :, :n2]
+
+        dT_01 = dS_01
+
+    # du = ((dT_00_sum[:, :, np.newaxis] * v[np.newaxis, :, :, np.newaxis]).sum(dim=1) + dT_01).squeeze(dim=-1)
+    du = w[:, :, 0] @ v + dT_01.squeeze(dim=-1)
+    return du
+
 def krylov_multiply_by_autodiff(subdiag, v, w):
     """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal, using Pytorch's autodiff.
     Parameters:
@@ -189,11 +249,12 @@ def krylov_multiply_by_autodiff(subdiag, v, w):
     return result
 
 
-def krylov_multiply_forward_(subdiag, v):
+def krylov_multiply_forward_old_(subdiag, v):
     """Forward pass of Krylov_multiply. Since K @ w can be computed by
     autodiffing K^T @ u, we carry out the forward pass K^T @ u for u = 0 here
     to save the intermediate values. This code is exactly the same as the
-    function @krylov_transpose_multiply, specialized to the case where u = 0.
+    function @krylov_transpose_multiply_old, specialized to the case where u = 0.
+    Uses the old algorithm that scales worse when batching.
     Parameters:
         subdiag: Tensor of shape (n - 1, )
         v: Tensor of shape (rank, n)
@@ -241,6 +302,7 @@ def krylov_multiply_old(subdiag, v, w):
     """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal.
     Since K @ w can be computed by autodiffing K^T @ u, the algorithm is just
     hand-differentiating the code of @krylov_transpose_multiply.
+    Uses the old algorithm that scales worse when batching.
     Parameters:
         subdiag: Tensor of shape (n - 1, )
         v: Tensor of shape (rank, n)
@@ -255,7 +317,7 @@ def krylov_multiply_old(subdiag, v, w):
     m = int(np.log2(n))
     assert n == 1 << m, 'n must be a power of 2'
 
-    save_for_backward = krylov_multiply_forward_(subdiag, v)
+    save_for_backward = krylov_multiply_forward_old_(subdiag, v)
     w = w[:, :, np.newaxis, :]
     dT_00, dT_01 = w.flip(w.dim() - 1), torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
 
@@ -285,63 +347,6 @@ def krylov_multiply_old(subdiag, v, w):
 
     du = ((dT_00 * v[np.newaxis, :, :, np.newaxis]).sum(dim=1) + dT_01).squeeze(dim=-1)
     return du
-
-def krylov_multiply(subdiag, v, w):
-    """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal.
-    Since K @ w can be computed by autodiffing K^T @ u, the algorithm is just
-    hand-differentiating the code of @krylov_transpose_multiply.
-    Parameters:
-        subdiag: Tensor of shape (n - 1, )
-        v: Tensor of shape (rank, n)
-        w: Tensor of shape (batch_size, rank, n)
-    Returns:
-        product: Tensor of shape (batch_size, n)
-    """
-    batch_size, rank, n = w.shape
-    rank_, n_ = v.shape
-    assert n == n_, 'w and v must have the same last dimension'
-    assert rank == rank_, 'w and v must have the same rank'
-    m = int(np.log2(n))
-    assert n == 1 << m, 'n must be a power of 2'
-
-    # Forward pass. Since K @ w can be computed by autodiffing K^T @ u, we
-    # carry out the forward pass K^T @ u for u = 0 here to save the
-    # intermediate values. This code is exactly the same as the function
-    # @krylov_transpose_multiply, specialized to the case where u = 0.
-    save_for_backward = [None] * m
-    T_10 = v[..., np.newaxis]
-    T_11 = torch.ones((n), device=T_10.device)
-    for d in range(m)[::-1]:
-        n1, n2 = 1 << d, 1 << (m - d - 1)
-        S_10, S_11 = T_10, T_11
-        S0_10_mult_subdiag = S_10[:, ::2] * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
-        T_10 = torch.cat((S0_10_mult_subdiag * S_11[1::2][:, np.newaxis], S_10[:, 1::2]), dim=-1)
-        S0_11_mult_subdiag = S_11[::2] * subdiag[(n2 - 1)::(2 * n2)]
-        save_for_backward[d] = S0_10_mult_subdiag, S0_11_mult_subdiag
-        T_11 = S0_11_mult_subdiag * S_11[1::2]
-
-    # Backward pass
-    dT_00_sum, dT_01 = w.flip(w.dim() - 1), torch.zeros((batch_size, 1, n), dtype=w.dtype, device=w.device)
-
-    for d in range(m):
-        n1, n2 = 1 << d, 1 << (m - d - 1)
-        S0_10_mult_subdiag, S0_11_mult_subdiag = save_for_backward[d]
-        dS_01 = torch.empty((batch_size, 2 * n1, n2), device=w.device)
-        dS_01[:, ::2] = dT_01[:, :, n2:]
-        dS_00_sum = dT_00_sum[:, :, n2:]
-
-        dT_00_sum_f = torch.rfft(dT_00_sum, 1)
-        S0_10_f = torch.rfft(torch.cat((S0_10_mult_subdiag, torch.zeros_like(S0_10_mult_subdiag)), dim=-1), 1)
-        dS1_01_f = complex_mult(conjugate(S0_10_f), dT_00_sum_f[:, :, np.newaxis]).sum(dim=1)
-        dS1_01 = torch.irfft(dS1_01_f, 1, signal_sizes=(2 * n2, ))
-        dS_01[:, 1::2] = dT_01[:, :, :n2] * S0_11_mult_subdiag[:, np.newaxis] + dS1_01[:, :, :n2]
-
-        dT_00_sum, dT_01 = dS_00_sum, dS_01
-
-    # du = ((dT_00_sum[:, :, np.newaxis] * v[np.newaxis, :, :, np.newaxis]).sum(dim=1) + dT_01).squeeze(dim=-1)
-    du = w[:, :, 0] @ v + dT_01.squeeze(dim=-1)
-    return du
-
 
 def subdiag_mult(subdiag_A, subdiag_B, G, H, x):
     """Multiply \sum_i Krylov(A, G_i) @ Krylov(B, H_i) @ x when A and B are zero except on the subdiagonal.
@@ -654,7 +659,7 @@ def test_krylov_transpose_multiply():
     # Fast algorithm on GPU
     result = krylov_transpose_multiply(subdiag, v, u)
     # result = krylov_transpose_multiply_conv(subdiag, v, u)
-    # result = krylov_transpose_multiply_fast_slow(subdiag, v, u)
+    # result = krylov_transpose_multiply_old(subdiag, v, u)
     grad,  = torch.autograd.grad(result.sum(), subdiag, retain_graph=True)
     # CPU dense multiply
     Ks = [krylov_construct(A, v.data.cpu().numpy()[i], n) for i in range(rank)]
