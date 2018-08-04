@@ -42,7 +42,7 @@ parser.add_argument("--epochs", type=int, default=1, help='Number of passes thro
 parser.add_argument('--optim', default='sgd', help='Optimizer')
 parser.add_argument('--lr', nargs='+', type=float, default=[1e-3], help='Learning rates')
 parser.add_argument('--mom', nargs='+', type=float, default=[0.9], help='Momentums')
-parser.add_argument('--weight-decay', type=float, default=0.975)
+parser.add_argument('--weight-decay', type=float, default=1.0)
 parser.add_argument('--log-freq', type=int, default=100)
 # parser.add_argument('--steps', type=int, help='Steps')
 parser.add_argument('--test', action='store_false', help='Toggle testing on test set')
@@ -121,9 +121,10 @@ def mlp(args):
 ## parse
 
 # task
-subparsers = parser.add_subparsers()
-mlp_parser = subparsers.add_parser('MLP')
-mlp_parser.set_defaults(task=mlp)
+parser.set_defaults(task=mlp)
+# subparsers = parser.add_subparsers()
+# mlp_parser = subparsers.add_parser('MLP')
+# mlp_parser.set_defaults(task=mlp)
 # vae_parser = subparsers.add_parser('VAE')
 # vae_parser.set_defaults(task=vae)
 # possible other main commands: sample() for the sample complexity case, vae(), etc.
@@ -136,7 +137,7 @@ for model in descendants(ArghModel):
     model.args.__name__ = model.__name__
     model_options.append(model.args)
     nets[model.__name__] = model
-argh.add_commands(mlp_parser, model_options, namespace='model', namespace_kwargs={'dest': 'model'})
+argh.add_commands(parser, model_options, namespace='model', namespace_kwargs={'dest': 'model'})
 for model in ArghModel.__subclasses__():
     # change names back
     model.args.__name__ = 'args'

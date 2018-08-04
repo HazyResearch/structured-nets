@@ -1,4 +1,4 @@
-from tensorflow.examples.tutorials.mnist import input_data
+# from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
 import os,sys,h5py
 import scipy.io as sio
