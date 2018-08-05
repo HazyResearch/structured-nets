@@ -424,6 +424,37 @@ def krylov_multiply_old(subdiag, v, w):
     du = ((dT_00 * v[np.newaxis, :, :, np.newaxis]).sum(dim=1) + dT_01).squeeze(dim=-1)
     return du
 
+def subdiag_mult_conv(subdiag_A, subdiag_B, G, H, x):
+    """Multiply \sum_i Krylov(A, G_i) @ Krylov(B, H_i) @ x when A and B are zero except on the subdiagonal.
+    Uses the fast algorithm.
+    Use either Pytorch's conv1d or FFT or polynomial multiplication, depending
+    on polynomial degree. This is the fastest implementation.
+    Parameters:
+        subdiag_A: Tensor of shape (n - 1, )
+        subdiag_B: Tensor of shape (n - 1, )
+        G: Tensor of shape (rank, n)
+        H: Tensor of shape (rank, n)
+        x: Tensor of shape (batch_size, n)
+    Returns:
+        product: Tensor of shape (batch_size, n)
+    """
+    rank, n = G.shape
+    batch_size = x.shape[0]
+    # if not power of 2, round everything up
+    # TODO: this can maybe be handled better. also should benchmark how much speed non-po2 FFT loses
+    m = int(np.ceil(np.log2(n)))
+    n_extended = 1 << m
+    if n != n_extended:
+        x = torch.cat((x, torch.zeros(batch_size, n_extended - n, dtype=x.dtype, device=x.device)), dim=-1)
+        G = torch.cat((G, torch.zeros(rank, n_extended - n, dtype=G.dtype, device=G.device)), dim=-1)
+        H = torch.cat((H, torch.zeros(rank, n_extended - n, dtype=H.dtype, device=H.device)), dim=-1)
+        subdiag_A = torch.cat((subdiag_A, torch.zeros(n_extended - n, dtype=subdiag_A.dtype, device=subdiag_A.device)))
+        subdiag_B = torch.cat((subdiag_B, torch.zeros(n_extended - n, dtype=subdiag_B.dtype, device=subdiag_B.device)))
+    KT_out = krylov_transpose_multiply_conv(subdiag_B, H, x)
+    K_out = krylov_multiply_conv(subdiag_A, G, KT_out)
+    return K_out[:, :n] if n != n_extended else K_out
+
+
 def subdiag_mult(subdiag_A, subdiag_B, G, H, x):
     """Multiply \sum_i Krylov(A, G_i) @ Krylov(B, H_i) @ x when A and B are zero except on the subdiagonal.
     Uses the fast algorithm.
@@ -833,7 +864,8 @@ def test_subdiag_mult():
     K_fast = krylov_subdiag_fast(subdiag, v, upper_right_corner=1.0)
     print((K - K_fast).abs().max().item())
 
-    result = subdiag_mult(subdiag, subdiag, v, v, u)
+    result = subdiag_mult_conv(subdiag, subdiag, v, v, u)
+    # result = subdiag_mult(subdiag, subdiag, v, v, u)
     grad,  = torch.autograd.grad(result.sum(), subdiag, retain_graph=True)
     result_slow_old = subdiag_mult_slow_old(subdiag, subdiag, v, v, u)
     grad_slow_old,  = torch.autograd.grad(result_slow_old.sum(), subdiag, retain_graph=True)
