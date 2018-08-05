@@ -3,8 +3,18 @@ import torch
 
 use_hadamard_transform_cuda = True
 try:
-    import cuda_extension
-except ImportError:
+    import hadamard_cuda
+    import torch.utils.cpp_extension
+    hadamard_cuda = torch.utils.cpp_extension.load(
+        name='hadamard_cuda',
+        sources=[
+            'hadamard_cuda/hadamard_cuda.cpp',
+            'hadamard_cuda/hadamard_cuda_kernel.cu',
+        ],
+        extra_cuda_cflags=['-O2'],
+        verbose=False
+        )
+except (ImportError, RuntimeError) as e:
     print("CUDA version of Hadamard transform isn't installed. Will use Pytorch's version, which is much slower.")
     use_hadamard_transform_cuda = False
 
@@ -36,7 +46,7 @@ class HadamardTransformCuda(torch.autograd.Function):
     '''
     @staticmethod
     def forward(ctx, u):
-        return cuda_extension.hadamard_transform(u)
+        return hadamard_cuda.hadamard_transform(u)
 
     @staticmethod
     def backward(ctx, grad):
@@ -80,3 +90,6 @@ def test_hadamard_transform():
 
 
 hadamard_transform = hadamard_transform_cuda if use_hadamard_transform_cuda else hadamard_transform_torch
+
+if __name__ == '__main__':
+    test_hadamard_transform()

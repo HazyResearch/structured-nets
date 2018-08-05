@@ -9,7 +9,10 @@ pytorch>=0.4.1
 ## Installing CUDA extensions
 Some of the functions are written in CUDA for speed. To install them:
 ```
-cd pytorch/structure/cuda_extension
+cd pytorch/structure/hadamard_cuda
+python setup.py install
+
+cd pytorch/structure/diag_mult_cuda
 python setup.py install
 ```
 

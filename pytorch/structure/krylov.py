@@ -19,9 +19,19 @@ from .triextrafat import krylov_construct
 from .complex_utils import complex_mult, conjugate
 
 try:
-    import cuda_extension
-except ImportError:
-    print("CUDA version of Hadamard transform isn't installed. Will use Pytorch's version, which is much slower.")
+    # import diag_mult_cuda
+    import torch.utils.cpp_extension
+    diag_mult_cuda = torch.utils.cpp_extension.load(
+        name='diag_mult_cuda',
+        sources=[
+            'diag_mult_cuda/diag_mult_cuda.cpp',
+            'diag_mult_cuda/diag_mult_cuda_kernel.cu',
+        ],
+        extra_cuda_cflags=['-O2'],
+        verbose=False
+        )
+except (ImportError, RuntimeError) as e:
+    print("CUDA version of slow Krylov multiply isn't installed.")
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -711,12 +721,12 @@ class CycleDownMultCuda(torch.autograd.Function):
     @staticmethod
     def forward(ctx, subdiag, v):
         ctx.save_for_backward(subdiag, v)
-        return cuda_extension.cycle_mult(subdiag, v, 0, -1)
+        return diag_mult_cuda.cycle_mult(subdiag, v, 0, -1)
 
     @staticmethod
     def backward(ctx, grad):
         subdiag, v = ctx.saved_tensors
-        return cuda_extension.cycle_mult(grad, v, 0, -1).sum(dim=0), cuda_extension.cycle_mult(subdiag, grad, 1, 1)
+        return diag_mult_cuda.cycle_mult(grad, v, 0, -1).sum(dim=0), diag_mult_cuda.cycle_mult(subdiag, grad, 1, 1)
 
 cycle_down_mult = CycleDownMultCuda.apply
 

@@ -13,6 +13,6 @@ at::Tensor hadamard_transform(at::Tensor x) {
   return output;
 }
 
-void init_hadamard_transform(py::module &m) {
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("hadamard_transform", &hadamard_transform, "Fast Hadamard transform");
 }
