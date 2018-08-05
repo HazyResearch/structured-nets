@@ -53,12 +53,23 @@ def krylov_transpose_multiply_conv(subdiag, v, u):
         S_00_sum, S_01, S_10, S_11 = T_00_sum, T_01, T_10, T_11
         S0_10_mult_subdiag = S_10[:, ::2] * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         # polynomial multiplication
-        T_00_sum = F.conv1d(S_01[:, 1::2], S0_10_mult_subdiag, padding=n2-1)
+        if n2 <= 128:  # Pick between 2 implementations based on polynomial degree n2
+            T_00_sum = F.conv1d(S_01[:, 1::2], S0_10_mult_subdiag.flip(2), padding=n2 - 1)
+        else:
+            S = torch.cat((torch.cat((S0_10_mult_subdiag, S_01[:, 1::2])),
+                           torch.zeros((rank + batch_size, n1, n2), dtype=S_10.dtype, device=S_10.device)), dim=-1)
+            S_f = torch.rfft(S, 1)
+            S0_10_f, S1_01_f = S_f[:rank], S_f[rank:rank+batch_size]
+            # T_00_f_sum = complex_mult(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis]).sum(dim=2)
+            # Manually doing complex multiply, somehow this is faster than Cupy's complex mult
+            prod = (S1_01_f[:, np.newaxis, ..., np.newaxis] * S0_10_f[np.newaxis, ..., np.newaxis, :]).sum(dim=2)
+            T_00_f_sum = torch.stack((prod[..., 0, 0] - prod[..., 1, 1], prod[..., 0, 1] + prod[..., 1, 0]), dim=-1)
+            T_00_sum = torch.irfft(T_00_f_sum, 1, signal_sizes=(2 * n2, ))[..., :-1]
         # polynomial additions
         result[:, :, 1:2*n2] += T_00_sum
         S0_11_mult_subdiag = S_11[::2] * subdiag[(n2 - 1)::(2 * n2)]
         T_01 = torch.cat((S_01[:, ::2], S_01[:, 1::2] * S0_11_mult_subdiag[:, np.newaxis]), dim=-1)
-        T_10 = torch.cat((S0_10_mult_subdiag * S_11[1::2][:, np.newaxis], S_10[:, 1::2]), dim=-1)
+        T_10 = torch.cat((S_10[:, 1::2], S0_10_mult_subdiag * S_11[1::2][:, np.newaxis]), dim=-1)
         T_11 = S0_11_mult_subdiag * S_11[1::2]
     return result
 
