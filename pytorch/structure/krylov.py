@@ -27,6 +27,87 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 ##### Fast multiplication for the subdiagonal case
 
+def poly_mult_sum_benchmark(p, q):
+    """Multiply and sum two sets of polynomials.
+    Parameters:
+        p: (batch_size, n1, n2)
+        q: (rank, n1, n2)
+    Output:
+        o: (batch_size, rank, 2 * n2 - 1)
+    """
+    print(p.shape[2])
+
+    import time
+
+    torch.cuda.synchronize()
+    start = time.perf_counter()
+    for _ in range(100):
+        y = F.conv1d(p, q.flip(q.dim() - 1), padding=p.shape[-1] -1)
+        g = torch.autograd.grad(y.sum(), (p, q), retain_graph=True)
+    torch.cuda.synchronize()
+    end = time.perf_counter()
+    print(f'Elapsed time conv1d: {end - start}s.')
+
+    batch_size, rank = p.shape[0], q.shape[0]
+    n1, n2 = p.shape[1], p.shape[2]
+    start = time.perf_counter()
+    for _ in range(100):
+        S = torch.cat((torch.cat((q, p)),
+                       torch.zeros((rank + batch_size, p.shape[1], p.shape[2]), dtype=q.dtype, device=q.device)), dim=-1)
+        S_f = torch.rfft(S, 1)
+        S0_10_f, S1_01_f = S_f[:rank], S_f[rank:rank+batch_size]
+        prod = (S1_01_f[:, np.newaxis, ..., np.newaxis] * S0_10_f[np.newaxis, ..., np.newaxis, :]).sum(dim=2)
+        T_00_f_sum = torch.stack((prod[..., 0, 0] - prod[..., 1, 1], prod[..., 0, 1] + prod[..., 1, 0]), dim=-1)
+        T_00_sum = torch.irfft(T_00_f_sum, 1, signal_sizes=(2 * n2, ))[..., :-1]
+        g = torch.autograd.grad(T_00_sum.sum(), (p, q), retain_graph=True)
+    torch.cuda.synchronize()
+    end = time.perf_counter()
+    print(f'Elapsed time FFT: {end - start}s.\n')
+
+    return F.conv1d(p, q.flip(q.dim() - 1), padding=p.shape[-1] - 1)
+
+
+def poly_mult_sum_backward_benchmark(grad, q):
+    """Backward pass of multiplying and summing two sets of polynomials.
+    Parameters:
+        grad: (batch_size, rank, 2 * n2 - 1)
+        q: (rank, n1, n2)
+    Output:
+        dp: (batch_size, n1, n2)
+    """
+    print(q.shape[2])
+
+    import time
+
+    torch.cuda.synchronize()
+    start = time.perf_counter()
+    for _ in range(100):
+        dp = F.conv_transpose1d(grad, q.flip(2), padding=q.shape[-1] - 1)
+        g = torch.autograd.grad(dp.sum(), (grad, q), retain_graph=True)
+    torch.cuda.synchronize()
+    end = time.perf_counter()
+    print(f'Elapsed time conv1d: {end - start}s.')
+
+    batch_size, rank = grad.shape[0], q.shape[0]
+    n1, n2 = q.shape[1], q.shape[2]
+    start = time.perf_counter()
+    for _ in range(100):
+        dT_00_sum = torch.cat((grad, torch.zeros((batch_size, rank, 1), dtype=grad.dtype, device=grad.device)), dim=-1)
+        dT_00_sum_f = torch.rfft(dT_00_sum, 1)
+        S0_10_f = torch.rfft(torch.cat((q, torch.zeros_like(q)), dim=-1), 1)
+        # dS1_01_f = complex_mult(conjugate(S0_10_f), dT_00_sum_f[:, :, np.newaxis]).sum(dim=1)
+        # Manually doing complex multiply
+        prod = (S0_10_f[..., np.newaxis] * dT_00_sum_f[:, :, np.newaxis, :, np.newaxis, :]).sum(dim=1)
+        dS1_01_f = torch.stack((prod[..., 0, 0] + prod[..., 1, 1], prod[..., 0, 1] - prod[..., 1, 0]), dim=-1)
+        dp = torch.irfft(dS1_01_f, 1, signal_sizes=(2 * n2, ))[:, :, :n2]
+        g = torch.autograd.grad(dp.sum(), (grad, q), retain_graph=True)
+    torch.cuda.synchronize()
+    end = time.perf_counter()
+    print(f'Elapsed time FFT: {end - start}s.\n')
+
+    return F.conv_transpose1d(grad, q.flip(2), padding=q.shape[-1] - 1)
+
+
 def krylov_transpose_multiply_conv(subdiag, v, u):
     """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
     Use either Pytorch's conv1d or FFT or polynomial multiplication, depending
@@ -55,6 +136,7 @@ def krylov_transpose_multiply_conv(subdiag, v, u):
         S_00_sum, S_01, S_10, S_11 = T_00_sum, T_01, T_10, T_11
         S0_10_mult_subdiag = S_10[:, ::2] * subdiag[(n2 - 1)::(2 * n2), np.newaxis]
         # polynomial multiplication
+        # T_00_sum = poly_mult_sum_benchmark(S_01[:, 1::2], S0_10_mult_subdiag)
         if n2 <= 128:  # Pick between 2 implementations based on polynomial degree n2
             T_00_sum = F.conv1d(S_01[:, 1::2], S0_10_mult_subdiag.flip(2), padding=n2 - 1)
         else:
@@ -225,6 +307,7 @@ def krylov_multiply_conv(subdiag, v, w):
         S0_10_mult_subdiag, S0_11_mult_subdiag = save_for_backward[d]
         dS_01 = torch.empty((batch_size, 2 * n1, n2), device=w.device)
         dS_01[:, ::2] = dT_01[:, :, :n2]
+        # dS1_01 = poly_mult_sum_backward_benchmark(w[:, :, 1:2*n2], S0_10_mult_subdiag)
         if n2 <= 128:
             dS1_01 = F.conv_transpose1d(w[:, :, 1:2*n2], S0_10_mult_subdiag.flip(2), padding=n2 - 1)
         else:
@@ -800,6 +883,9 @@ def test_krylov_transpose_multiply():
     print((grad - grad_gpu_fast).abs().max().item())
     print((grad - grad_gpu_fast).abs().mean().item())
 
+    # with torch.autograd.profiler.profile(use_cuda=True) as prof:
+    #     result = krylov_transpose_multiply_conv(subdiag, v, u)
+    #     grad,  = torch.autograd.grad(result.sum(), subdiag, retain_graph=True)
 
 def test_krylov_multiply():
     m = 10
