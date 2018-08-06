@@ -7,7 +7,7 @@ structure/ contains code for matrix multiplication and gradient computation for 
 
 Example command:
 ```
-python mlp/main.py --dataset mnist_noise_1 --result_dir test --lr 1e-3 --epochs 10 MLP model SHL --class-type toeplitz
+python mlp/main.py --dataset mnist_noise_1 --result-dir test --lr 1e-3 --epochs 10 model SHL --class-type toeplitz
 ```
 runs a single hidden layer model with a Toeplitz-like matrix of equal dimensions to the dataset input size.
 
