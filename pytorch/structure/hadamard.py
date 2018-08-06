@@ -4,16 +4,16 @@ import torch
 use_hadamard_transform_cuda = True
 try:
     import hadamard_cuda
-    import torch.utils.cpp_extension
-    hadamard_cuda = torch.utils.cpp_extension.load(
-        name='hadamard_cuda',
-        sources=[
-            'hadamard_cuda/hadamard_cuda.cpp',
-            'hadamard_cuda/hadamard_cuda_kernel.cu',
-        ],
-        extra_cuda_cflags=['-O2'],
-        verbose=False
-        )
+    # import torch.utils.cpp_extension
+    # hadamard_cuda = torch.utils.cpp_extension.load(
+    #     name='hadamard_cuda',
+    #     sources=[
+    #         'hadamard_cuda/hadamard_cuda.cpp',
+    #         'hadamard_cuda/hadamard_cuda_kernel.cu',
+    #     ],
+    #     extra_cuda_cflags=['-O2'],
+    #     verbose=False
+    #     )
 except (ImportError, RuntimeError) as e:
     print("CUDA version of Hadamard transform isn't installed. Will use Pytorch's version, which is much slower.")
     use_hadamard_transform_cuda = False

@@ -19,17 +19,17 @@ from .triextrafat import krylov_construct
 from .complex_utils import complex_mult, conjugate
 
 try:
-    # import diag_mult_cuda
-    import torch.utils.cpp_extension
-    diag_mult_cuda = torch.utils.cpp_extension.load(
-        name='diag_mult_cuda',
-        sources=[
-            'diag_mult_cuda/diag_mult_cuda.cpp',
-            'diag_mult_cuda/diag_mult_cuda_kernel.cu',
-        ],
-        extra_cuda_cflags=['-O2'],
-        verbose=False
-        )
+    import diag_mult_cuda
+    # import torch.utils.cpp_extension
+    # diag_mult_cuda = torch.utils.cpp_extension.load(
+    #     name='diag_mult_cuda',
+    #     sources=[
+    #         'diag_mult_cuda/diag_mult_cuda.cpp',
+    #         'diag_mult_cuda/diag_mult_cuda_kernel.cu',
+    #     ],
+    #     extra_cuda_cflags=['-O2'],
+    #     verbose=False
+    #     )
 except (ImportError, RuntimeError) as e:
     print("CUDA version of slow Krylov multiply isn't installed.")
 
