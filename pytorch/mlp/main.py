@@ -84,6 +84,8 @@ def mlp(args):
             run_name = args.name + '_' + model.name() \
                     + '_lr' + str(lr) \
                     + '_mom' + str(mom) \
+                    + '_wd' + str(args.weight_decay) \
+                    + '_vf' + str(args.val_frac) \
                     + '_bs' + str(args.batch_size) \
                     + '_ep' + str(args.epochs) \
                     + '_' + str(args.dataset)
