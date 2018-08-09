@@ -10,7 +10,6 @@ import structure.layer as sl
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
 def construct_model(cls, in_size, out_size, args):
     args_fn = cls.args
     options = {param: vars(args)[param]
@@ -97,6 +96,32 @@ class CNN(ArghModel):
 
     def forward(self, x):
         x = x.view(-1, 1, self.d, self.d)
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = x.view(-1, self.layer_size)
+        x = F.relu(self.W(x))
+        x = self.logits(x)
+        return x
+
+class CNNColor(ArghModel):
+    """
+    3 channel net where the dense last layer has same dimensions as input
+    """
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True): pass
+    def reset_parameters(self):
+        self.layer_size = int(self.in_size/3)
+        self.d = int(np.sqrt(self.layer_size))
+        self.conv1 = nn.Conv2d(3, 6, 5, padding=2)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
+        self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.logits = nn.Linear(self.layer_size, self.out_size)
+
+    def name(self):
+        return self.W.name()
+
+    def forward(self, x):
+        x = x.view(-1, 3, self.d, self.d)
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = x.view(-1, self.layer_size)
