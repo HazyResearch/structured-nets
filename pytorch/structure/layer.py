@@ -120,8 +120,8 @@ class LowRank(StructuredLinear):
         super().reset_parameters()
         self.G = Parameter(torch.Tensor(self.r, self.layer_size))
         self.H = Parameter(torch.Tensor(self.r, self.layer_size))
-        # self.init_stddev = 0.01
-        self.init_stddev = np.power(1. / (self.r * self.layer_size), 1/2)
+        self.init_stddev = 0.01
+        # self.init_stddev = np.power(1. / (self.r * self.layer_size), 1/2)
         torch.nn.init.normal_(self.G, std=self.init_stddev)
         torch.nn.init.normal_(self.H, std=self.init_stddev)
 
@@ -129,6 +129,11 @@ class LowRank(StructuredLinear):
         xH = torch.matmul(x, self.H.t())
         out = torch.matmul(xH, self.G)
         return self.apply_bias(out)
+
+    def loss(self):
+        lamb = 0.0001
+        return lamb*torch.sum(torch.abs(self.W.G)) + lamb*torch.sum(torch.abs(self.W.H))
+        # return 0
 
 
 class ToeplitzLike(LowRank):
@@ -197,7 +202,8 @@ class LDRSubdiagonal(LearnedOperator):
             self.subd_B = Parameter(torch.ones(self.layer_size-1))
 
     def forward(self, x):
-        out = kry.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
+        # out = kry.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
+        out = kry.subdiag_mult_conv(self.subd_A, self.subd_B, self.G, self.H, x)
         return self.apply_bias(out)
 
 class LDRSubdiagonalC(LDRSubdiagonal):

@@ -58,7 +58,7 @@ class Lenet(ArghModel):
     def reset_parameters(self):
         # super().__init__()
         # in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True
-        self.conv1 = nn.Conv2d(1, 6, 5)
+        self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5)
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
@@ -66,7 +66,7 @@ class Lenet(ArghModel):
         self.fc3 = nn.Linear(84, 10)
 
     def forward(self, x):
-        x = x.view(-1, 1, 32, 32)
+        x = x.view(-1, 3, 32, 32)
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = x.view(-1, 16 * 5 * 5)
@@ -74,6 +74,7 @@ class Lenet(ArghModel):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
 
 class CNN(ArghModel):
     """
@@ -134,22 +135,22 @@ class CNNPool(ArghModel):
     Simple 3 layer CNN with pooling for cifar10
     """
     def name(self):
-        return 'pool'
+        return str(self.channels) + 'pool'
 
     def args(channels=3, fc_size=512): pass
     def reset_parameters(self):
-        self.channels = 3
+        # self.channels = 3
         self.conv1 = nn.Conv2d(3, self.channels, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
 
-        self.fc = nn.Linear(self.channels/4*1024, self.fc_size)
+        self.fc = nn.Linear(self.channels*1024//4, self.fc_size)
         self.logits = nn.Linear(self.fc_size,10)
 
     def forward(self, x):
         x = x.view(-1, 3, 32, 32)
         x = F.relu(self.conv1(x))
         x = self.pool(x)
-        x = x.view(-1, self.channels/4*1024)
+        x = x.view(-1, self.channels*1024//4)
 
         x = F.relu(self.fc(x))
         x = self.logits(x)
@@ -158,35 +159,28 @@ class CNNPool(ArghModel):
 
 class TwoLayer(ArghModel):
     """
-    Simple 2 layer CNN: convolution channels, FC, softmax
+    Simple 2 layer network: convolution channels or FC, FC, softmax
     """
-    def args(noconv=False, pool=True): pass
-    def reset_parameters(self):
-        if self.noconv:
-            self.conv1 = nn.Linear(3*1024, 3*1024)
-        else:
-            self.conv1 = nn.Conv2d(3, 3, 5, padding=2)
+    def name(self):
+        return "3conv"
 
-        if self.pool:
-            self.pool = nn.MaxPool2d(2, 2)
-            self.fc = nn.Linear(768, 512)
-            self.logits = nn.Linear(512,10)
+    def args(conv=True): pass
+    def reset_parameters(self):
+        if self.conv:
+            self.conv1 = nn.Conv2d(3, 3, 5, padding=2)
         else:
-            self.fc = nn.Linear(3*1024, 512)
-            self.logits = nn.Linear(512, 10)
+            self.conv1 = nn.Linear(3*1024, 3*1024)
+
+        self.fc = nn.Linear(3*1024, 512)
+        self.logits = nn.Linear(512, 10)
 
     def forward(self, x):
-        if self.noconv:
-            x = F.relu(self.conv1(x))
-        else:
+        if self.conv:
             x = x.view(-1, 3, 32, 32)
             x = F.relu(self.conv1(x))
             x = x.view(-1, 3*1024)
-
-        if self.pool:
-            x = x.view(-1, 3, 32, 32)
-            x = self.pool(x)
-            x = x.view(-1, 768)
+        else:
+            x = F.relu(self.conv1(x))
 
         x = F.relu(self.fc(x))
         x = self.logits(x)
@@ -195,12 +189,12 @@ class TwoLayer(ArghModel):
     def loss(self):
         return 0
 
-class LDRFat(ArghModel):
+class WLDRFC(ArghModel):
     """
     LDR layer (single weight matrix), followed by FC and softmax
     """
     def name(self):
-        return self.W.name()
+        return 'wide'+self.W.name()+'u'
 
     def args(class_type='unconstrained', layer_size=-1, r=1, fc_size = 512): pass
     def reset_parameters(self):
@@ -216,17 +210,16 @@ class LDRFat(ArghModel):
         return x
 
     def loss(self):
-        # lamb = 0.0001
-        # if self.class_type != 'unconstrained':
-        #     return lamb*torch.sum(torch.abs(self.W.G)) + lamb*torch.sum(torch.abs(self.W.H))
-        return 0
-
+        return self.W.loss()
 
 
 class LDRFC(ArghModel):
     """
     LDR layer with channels, followed by FC and softmax
     """
+    def name(self):
+        return self.W.name()+'u'
+
     def args(class_type='t', r=1, channels=3, fc_size=512): pass
     def reset_parameters(self):
         self.n = 1024
@@ -250,80 +243,70 @@ class LDRFC(ArghModel):
 
 class LDRLDR(ArghModel):
     """
-    LDR layer with 3 channels, followed by another LDR layer, then softmax
+    LDR layer (either 3 channels or one wide matrix), followed by another LDR layer, then softmax
+    intended for 3-channel images of size 1024 (e.g. CIFAR-10)
     """
+    def name(self):
+        w = 'wide' if not self.channels else ''
+        return w + self.LDR1.name() + self.LDR211.name()
+
+    def args(class1='toeplitz', class2='toeplitz', channels=False, rank1=48, rank2=16): pass
     def reset_parameters(self):
-        self.channels = False
-
         self.n = 1024
-        fc_size = 512
-
-        rank1 = 48
-        rank2 = 16
-        class1 = 'toeplitz'
-        class2 = 'toeplitz'
+        self.fc_size = self.n // 2
 
         if self.channels:
-            self.LDR1 = ldr.LDR(class1, 3, 3, rank1, self.n)
+            self.LDR1 = ldr.LDR(self.class1, 3, 3, self.rank1, self.n)
         else:
-            self.LDR1 = sl.class_map[class1](layer_size=3*1024, r=rank1)
+            self.LDR1 = sl.class_map[self.class1](layer_size=3*self.n, r=self.rank1)
 
-        self.LDR211 = sl.class_map[class2](layer_size=fc_size, r=rank2)
-        self.LDR212 = sl.class_map[class2](layer_size=fc_size, r=rank2)
-        self.LDR221 = sl.class_map[class2](layer_size=fc_size, r=rank2)
-        self.LDR222 = sl.class_map[class2](layer_size=fc_size, r=rank2)
-        self.LDR231 = sl.class_map[class2](layer_size=fc_size, r=rank2)
-        self.LDR232 = sl.class_map[class2](layer_size=fc_size, r=rank2)
-        self.b = Parameter(torch.zeros(fc_size))
-        self.logits = nn.Linear(fc_size, 10)
+        self.LDR211 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR212 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR221 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR222 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR231 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR232 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.b = Parameter(torch.zeros(self.fc_size))
+        self.logits = nn.Linear(self.fc_size, 10)
 
     def forward(self, x):
         if self.channels:
-            x = x.view(-1, 3, 1024)
+            x = x.view(-1, 3, self.n)
             x = x.transpose(0,1).contiguous().view(3, -1, self.n)
             x = F.relu(self.LDR1(x))
         else:
             x = F.relu(self.LDR1(x))
-            x = x.view(-1, 3, 1024)
+            x = x.view(-1, 3, self.n)
             x = x.transpose(0,1).contiguous().view(3, -1, self.n)
-        x11 = x[0][:,:512]
-        x12 = x[0][:,512:]
-        x21 = x[1][:,:512]
-        x22 = x[1][:,512:]
-        x31 = x[2][:,:512]
-        x32 = x[2][:,512:]
-        # x = x.transpose(0,1) # swap batches and channels axis
-        # x = x.contiguous().view(-1, 3*self.n)
-        # x = F.relu(self.LDR21(x1) + self.LDR22(x2) + self.LDR23(x3) + self.b)
+        x11 = x[0][:,:self.fc_size]
+        x12 = x[0][:,self.fc_size:]
+        x21 = x[1][:,:self.fc_size]
+        x22 = x[1][:,self.fc_size:]
+        x31 = x[2][:,:self.fc_size]
+        x32 = x[2][:,self.fc_size:]
         x = F.relu(self.LDR211(x11) + self.LDR212(x12) + self.LDR221(x21) + self.LDR222(x22) + self.LDR231(x31) + self.LDR232(x32) + self.b)
         x = self.logits(x)
         return x
 
     def loss(self):
-        if self.channels:
-            return self.LDR1.loss()
-        else:
-            lamb = 0.0001
-            # return 0
-            return lamb*torch.sum(torch.abs(self.LDR1.G)) + lamb*torch.sum(torch.abs(self.LDR1.H))
+        return self.LDR1.loss()
 
 
 class LDRLDR2(ArghModel):
     """
-    Same as LDRLDR but use wide matrices to represent rectangular LDR
+    Same as LDRLDR but use larger matrix to represent rectangular LDR
     """
+    def name(self):
+        return self.LDR1.name() + self.LDR2.name()
+
+    def args(class1='toeplitz', class2='toeplitz', layer_size=-1, channels=3, fc_size=512, rank1=48, rank2=16): pass
     def reset_parameters(self):
-        self.n = 1024
-        self.channels = 4
-        self.fc_size = 512
+        if self.layer_size == -1:
+            self.layer_size = self.in_size
+        self.n = self.layer_size
 
-        rank1 = 48
-        rank2 = 16
-        class1 = 'subdiagonal'
-        class2 = 'subdiagonal'
-
-        self.LDR1 = sl.class_map[class1](layer_size=self.channels*self.n, r=rank1, bias=True)
-        self.LDR2 = sl.class_map[class2](layer_size=self.channels*self.n, r=rank2, bias=True)
+        self.LDR1 = sl.class_map[self.class1](layer_size=self.channels*self.n, r=self.rank1, bias=True)
+        self.LDR2 = sl.class_map[self.class2](layer_size=self.channels*self.n, r=self.rank2, bias=True)
         self.logits = nn.Linear(self.fc_size, 10)
 
     def forward(self, x):
@@ -336,9 +319,7 @@ class LDRLDR2(ArghModel):
         return x
 
     def loss(self):
-        lamb = 0.0001
-        # return 0
-        return lamb*torch.sum(torch.abs(self.LDR1.G)) + lamb*torch.sum(torch.abs(self.LDR1.H))
+        return self.LDR1.loss()
 
 
 class SL(ArghModel):
