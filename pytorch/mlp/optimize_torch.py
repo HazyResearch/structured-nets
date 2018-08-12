@@ -8,7 +8,6 @@ from tensorboardX import SummaryWriter
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# TODO: get rid of params here
 def test_split(net, dataloader, loss_fn):
     # assert data_X.shape[0] == data_Y.shape[0]
     n = len(dataloader.dataset)
@@ -20,14 +19,12 @@ def test_split(net, dataloader, loss_fn):
         # print("lengths: ", len(dataloader), len(batch_X), len(batch_Y))
 
         output = net(batch_X)
-        # loss_batch, acc_batch = compute_loss_and_accuracy(output, batch_Y, loss_name)
         loss_batch, acc_batch = loss_fn(output, batch_Y)
         total_loss += len(batch_X)*loss_batch.data.item()
         total_acc += len(batch_X)*acc_batch.data.item()
     return total_loss/n, total_acc/n
 
 
-# TODO loss type should be moved to model or dataset?
 # Epoch_offset: to ensure stats are not overwritten when called during pruning
 def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path, test, epoch_offset=0):
     logging.debug('Tensorboard log path: ' + log_path)
@@ -39,8 +36,6 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
     # os.makedirs(vis_path, exist_ok=True)
 
     writer = SummaryWriter(log_path)
-    # net = construct_net(params)
-    # net.cuda() # TODO: to device?
     net.to(device)
 
     logging.debug((torch.cuda.get_device_name(0)))
@@ -49,19 +44,13 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
         if param.requires_grad:
             logging.debug(('Parameter name, shape: ', name, param.data.shape))
 
-    # optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom)
-    # optimizer = optim.SGD(net.parameters(), lr=params.lr, momentum=params.mom, weight_decay=1e-5)
-    # optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
     # steps_in_epoch = int(np.ceil(dataset.train_X.shape[0] / params.batch_size))
 
     losses = {'Train': [], 'Val': [], 'DR': [], 'ratio': [], 'Test':[]}
     accuracies = {'Train': [], 'Val': [], 'Test':[]}
 
-    # val_X, val_Y = Variable(torch.FloatTensor(dataset.val_X).cuda()), Variable(torch.FloatTensor(dataset.val_Y).cuda())
     best_val_acc = 0.0
     best_val_save = None
-
-    # loss_name_fn = get_loss(params) # tuple of (loss name, loss fn)
 
 
     def log_stats(name, split, loss, acc, step):
@@ -80,7 +69,6 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
     # print("length of dataloader: ", len(dataset.train_loader))
     for epoch in range(epochs):
         logging.debug('Starting epoch ' + str(epoch+epoch_offset))
-    # for step in range(1, params.steps+1):
         for step, data in enumerate(dataset.train_loader, 0):
         # get the inputs
             batch_xs, batch_ys = data
@@ -138,14 +126,6 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
 
     # Test trained model
     if test:
-        #if net.W.mask is not None:
-        #    net.W.W.data *= net.W.mask.data
-        #    print('NNZ, net.W: ', torch.nonzero(net.W.W).size(0))
-
-        # Load test
-        # dataset.load_test_data()
-        # test_X, test_Y = Variable(torch.FloatTensor(dataset.test_X).cuda()), Variable(torch.FloatTensor(dataset.test_Y).cuda())
-
         # Load net from best validation
         if best_val_save is not None: net.load_state_dict(torch.load(best_val_save))
         logging.debug(f'Loaded best validation checkpoint from: {best_val_save}')
@@ -153,7 +133,6 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
         test_loss, test_accuracy = test_split(net, dataset.test_loader, dataset.loss)
         log_stats('Test', 'Test', test_loss, test_accuracy, 0)
 
-        # train_X, train_Y = Variable(torch.FloatTensor(dataset.train_X).cuda()), Variable(torch.FloatTensor(dataset.train_Y).cuda())
         train_loss, train_accuracy = test_split(net, dataset.train_loader, dataset.loss)
 
         # Log best validation accuracy and training acc for that model

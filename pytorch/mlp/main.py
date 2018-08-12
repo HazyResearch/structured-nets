@@ -43,7 +43,7 @@ parser.add_argument("--epochs", type=int, default=1, help='Number of passes thro
 parser.add_argument('--optim', default='sgd', help='Optimizer')
 parser.add_argument('--lr', nargs='+', type=float, default=[1e-3], help='Learning rates')
 parser.add_argument('--mom', nargs='+', type=float, default=[0.9], help='Momentums')
-parser.add_argument('--weight-decay', type=float, default=1.0)
+parser.add_argument('--lr-decay', type=float, default=1.0)
 parser.add_argument('--log-freq', type=int, default=100)
 # parser.add_argument('--steps', type=int, help='Steps')
 parser.add_argument('--test', action='store_false', help='Toggle testing on test set')
@@ -55,14 +55,14 @@ parser.add_argument('--prune-iters', type=int, default=1, help='Number of prunin
 # out_dir = '../..'
 out_dir = os.path.dirname(pytorch_root) # repo root
 
-seed = 0
-np.random.seed(seed)
-torch.manual_seed(seed)
+# seed = 0
+# np.random.seed(seed)
+# torch.manual_seed(seed)
 
 
 
 def save_args(args, results_dir):
-    commit_id = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'])
+    commit_id = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip()
     command = ' '.join(sys.argv)
     param_str = str(commit_id) + '\n' + command + '\n' + pprint.pformat(vars(args))
     print(param_str)
@@ -88,12 +88,12 @@ def mlp(args):
         for lr, mom in itertools.product(args.lr, args.mom):
             run_name = args.name + '_' + model.name() \
                     + '_lr' + str(lr) \
+                    + '_lrd' + str(args.lr_decay) \
                     + '_mom' + str(mom) \
-                    + '_wd' + str(args.weight_decay) \
-                    + '_vf' + str(args.val_frac) \
                     + '_bs' + str(args.batch_size) \
                     + '_ep' + str(args.epochs) \
-                    + '_' + str(args.dataset)
+                    + '_' + str(args.dataset) \
+                    + '_vf' + str(args.val_frac)
                     # + '_steps' + str(steps)
             if train_frac is not None:
                 run_name += '_tf' + str(train_frac)
@@ -120,7 +120,7 @@ def mlp(args):
                     optimizer = torch.optim.Adam(model.parameters(), lr=lr, amsgrad=True)
                 else:
                     assert False, "invalid optimizer"
-                lr_scheduler = StepLR(optimizer, step_size=1, gamma=args.weight_decay)
+                lr_scheduler = StepLR(optimizer, step_size=1, gamma=args.lr_decay)
 
                 if args.prune:
                     # Is there a better way to enforce pruning only for unconstrained?
@@ -140,9 +140,6 @@ parser.set_defaults(task=mlp)
 # subparsers = parser.add_subparsers()
 # mlp_parser = subparsers.add_parser('MLP')
 # mlp_parser.set_defaults(task=mlp)
-# vae_parser = subparsers.add_parser('VAE')
-# vae_parser.set_defaults(task=vae)
-# possible other main commands: sample() for the sample complexity case, vae(), etc.
 
 # MLP models
 model_options = []
