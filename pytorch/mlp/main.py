@@ -18,6 +18,7 @@ from dataset import DatasetLoaders
 from nets import ArghModel, construct_model
 from optimize_torch import optimize_torch
 from utils import descendants
+from prune import prune
 
 
 logging.basicConfig(level=logging.DEBUG,
@@ -46,6 +47,10 @@ parser.add_argument('--weight-decay', type=float, default=1.0)
 parser.add_argument('--log-freq', type=int, default=100)
 # parser.add_argument('--steps', type=int, help='Steps')
 parser.add_argument('--test', action='store_false', help='Toggle testing on test set')
+parser.add_argument('--prune', action='store_true', help='Whether to do pruning')
+parser.add_argument('--prune-lr-decay', type=float, default=0.1, help='LR decay factor in each pruning iter')
+parser.add_argument('--prune-factor', type=float, default=1, help='Factor by which to prune')
+parser.add_argument('--prune-iters', type=int, default=1, help='Number of pruning iters')
 
 # out_dir = '../..'
 out_dir = os.path.dirname(pytorch_root) # repo root
@@ -117,7 +122,15 @@ def mlp(args):
                     assert False, "invalid optimizer"
                 lr_scheduler = StepLR(optimizer, step_size=1, gamma=args.weight_decay)
 
-                losses, accuracies = optimize_torch(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq, log_path, checkpoint_path, result_path, args.test)
+                if args.prune:
+                    # Is there a better way to enforce pruning only for unconstrained?
+                    assert model.class_type in ['unconstrained', 'u']
+                    prune(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq, log_path,
+                        checkpoint_path, result_path, args.test, args.prune_lr_decay, args.prune_factor,
+                        args.prune_iters)
+                else:
+                    optimize_torch(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq,
+                        log_path, checkpoint_path, result_path, args.test)
 
 
 ## parse

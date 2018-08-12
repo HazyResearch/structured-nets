@@ -28,7 +28,8 @@ def test_split(net, dataloader, loss_fn):
 
 
 # TODO loss type should be moved to model or dataset?
-def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path, test):
+# Epoch_offset: to ensure stats are not overwritten when called during pruning
+def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path, test, epoch_offset=0):
     logging.debug('Tensorboard log path: ' + log_path)
     logging.debug('Tensorboard checkpoint path: ' + checkpoint_path)
     # logging.debug('Tensorboard vis path: ' + vis_path)
@@ -74,11 +75,11 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
     # compute initial stats
     t1 = time.time()
     init_loss, init_accuracy = test_split(net, dataset.val_loader, dataset.loss)
-    log_stats('Initial', 'Val', init_loss, init_accuracy, 0)
+    log_stats('Initial', 'Val', init_loss, init_accuracy, epoch_offset)
 
     # print("length of dataloader: ", len(dataset.train_loader))
     for epoch in range(epochs):
-        logging.debug('Starting epoch ' + str(epoch))
+        logging.debug('Starting epoch ' + str(epoch+epoch_offset))
     # for step in range(1, params.steps+1):
         for step, data in enumerate(dataset.train_loader, 0):
         # get the inputs
@@ -98,7 +99,7 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
             optimizer.step()
 
             # log training every log_freq steps
-            total_step = epoch*len(dataset.train_loader) + step+1
+            total_step = (epoch + epoch_offset)*len(dataset.train_loader) + step+1
             if total_step % log_freq == 0:
                 logging.debug(('Time: ', time.time() - t1))
                 t1 = time.time()
@@ -109,7 +110,7 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
         # validate and checkpoint by epoch
         # Test on validation set
         val_loss, val_accuracy = test_split(net, dataset.val_loader, dataset.loss)
-        log_stats('Validation', 'Val', val_loss, val_accuracy, epoch+1)
+        log_stats('Validation', 'Val', val_loss, val_accuracy, epoch+epoch_offset+1)
 
         # Update LR
         lr_scheduler.step()
@@ -137,6 +138,10 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
 
     # Test trained model
     if test:
+        #if net.W.mask is not None:
+        #    net.W.W.data *= net.W.mask.data
+        #    print('NNZ, net.W: ', torch.nonzero(net.W.W).size(0))
+
         # Load test
         # dataset.load_test_data()
         # test_X, test_Y = Variable(torch.FloatTensor(dataset.test_X).cuda()), Variable(torch.FloatTensor(dataset.test_Y).cuda())

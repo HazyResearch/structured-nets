@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
+from torch.autograd import Variable
 
 from . import toeplitz as toep
 from . import krylov as kry
@@ -46,10 +47,23 @@ class Unconstrained(StructuredLinear):
         self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
         self.init_stddev = np.sqrt(1./self.layer_size)
         torch.nn.init.normal_(self.W, std=self.init_stddev)
+        self.mask = None
+
+    def set_mask(self, mask, device):
+        self.mask = Variable(torch.FloatTensor(mask).to(device), requires_grad=False)
+        self.W.data *= self.mask.data
+        print('Num. nonzero entries after pruning: ', torch.nonzero(self.W).size(0))
 
     def forward(self, x):
-        out = torch.matmul(x, self.W)
+        if self.mask is not None:
+            masked_W = self.W*self.mask
+            #print('NNZ, mask: ', torch.nonzero(self.mask).size(0))
+            #print('NNZ, masked_W: ', torch.nonzero(masked_W).size(0))
+            out = torch.matmul(x, masked_W)
+        else:
+            out = torch.matmul(x, self.W)
         return self.apply_bias(out)
+
 
 
 class Circulant(StructuredLinear):
