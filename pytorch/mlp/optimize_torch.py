@@ -26,7 +26,8 @@ def test_split(net, dataloader, loss_fn):
 
 
 # Epoch_offset: to ensure stats are not overwritten when called during pruning
-def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path, test, epoch_offset=0):
+def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path,
+    test, save_model, epoch_offset=0):
     logging.debug('Tensorboard log path: ' + log_path)
     logging.debug('Tensorboard checkpoint path: ' + checkpoint_path)
     # logging.debug('Tensorboard vis path: ' + vis_path)
@@ -52,6 +53,9 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
     best_val_acc = 0.0
     best_val_save = None
 
+    # If not saving models, then keep updating test accuracy of best validation model
+    test_acc_of_best_val = 0.0
+    test_loss_of_best_val = 0.0
 
     def log_stats(name, split, loss, acc, step):
         losses[split].append(loss)
@@ -109,13 +113,20 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
         # record best model
         if val_accuracy > best_val_acc:
             # save_path = os.path.join(params.checkpoint_path, str(step))
-            save_path = os.path.join(checkpoint_path, 'best')
-            with open(save_path, 'wb') as f:
-                torch.save(net.state_dict(), f)
-            logging.debug(("Best model saved in file: %s" % save_path))
+            if save_model:
+                save_path = os.path.join(checkpoint_path, 'best')
+                with open(save_path, 'wb') as f:
+                    torch.save(net.state_dict(), f)
+                logging.debug(("Best model saved in file: %s" % save_path))
+                best_val_save = save_path
+
+            else:
+                test_loss, test_accuracy = test_split(net, dataset.test_loader, dataset.loss)
+                test_loss_of_best_val = test_loss
+                test_acc_of_best_val = test_accuracy
+
 
             best_val_acc = val_accuracy
-            best_val_save = save_path
 
     # save last checkpoint
     save_path = os.path.join(checkpoint_path, 'last')
@@ -126,12 +137,15 @@ def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_
 
     # Test trained model
     if test:
-        # Load net from best validation
-        if best_val_save is not None: net.load_state_dict(torch.load(best_val_save))
-        logging.debug(f'Loaded best validation checkpoint from: {best_val_save}')
+        if save_model:
+            # Load net from best validation
+            if best_val_save is not None: net.load_state_dict(torch.load(best_val_save))
+            logging.debug(f'Loaded best validation checkpoint from: {best_val_save}')
 
-        test_loss, test_accuracy = test_split(net, dataset.test_loader, dataset.loss)
-        log_stats('Test', 'Test', test_loss, test_accuracy, 0)
+            test_loss, test_accuracy = test_split(net, dataset.test_loader, dataset.loss)
+            log_stats('Test', 'Test', test_loss, test_accuracy, 0)
+        else:
+            log_stats('Test', 'Test', test_loss_of_best_val, test_acc_of_best_val, 0)
 
         train_loss, train_accuracy = test_split(net, dataset.train_loader, dataset.loss)
 

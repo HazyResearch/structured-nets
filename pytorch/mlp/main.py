@@ -51,6 +51,7 @@ parser.add_argument('--prune', action='store_true', help='Whether to do pruning'
 parser.add_argument('--prune-lr-decay', type=float, default=0.1, help='LR decay factor in each pruning iter')
 parser.add_argument('--prune-factor', type=float, default=1, help='Factor by which to prune')
 parser.add_argument('--prune-iters', type=int, default=1, help='Number of pruning iters')
+parser.add_argument('--save-model', action='store_false', help='Whether to save best model')
 
 # out_dir = '../..'
 out_dir = os.path.dirname(pytorch_root) # repo root
@@ -126,11 +127,11 @@ def mlp(args):
                     # Is there a better way to enforce pruning only for unconstrained?
                     assert model.class_type in ['unconstrained', 'u']
                     prune(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq, log_path,
-                        checkpoint_path, result_path, args.test, args.prune_lr_decay, args.prune_factor,
+                        checkpoint_path, result_path, args.test, args.save_model, args.prune_lr_decay, args.prune_factor,
                         args.prune_iters)
                 else:
                     optimize_torch(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq,
-                        log_path, checkpoint_path, result_path, args.test)
+                        log_path, checkpoint_path, result_path, args.test, args.save_model)
 
 
 ## parse
