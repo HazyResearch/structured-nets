@@ -120,7 +120,7 @@ def poly_mult_sum_backward_benchmark(grad, q):
 
 def krylov_transpose_multiply_conv(subdiag, v, u):
     """Multiply Krylov(A, v_i)^T @ u when A is zero except on the subdiagonal.
-    Use either Pytorch's conv1d or FFT or polynomial multiplication, depending
+    Use either Pytorch's conv1d or FFT for polynomial multiplication, depending
     on polynomial degree. This is the fastest implementation.
     Parameters:
         subdiag: Tensor of shape (n - 1, )
@@ -277,7 +277,7 @@ def krylov_multiply_conv(subdiag, v, w):
     """Multiply \sum_i Krylov(A, v_i) @ w_i when A is zero except on the subdiagonal.
     Since K @ w can be computed by autodiffing K^T @ u, the algorithm is just
     hand-differentiating the code of @krylov_transpose_multiply.
-    Use either Pytorch's conv1d or FFT or polynomial multiplication, depending
+    Use either Pytorch's conv1d or FFT for polynomial multiplication, depending
     on polynomial degree. This is the fastest implementation.
     Parameters:
         subdiag: Tensor of shape (n - 1, )
@@ -520,7 +520,7 @@ def krylov_multiply_old(subdiag, v, w):
 def subdiag_mult_conv(subdiag_A, subdiag_B, G, H, x):
     """Multiply \sum_i Krylov(A, G_i) @ Krylov(B, H_i) @ x when A and B are zero except on the subdiagonal.
     Uses the fast algorithm.
-    Use either Pytorch's conv1d or FFT or polynomial multiplication, depending
+    Use either Pytorch's conv1d or FFT for polynomial multiplication, depending
     on polynomial degree. This is the fastest implementation.
     Parameters:
         subdiag_A: Tensor of shape (n - 1, )
