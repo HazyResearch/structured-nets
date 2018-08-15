@@ -132,7 +132,7 @@ class LowRank(StructuredLinear):
 
     def loss(self):
         lamb = 0.0001
-        return lamb*torch.sum(torch.abs(self.W.G)) + lamb*torch.sum(torch.abs(self.W.H))
+        return lamb*torch.sum(torch.abs(self.G)) + lamb*torch.sum(torch.abs(self.H))
         # return 0
 
 

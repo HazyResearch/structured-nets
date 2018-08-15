@@ -13,7 +13,6 @@ from inspect import signature
 # add parent (pytorch root) to path
 pytorch_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, pytorch_root)
-from model_params import ModelParams
 from dataset import DatasetLoaders
 from nets import ArghModel, construct_model
 from optimize_torch import optimize_torch

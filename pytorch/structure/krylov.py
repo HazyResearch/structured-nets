@@ -15,7 +15,7 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 
-from .triextrafat import krylov_construct
+from .scratch.krylovslow import krylov_construct
 from .complex_utils import complex_mult, conjugate
 
 try:
