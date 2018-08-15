@@ -170,11 +170,25 @@ class VandermondeLike(LowRank):
 
     def reset_parameters(self):
         super().reset_parameters()
-        self.diag = Parameter(torch.ones(self.layer_size))
+        # self.diag = Parameter(torch.ones(self.layer_size))
+        self.diag = Parameter(torch.Tensor(self.layer_size))
+        torch.nn.init.uniform_(self.diag, -0.7, 0.7)
 
     def forward(self, x):
-        K_H = kry.Krylov(lambda v: self.diag * v, self.H)
-        out = toep.toeplitz_krylov_multiply(self.G, torch.transpose(x @ K_H, 0,1))
+        # want: K_A[i,j,k] = g_i[j] * d[j] ** k
+        # K_A = kry.Krylov(lambda v: self.diag * v, self.G)
+        n = x.size(-1)
+        d_ = self.diag.unsqueeze(1) ** torch.arange(n, dtype=x.dtype, device=x.device)
+        K_A = self.G.unsqueeze(-1) * d_
+
+        # K_B = kry.Krylov(lambda v: torch.cat((v[...,1:],0*v[...,:1]),dim=-1), self.H)
+        # out = (x @ K_B) @ K_A.transpose(1,2)
+
+        out = toep.toeplitz_krylov_transpose_multiply(self.H, x)
+        out = out.transpose(0,1) @ K_A.transpose(1,2)
+        out = torch.sum(out, dim=0)
+        # K_H = kry.Krylov(lambda v: self.diag * v, self.H)
+        # out = toep.toeplitz_krylov_multiply(self.G, torch.transpose(x @ K_H, 0,1))
         return self.apply_bias(out)
 
 
