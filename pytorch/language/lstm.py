@@ -1,3 +1,5 @@
+# Modified from https://github.com/jihunchoi/recurrent-batch-normalization-pytorch/blob/master/bnlstm.py
+
 import torch
 from torch import nn
 from torch.autograd import Variable
