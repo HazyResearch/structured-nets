@@ -1,61 +1,12 @@
-"""Implementation of batch-normalized LSTM."""
 import torch
 from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional, init
 import sys
-sys.path.insert(0, '../pytorch/')
-from structured_layer import StructuredLinear
+sys.path.insert(0, '../')
+import structure.layer as sl
+#from structured_layer import StructuredLinear
 
-class BNLSTMCell(nn.Module):
-
-    """A BN-LSTM cell."""
-    def __init__(self, input_size, hidden_size, max_length, use_bias=True):
-
-        super(BNLSTMCell, self).__init__()
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.max_length = max_length
-        self.use_bias = use_bias
-        #self.weight_ih = nn.Parameter(
-        #    torch.FloatTensor(input_size, 4 * hidden_size))
-        self.weight_hh = nn.Parameter(
-            torch.FloatTensor(hidden_size, 4 * hidden_size))
-        if use_bias:
-            self.bias = nn.Parameter(torch.FloatTensor(4 * hidden_size))
-        else:
-            self.register_parameter('bias', None)
-        # BN parameters
-        self.bn_ih = SeparatedBatchNorm1d(
-            num_features=4 * hidden_size, max_length=max_length)
-        self.bn_hh = SeparatedBatchNorm1d(
-            num_features=4 * hidden_size, max_length=max_length)
-        self.bn_c = SeparatedBatchNorm1d(
-            num_features=hidden_size, max_length=max_length)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        """
-        Initialize parameters following the way proposed in the paper.
-        """
-
-        # The input-to-hidden weight matrix is initialized orthogonally.
-        #init.orthogonal(self.weight_ih.data)
-        # The hidden-to-hidden weight matrix is initialized as an identity
-        # matrix.
-        weight_hh_data = torch.eye(self.hidden_size)
-        weight_hh_data = weight_hh_data.repeat(1, 4)
-        self.weight_hh.data.set_(weight_hh_data)
-        # The bias is just set to zero vectors.
-        init.constant(self.bias.data, val=0)
-        # Initialization of BN parameters.
-        self.bn_ih.reset_parameters()
-        self.bn_hh.reset_parameters()
-        self.bn_c.reset_parameters()
-        self.bn_ih.bias.data.fill_(0)
-        self.bn_hh.bias.data.fill_(0)
-        self.bn_ih.weight.data.fill_(0.1)
-        self.bn_hh.weight.data.fill_(0.1)
 class LSTMCell(nn.Module):
 
     """A basic LSTM cell."""
@@ -69,7 +20,12 @@ class LSTMCell(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.use_bias = use_bias
-        self.struct = StructuredLinear(None, class_type, 512, 0.01, r) 
+        self.struct_1 = sl.class_map[class_type](layer_size=hidden_size, r=r, bias=False)
+        self.struct_2 = sl.class_map[class_type](layer_size=hidden_size, r=r, bias=False)
+        self.struct_3 = sl.class_map[class_type](layer_size=hidden_size, r=r, bias=False)
+        self.struct_4 = sl.class_map[class_type](layer_size=hidden_size, r=r, bias=False)
+        #self.struct = sl.class_map[class_type](layer_size=512, r=r, bias=False)
+        #self.struct = StructuredLinear(None, class_type, 512, 0.01, r)
         #self.weight_ih = nn.Parameter(
         #    torch.FloatTensor(input_size, 4 * hidden_size))
         self.weight_hh = nn.Parameter(
@@ -119,9 +75,17 @@ class LSTMCell(nn.Module):
         wh_b = torch.addmm(bias_batch, h_0, self.weight_hh)
         #wi = torch.mm(input_, self.weight_ih)
         # Pad with zeros
-        z = torch.zeros(input_.size(0),384).cuda()
-        input_padded = torch.cat((input_, z),dim=1)
-        wi = self.struct(input_padded)
+        #z = torch.zeros(input_.size(0),384).cuda()
+        #input_padded = torch.cat((input_, z),dim=1)
+        #print('input shape, hidden size: ', input_.shape, self.hidden_size)
+        wi_1 = self.struct_1(input_)
+        wi_2 = self.struct_2(input_)
+        wi_3 = self.struct_3(input_)
+        wi_4 = self.struct_4(input_)
+        wi = torch.cat((wi_1, wi_2, wi_3, wi_4), 1)
+        #print('wi shape: ', wi.shape)
+        #wi = self.struct(input_padded)
+        #print('wi_1, 2, 3, 4: ', wi_1.shape, wi_2.shape, wi_3.shape, wi_4.shape)
         #print('self.weight_hh.shape: ', self.weight_hh.shape)
         #print('self.weight_ih.shape: ', self.weight_ih.shape)
         f, i, o, g = torch.split(wh_b + wi,
