@@ -120,8 +120,8 @@ class LowRank(StructuredLinear):
         super().reset_parameters()
         self.G = Parameter(torch.Tensor(self.r, self.layer_size))
         self.H = Parameter(torch.Tensor(self.r, self.layer_size))
-        self.init_stddev = 0.01
-        # self.init_stddev = np.power(1. / (self.r * self.layer_size), 1/2)
+        # self.init_stddev = 0.01
+        self.init_stddev = np.power(1. / (self.r * self.layer_size), 1/2)
         torch.nn.init.normal_(self.G, std=self.init_stddev)
         torch.nn.init.normal_(self.H, std=self.init_stddev)
 
@@ -131,9 +131,9 @@ class LowRank(StructuredLinear):
         return self.apply_bias(out)
 
     def loss(self):
-        lamb = 0.0001
-        return lamb*torch.sum(torch.abs(self.G)) + lamb*torch.sum(torch.abs(self.H))
-        # return 0
+        return 0
+        # lamb = 0.0001
+        # return lamb*torch.sum(torch.abs(self.G)) + lamb*torch.sum(torch.abs(self.H))
 
 
 class ToeplitzLike(LowRank):
@@ -170,7 +170,6 @@ class VandermondeLike(LowRank):
 
     def reset_parameters(self):
         super().reset_parameters()
-        # self.diag = Parameter(torch.ones(self.layer_size))
         self.diag = Parameter(torch.Tensor(self.layer_size))
         torch.nn.init.uniform_(self.diag, -0.7, 0.7)
 
@@ -187,9 +186,11 @@ class VandermondeLike(LowRank):
         out = toep.toeplitz_krylov_transpose_multiply(self.H, x)
         out = out.transpose(0,1) @ K_A.transpose(1,2)
         out = torch.sum(out, dim=0)
+        return self.apply_bias(out)
+
+        # transpose Vandermonde:
         # K_H = kry.Krylov(lambda v: self.diag * v, self.H)
         # out = toep.toeplitz_krylov_multiply(self.G, torch.transpose(x @ K_H, 0,1))
-        return self.apply_bias(out)
 
 
 class LearnedOperator(LowRank):
@@ -266,25 +267,3 @@ class LDRTridiagonalC(LDRTridiagonal):
         self.corners_A = (Parameter(torch.tensor(0.0)), Parameter(torch.tensor(0.0)))
         self.corners_B = (Parameter(torch.tensor(0.0)), Parameter(torch.tensor(0.0)))
 
-
-# create a map from class names to the Python class
-# TODO: should go in some utils file
-def descendants(cls):
-    """
-    Get all subclasses (recursively) of class cls, not including itself
-    Assumes no multiple inheritance
-    """
-    desc = []
-    for subcls in cls.__subclasses__():
-        desc.append(subcls)
-        desc.extend(descendants(subcls))
-    return desc
-
-class_map = {}
-for cls in descendants(StructuredLinear):
-    if cls.class_type is None: continue
-    class_map[cls.class_type] = cls
-    class_map[cls.abbrev] = cls
-
-    # else:
-    #     assert 0, f"{self.__class__.__name__} does not support {self.class_type}"

@@ -7,8 +7,16 @@ from torch.nn.parameter import Parameter
 
 import structure.LDR as ldr
 import structure.layer as sl
+from utils import descendants
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+# create a map from structured class names to the Python class
+class_map = {}
+for cls in descendants(sl.StructuredLinear):
+    if cls.class_type is None: continue
+    class_map[cls.class_type] = cls
+    class_map[cls.abbrev] = cls
+
 
 def construct_model(cls, in_size, out_size, args):
     args_fn = cls.args
@@ -89,7 +97,7 @@ class CNN(ArghModel):
         self.conv1 = nn.Conv2d(1, 6, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
-        self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
         self.logits = nn.Linear(self.layer_size, self.out_size)
 
     def name(self):
@@ -115,7 +123,7 @@ class CNNColor(ArghModel):
         self.conv1 = nn.Conv2d(3, 6, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
-        self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
         self.logits = nn.Linear(self.layer_size, self.out_size)
 
     def name(self):
@@ -139,7 +147,6 @@ class CNNPool(ArghModel):
 
     def args(channels=3, fc_size=512): pass
     def reset_parameters(self):
-        # self.channels = 3
         self.conv1 = nn.Conv2d(3, self.channels, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
 
@@ -159,7 +166,7 @@ class CNNPool(ArghModel):
 
 class TwoLayer(ArghModel):
     """
-    Simple 2 layer network: convolution channels or FC, FC, softmax
+    Simple 2 hidden layer network: convolution channels or FC, FC, softmax
     """
     def name(self):
         return "3conv"
@@ -194,12 +201,12 @@ class WLDRFC(ArghModel):
     LDR layer (single weight matrix), followed by FC and softmax
     """
     def name(self):
-        return 'wide'+self.W.name()+'u'
+        return self.W.name()+'u'
 
     def args(class_type='unconstrained', layer_size=-1, r=1, fc_size = 512): pass
     def reset_parameters(self):
         if self.layer_size == -1: self.layer_size = self.in_size
-        self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r)
+        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r)
         self.fc = nn.Linear(3*1024, self.fc_size)
         self.logits = nn.Linear(self.fc_size, 10)
 
@@ -247,8 +254,8 @@ class LDRLDR(ArghModel):
     intended for 3-channel images of size 1024 (e.g. CIFAR-10)
     """
     def name(self):
-        w = 'wide' if not self.channels else ''
-        return w + self.LDR1.name() + self.LDR211.name()
+        # w = 'wide' if not self.channels else ''
+        return self.LDR1.name() + self.LDR211.name()
 
     def args(class1='toeplitz', class2='toeplitz', channels=False, rank1=48, rank2=16): pass
     def reset_parameters(self):
@@ -258,14 +265,14 @@ class LDRLDR(ArghModel):
         if self.channels:
             self.LDR1 = ldr.LDR(self.class1, 3, 3, self.rank1, self.n)
         else:
-            self.LDR1 = sl.class_map[self.class1](layer_size=3*self.n, r=self.rank1)
+            self.LDR1 = class_map[self.class1](layer_size=3*self.n, r=self.rank1)
 
-        self.LDR211 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
-        self.LDR212 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
-        self.LDR221 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
-        self.LDR222 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
-        self.LDR231 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
-        self.LDR232 = sl.class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR211 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR212 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR221 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR222 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR231 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR232 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
         self.b = Parameter(torch.zeros(self.fc_size))
         self.logits = nn.Linear(self.fc_size, 10)
 
@@ -305,8 +312,8 @@ class LDRLDR2(ArghModel):
             self.layer_size = self.in_size
         self.n = self.layer_size
 
-        self.LDR1 = sl.class_map[self.class1](layer_size=self.channels*self.n, r=self.rank1, bias=True)
-        self.LDR2 = sl.class_map[self.class2](layer_size=self.channels*self.n, r=self.rank2, bias=True)
+        self.LDR1 = class_map[self.class1](layer_size=self.channels*self.n, r=self.rank1, bias=True)
+        self.LDR2 = class_map[self.class2](layer_size=self.channels*self.n, r=self.rank2, bias=True)
         self.logits = nn.Linear(self.fc_size, 10)
 
     def forward(self, x):
@@ -333,7 +340,7 @@ class SL(ArghModel):
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
-        self.W = sl.class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
 
     def forward(self, x):
         return self.W(x)
