@@ -1,5 +1,5 @@
 import numpy as np
-from optimize_torch import optimize_torch
+from learning import train
 import torch
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -18,7 +18,7 @@ def generate_mask(net, prune_factor):
 
 def prune(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path, test, save, prune_lr_decay, prune_factor, prune_iters):
     # Initial training
-    optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path, 0, save)
+    train.train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path, 0, save)
 
     for i in range(prune_iters):
         # Generate mask
@@ -32,4 +32,4 @@ def prune(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, che
             param_group['lr'] = prune_lr_decay*param_group['lr']
 
         # Retrain
-        optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path, test, save, (i+1)*epochs)
+        train.train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path, test, save, (i+1)*epochs)

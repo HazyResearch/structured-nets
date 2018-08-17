@@ -10,15 +10,13 @@ import torch
 from torch.optim.lr_scheduler import StepLR
 from inspect import signature
 
-# add parent (pytorch root) to path
-pytorch_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# add PyTorch root to path
+pytorch_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'pytorch')
 sys.path.insert(0, pytorch_root)
 from dataset import DatasetLoaders
-from nets import ArghModel, construct_model
-from optimize_torch import optimize_torch
+from models.nets import ArghModel, construct_model
+from learning import train, prune
 from utils import descendants
-from prune import prune
-
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(message)s',
@@ -51,16 +49,13 @@ parser.add_argument('--prune-lr-decay', type=float, default=0.1, help='LR decay 
 parser.add_argument('--prune-factor', type=float, default=1, help='Factor by which to prune')
 parser.add_argument('--prune-iters', type=int, default=1, help='Number of pruning iters')
 parser.add_argument('--save-model', action='store_false', help='Whether to save best model')
-parser.add_argument('--data-dir', default='../../../datasets/', help='Data directory')
+parser.add_argument('--data-dir', default='../../datasets/', help='Data directory')
 
-# out_dir = '../..'
 out_dir = os.path.dirname(pytorch_root) # repo root
 
 # seed = 0
 # np.random.seed(seed)
 # torch.manual_seed(seed)
-
-
 
 def save_args(args, results_dir):
     commit_id = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip()
@@ -126,11 +121,11 @@ def mlp(args):
                 if args.prune:
                     # Is there a better way to enforce pruning only for unconstrained?
                     assert model.class_type in ['unconstrained', 'u']
-                    prune(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq, log_path,
+                    prune.prune(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq, log_path,
                         checkpoint_path, result_path, args.test, args.save_model, args.prune_lr_decay, args.prune_factor,
                         args.prune_iters)
                 else:
-                    optimize_torch(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq,
+                    train.train(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq,
                         log_path, checkpoint_path, result_path, args.test, args.save_model)
 
 

@@ -26,7 +26,7 @@ def test_split(net, dataloader, loss_fn):
 
 
 # Epoch_offset: to ensure stats are not overwritten when called during pruning
-def optimize_torch(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path,
+def train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, checkpoint_path, result_path,
     test, save_model, epoch_offset=0):
     logging.debug('Tensorboard log path: ' + log_path)
     logging.debug('Tensorboard checkpoint path: ' + checkpoint_path)
