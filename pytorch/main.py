@@ -11,7 +11,7 @@ from torch.optim.lr_scheduler import StepLR
 from inspect import signature
 
 # add PyTorch root to path
-pytorch_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'pytorch')
+pytorch_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, pytorch_root)
 from dataset import DatasetLoaders
 from models.nets import ArghModel, construct_model
