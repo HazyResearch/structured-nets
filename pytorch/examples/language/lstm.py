@@ -7,8 +7,8 @@ from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional, init
 import sys
-sys.path.insert(0, '../')
-import structure.layer as sl
+sys.path.insert(0, '../../../pytorch/')
+from mlp.nets import class_map
 #from structured_layer import StructuredLinear
 
 class LSTMCell(nn.Module):
@@ -24,10 +24,10 @@ class LSTMCell(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.use_bias = use_bias
-        self.struct_1 = sl.class_map[class_type](layer_size=hidden_size, r=r, bias=False)
-        self.struct_2 = sl.class_map[class_type](layer_size=hidden_size, r=r, bias=False)
-        self.struct_3 = sl.class_map[class_type](layer_size=hidden_size, r=r, bias=False)
-        self.struct_4 = sl.class_map[class_type](layer_size=hidden_size, r=r, bias=False)
+        self.struct_1 = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
+        self.struct_2 = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
+        self.struct_3 = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
+        self.struct_4 = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
         #self.struct = sl.class_map[class_type](layer_size=512, r=r, bias=False)
         #self.struct = StructuredLinear(None, class_type, 512, 0.01, r)
         #self.weight_ih = nn.Parameter(
@@ -139,10 +139,7 @@ class LSTM(nn.Module):
         max_time = input_.size(0)
         output = []
         for time in range(max_time):
-            if isinstance(cell, BNLSTMCell):
-                h_next, c_next = cell(input_=input_[time], hx=hx, time=time)
-            else:
-                h_next, c_next = cell(input_=input_[time], hx=hx)
+            h_next, c_next = cell(input_=input_[time], hx=hx)
             mask = (time < length).float().unsqueeze(1).expand_as(h_next)
             h_next = h_next*mask + hx[0]*(1 - mask)
             c_next = c_next*mask + hx[1]*(1 - mask)

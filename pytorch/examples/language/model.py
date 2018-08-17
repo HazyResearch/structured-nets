@@ -7,9 +7,7 @@ from torch.nn import Parameter
 import torch
 import numpy as np
 import sys
-sys.path.insert(0, '../pytorch/')
-#from structured_layer import StructuredLinear
-from bnlstm import LSTM, LSTMCell
+from lstm import LSTM, LSTMCell
 
 class RNNModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
