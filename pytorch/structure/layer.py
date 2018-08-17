@@ -77,7 +77,7 @@ class Circulant(StructuredLinear):
         torch.nn.init.normal_(self.c, std=self.init_stddev)
 
     def forward(self, x):
-        return self.apply_bias(circ.circulant_multiply(self.c, x, self.layer_size))
+        return self.apply_bias(circ.circulant_multiply(self.c, x))
 
 
 class FastFood(StructuredLinear):
