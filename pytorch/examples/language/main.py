@@ -169,10 +169,7 @@ def train():
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         hidden = repackage_hidden(hidden)
         model.zero_grad()
-        #print('data, hidden: ', data.shape, hidden[0].shape, hidden[1].shape)
         output, hidden = model(data, hidden)
-        #print('output, hidden: ', output.shape, hidden[0].shape, hidden[1].shape)
-        #quit()
         loss = criterion(output.view(-1, ntokens), targets)
         loss.backward()
 
