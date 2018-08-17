@@ -21,6 +21,7 @@ parser.add_argument('--name', default='')
 parser.add_argument('--result-dir', default='../../../results/vae/')
 parser.add_argument('--layer-size',type=int, default=784)
 parser.add_argument('--class_type', default='unconstrained')
+parser.add_argument('--lr',type=float, default=1e-3)
 parser.add_argument('--r',type=int, default=1)
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 10)')
@@ -91,7 +92,7 @@ for name, param in model.named_parameters():
     if param.requires_grad:
         print(('Parameter name, shape: ', name, param.data.shape))
 
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, logvar):
