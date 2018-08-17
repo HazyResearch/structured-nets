@@ -1,4 +1,3 @@
-# from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
 import os,sys,h5py
 import scipy.io as sio
@@ -15,98 +14,45 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def get_dataset(dataset_name, transform):
     """
-    Get dataset specific information: the actual data, validation split size, input/output sizes
+    Get paths of datasets.
     """
-    # if dataset_name == 'mnist':
-    #     mnist_normalize = transforms.Compose([
-    #         transforms.ToTensor(),
-    #         transforms.Normalize((0.1307, ), (0.3081, ))
-    #     ])
-    #     mnist_train = datasets.MNIST(
-    #         '../data', train=True, download=True, transform=mnist_normalize)
-    #     mnist_test = datasets.MNIST(
-    #         '../data', train=False, download=True, transform=mnist_normalize)
-    #     val_size = 5000
-    #     in_size = 784
-    #     out_size = 10
-
-    #     train_loader = torch.utils.data.DataLoader(mnist_train, batch_size=len(mnist_train), shuffle=True)
-    #     for X, Y in train_loader:
-    #         train_X, train_Y = X, Y
-    #     test_loader = torch.utils.data.DataLoader(mnist_test, batch_size=len(mnist_test), shuffle=True)
-    #     for X, Y in test_loader:
-    #         test_X, test_Y = X, Y
-    #     train_X = train_X.view(-1, in_size)
-    #     test_X = test_X.view(-1, in_size)
-    #     train_Y = torch.zeros(train_X.size(0), out_size)
-    #     train_Y.scatter_(1, mnist_train.train_labels.unsqueeze(1), 1)
-    #     # test_X = mnist_test.test_data.view(-1, in_size)
-    #     test_Y = torch.zeros(test_X.size(0), out_size)
-    #     test_Y.scatter_(1, mnist_test.test_labels.unsqueeze(1), 1)
-    #     # return train_X, train_Y, test_X, test_Y, val_size, in_size, out_size
-    #     return torch.FloatTensor(train_X), torch.FloatTensor(train_Y), torch.FloatTensor(test_X), torch.FloatTensor(test_Y), val_size, in_size, out_size
-    #     # normalize
-
     prefix = '/dfs/scratch1/thomasat/datasets/'
     if dataset_name == 'mnist':
         train_loc = os.path.join(prefix, 'mnist/train_normalized')
         test_loc = os.path.join(prefix, 'mnist/test_normalized')
-        val_size = 5000
-        out_size = 10
     elif dataset_name == 'cifar10':
         train_loc = os.path.join(prefix, 'cifar10_combined/train')
         test_loc = os.path.join(prefix, 'cifar10_combined/test')
-        val_size = 5000
-        out_size = 10
     elif dataset_name == 'cifar10mono':
         train_loc = os.path.join(prefix, 'cifar10_combined/train_grayscale')
         test_loc = os.path.join(prefix, 'cifar10_combined/test_grayscale')
-        val_size = 5000
-        out_size = 10
     elif dataset_name.startswith('mnist_noise'):
         idx = dataset_name[-1]
         train_loc = os.path.join(prefix,'mnist_noise/train_' + str(idx))
         test_loc = os.path.join(prefix,'mnist_noise/test_' + str(idx))
-        val_size = 2000
-        out_size = 10
     elif dataset_name == 'norb':
         train_loc = os.path.join(prefix,'norb_full/processed_py2_train_32.pkl')
         test_loc = os.path.join(prefix,'norb_full/processed_py2_test_32.pkl')
-        val_size = 30000
-        out_size = 6
     elif dataset_name == 'rect_images': #TODO
         train_loc = os.path.join(prefix, 'rect_images/rectangles_im_train.amat')
         test_loc = os.path.join(prefix, 'rect_images/rectangles_im_test.amat')
-        out_size = 2
     elif dataset_name == 'rect':
         train_loc = os.path.join(prefix,'rect/train_normalized')
         test_loc = os.path.join(prefix, 'rect/test_normalized')
-        val_size = 100
-        out_size = 2
     elif dataset_name == 'convex':
         train_loc = os.path.join(prefix, 'convex/train_normalized')
         test_loc = os.path.join(prefix, 'convex/test_normalized')
-        val_size = 800
-        out_size = 2
     elif dataset_name == 'mnist_rand_bg': #TODO
         train_loc = os.path.join(prefix, 'mnist_rand_bg/mnist_background_random_train.amat')
         test_loc = os.path.join(prefix, 'mnist_rand_bg/mnist_background_random_test.amat')
-        val_size = 2000
-        out_size = 10
     elif dataset_name == 'mnist_bg_rot':
         train_loc = os.path.join(prefix, 'mnist_bg_rot/train_normalized')
         test_loc = os.path.join(prefix, 'mnist_bg_rot/test_normalized')
-        val_size = 2000
-        out_size = 10
     elif dataset_name == 'mnist_bg_rot_swap':
         train_loc = os.path.join(prefix, 'mnist_bg_rot/test_normalized')
         test_loc = os.path.join(prefix, 'mnist_bg_rot/train_normalized')
-        val_size = 5000
-        out_size = 10
-    elif dataset_name == 'timit': #TODO
-        out_size = 147
     #TODO handle iwslt, copy tasks
-    # TODO smallnorb
+    # TODO smallnorb, timit
     else:
         print('dataset.py: unknown dataset name')
 
@@ -126,10 +72,12 @@ def get_dataset(dataset_name, transform):
 
     print("Train dataset size: ", train_X.shape[0])
     print("Test dataset size: ", test_X.shape[0])
+    print("In size: ", in_size)
+    print("Out size: ", out_size)
 
-    return torch.FloatTensor(train_X), torch.FloatTensor(train_Y), torch.FloatTensor(test_X), torch.FloatTensor(test_Y), val_size, in_size, out_size
+    return torch.FloatTensor(train_X), torch.FloatTensor(train_Y), torch.FloatTensor(test_X), torch.FloatTensor(test_Y), in_size, out_size
 
-def split_train_val(train_X, train_Y, val_size, train_fraction=None, val_fraction=None):
+def split_train_val(train_X, train_Y, val_fraction, train_fraction=None):
     """
     Input: training data as a torch.Tensor
     """
@@ -139,9 +87,10 @@ def split_train_val(train_X, train_Y, val_size, train_fraction=None, val_fractio
     train_X = train_X[idx,:]
     train_Y = train_Y[idx,:]
 
+    # Compute validation set size
+    val_size = int(val_fraction*train_X.shape[0])
+
     # Downsample for sample complexity experiments
-    if val_fraction is not None:
-        val_size = int(val_fraction*train_X.shape[0])
     if train_fraction is not None:
         train_size = int(train_fraction*train_X.shape[0])
         assert val_size + train_size <= train_X.shape[0]
@@ -175,13 +124,13 @@ def create_data_loaders(dataset_name, transform, train_fraction, val_fraction, b
     else:
         loader_args = {'num_workers': 4, 'pin_memory': False}
 
-    train_X, train_Y, test_X, test_Y, val_size, in_size, out_size = get_dataset(dataset_name, transform) # train/test data, val size, input/output size
+    train_X, train_Y, test_X, test_Y, in_size, out_size = get_dataset(dataset_name, transform) # train/test data, input/output size
     # train_X, train_Y = postprocess(transform, train_X, train_Y)
     # test_X, test_Y = postprocess(transform, test_X, test_Y)
 
     # TODO: use torch.utils.data.random_split instead
     # however, this requires creating the dataset, then splitting, then applying transformations
-    train_X, train_Y, val_X, val_Y = split_train_val(train_X, train_Y, val_size, train_fraction, val_fraction)
+    train_X, train_Y, val_X, val_Y = split_train_val(train_X, train_Y, val_fraction, train_fraction)
 
 
     # TODO: use pytorch transforms to postprocess
@@ -198,7 +147,7 @@ def create_data_loaders(dataset_name, transform, train_fraction, val_fraction, b
 
 
 class DatasetLoaders:
-    def __init__(self, name, transform=None, train_fraction=None, val_fraction=None, batch_size=50):
+    def __init__(self, name, val_fraction, transform=None, train_fraction=None, batch_size=50):
         if name.startswith('true'):
             # TODO: Add support for synthetic datasets back. Possibly should be split into separate class
             self.loss = utils.mse_loss
