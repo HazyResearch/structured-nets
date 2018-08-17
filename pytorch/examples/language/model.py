@@ -7,7 +7,7 @@ from torch.nn import Parameter
 import torch
 import numpy as np
 import sys
-from lstm import LSTM, LSTMCell
+from lstm import SingleLayerLSTM, LSTMCell
 
 class RNNModel(nn.Module):
     """Container module with an encoder, a recurrent module, and a decoder."""
@@ -19,7 +19,7 @@ class RNNModel(nn.Module):
         if rnn_type in ['LSTM', 'GRU']:
             print('ninp, nhid, nlayers: ', ninp, nhid, nlayers)
             if rnn_type == 'LSTM':
-                self.rnn = LSTM(class_type, r, LSTMCell, input_size=ninp, hidden_size=nhid, num_layers=nlayers, dropout=dropout)
+                self.rnn = SingleLayerLSTM(class_type, r, input_size=ninp, hidden_size=nhid, dropout=dropout)
             else:
                 self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout)
         else:
