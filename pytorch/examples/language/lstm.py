@@ -9,7 +9,6 @@ from torch.nn import functional, init
 import sys
 sys.path.insert(0, '../../../pytorch/')
 from mlp.nets import class_map
-#from structured_layer import StructuredLinear
 
 class LSTMCell(nn.Module):
 
@@ -28,10 +27,6 @@ class LSTMCell(nn.Module):
         self.struct_2 = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
         self.struct_3 = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
         self.struct_4 = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
-        #self.struct = sl.class_map[class_type](layer_size=512, r=r, bias=False)
-        #self.struct = StructuredLinear(None, class_type, 512, 0.01, r)
-        #self.weight_ih = nn.Parameter(
-        #    torch.FloatTensor(input_size, 4 * hidden_size))
         self.weight_hh = nn.Parameter(
             torch.FloatTensor(hidden_size, 4 * hidden_size))
         if use_bias:
@@ -65,33 +60,18 @@ class LSTMCell(nn.Module):
         Returns:
             h_1, c_1: Tensors containing the next hidden and cell state.
         """
-        #print('input_: ', input_.shape) #20x200
         h_0, c_0 = hx
         h_0 = h_0.squeeze()
         c_0 = c_0.squeeze()
-        #print('h_0, c_0: ', h_0.shape, c_0.shape) #1x20x200, 1x20x200
         batch_size = h_0.size(0)
-        #print('batch_size: ', batch_size)
         bias_batch = (self.bias.unsqueeze(0)
                       .expand(batch_size, *self.bias.size()))
-        #print('bias_batch: ', bias_batch.shape)
-        #print('self.weight_hh: ', self.weight_hh.shape) #200x800, 200x800
         wh_b = torch.addmm(bias_batch, h_0, self.weight_hh)
-        #wi = torch.mm(input_, self.weight_ih)
-        # Pad with zeros
-        #z = torch.zeros(input_.size(0),384).cuda()
-        #input_padded = torch.cat((input_, z),dim=1)
-        #print('input shape, hidden size: ', input_.shape, self.hidden_size)
         wi_1 = self.struct_1(input_)
         wi_2 = self.struct_2(input_)
         wi_3 = self.struct_3(input_)
         wi_4 = self.struct_4(input_)
         wi = torch.cat((wi_1, wi_2, wi_3, wi_4), 1)
-        #print('wi shape: ', wi.shape)
-        #wi = self.struct(input_padded)
-        #print('wi_1, 2, 3, 4: ', wi_1.shape, wi_2.shape, wi_3.shape, wi_4.shape)
-        #print('self.weight_hh.shape: ', self.weight_hh.shape)
-        #print('self.weight_ih.shape: ', self.weight_ih.shape)
         f, i, o, g = torch.split(wh_b + wi,
                                  split_size_or_sections=self.hidden_size, dim=1)
         c_1 = torch.sigmoid(f)*c_0 + torch.sigmoid(i)*torch.tanh(g)
@@ -150,13 +130,9 @@ class LSTM(nn.Module):
         return output, hx
 
     def forward(self, input_, length=None, hx=None):
-        #print('input_', input_)
-        #print('length: ', length)
-        #print('hx: ', hx)
         if self.batch_first:
             input_ = input_.transpose(0, 1)
         max_time, batch_size, _ = input_.size()
-        #print('max_time, batch_size: ', max_time, batch_size)
         if length is None:
             length = Variable(torch.LongTensor([max_time] * batch_size))
             if input_.is_cuda:
