@@ -150,7 +150,7 @@ def test(epoch):
 train_losses = []
 for epoch in range(1, args.epochs + 1):
     train_losses.append(train(epoch))
-    test_losses = test(epoch)
+    test_loss = test(epoch)
     with torch.no_grad():
         sample = torch.randn(64, 20).to(device)
         sample = model.decode(sample).cpu()
