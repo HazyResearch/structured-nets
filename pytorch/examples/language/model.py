@@ -22,11 +22,6 @@ class RNNModel(nn.Module):
                 self.rnn = LSTM(class_type, r, LSTMCell, input_size=ninp, hidden_size=nhid, num_layers=nlayers, dropout=dropout)
             else:
                 self.rnn = getattr(nn, rnn_type)(ninp, nhid, nlayers, dropout=dropout)
-            # Replace with structured layers
-            #self.rnn.weight_ih_l0 = StructuredLinear(None, 'unconstrained', 512, 0.01, 1)
-            #self.rnn.weight_ih_l0 = Parameter(torch.Tensor(np.random.random((800,200))))
-            #print(self.rnn.weight_ih_l0)
-            #quit()
         else:
             try:
                 nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
@@ -61,13 +56,9 @@ class RNNModel(nn.Module):
 
     def forward(self, input, hidden):
         emb = self.drop(self.encoder(input))
-        #print('hidden: ', hidden.shape)
-        #print('emb, hidden: ', emb.shape, hidden[0].shape, hidden[1].shape)
         output, hidden = self.rnn(emb, hx=hidden)
         output = output.squeeze()
         hidden = (hidden[0].squeeze(0), hidden[1].squeeze(0))
-        #print('output, hidden: ', output.shape, hidden[0].shape, hidden[1].shape)
-        #quit()
         output = self.drop(output)
         decoded = self.decoder(output.view(output.size(0)*output.size(1), output.size(2)))
         return decoded.view(output.size(0), output.size(1), decoded.size(1)), hidden

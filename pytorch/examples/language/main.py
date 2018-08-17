@@ -4,7 +4,7 @@ Modified from pytorch/examples/word_language_model to demonstrate 'StructuredLin
 
 
 # coding: utf-8
-import argparse
+import argparse, os
 import time
 import math
 import torch
@@ -50,8 +50,7 @@ parser.add_argument('--cuda', action='store_true',
                     help='use CUDA')
 parser.add_argument('--log-interval', type=int, default=200, metavar='N',
                     help='report interval')
-parser.add_argument('--save', type=str,  default='/dfs/scratch1/thomasat/results/lang/',
-                    help='path to save the final model')
+parser.add_argument('--result-dir', default='../../../results/language/')
 parser.add_argument('--test', type=int,  default=0,
                     help='Flag to test on test set')
 args = parser.parse_args()
@@ -96,6 +95,11 @@ eval_batch_size = 10
 train_data = batchify(corpus.train, args.batch_size)
 val_data = batchify(corpus.valid, eval_batch_size)
 test_data = batchify(corpus.test, eval_batch_size)
+
+# Make results dir
+out_dir = os.path.join(args.result_dir, args.name)
+if not os.path.exists(out_dir):
+    os.makedirs(out_dir)
 
 ###############################################################################
 # Build the model
@@ -215,7 +219,7 @@ try:
         print('-' * 89)
         # Save the model if the validation loss is the best we've seen so far.
         if not best_val_loss or val_loss < best_val_loss:
-            with open(args.save + 'model.pt', 'wb') as f:
+            with open(os.path.join(out_dir, 'model.pt'), 'wb') as f:
                 torch.save(model, f)
             best_val_loss = val_loss
         else:
@@ -226,16 +230,16 @@ except KeyboardInterrupt:
     print('Exiting from training early')
 
 # Load the best saved model.
-with open(args.save + 'model.pt', 'rb') as f:
+with open(os.path.join(out_dir, 'model.pt'), 'rb') as f:
     model = torch.load(f)
     # after load the rnn params are not a continuous chunk of memory
     # this makes them a continuous chunk, and will speed up forward pass
     #model.rnn.flatten_parameters()
 
 
-losses = {}
-losses['val_losses'] = val_losses
-losses['val_perps'] = val_perps
+results = {}
+results['val_losses'] = val_losses
+results['val_perps'] = val_perps
 
 if args.test:
     # Run on test data.
@@ -245,10 +249,10 @@ if args.test:
         test_loss, math.exp(test_loss)))
     print('=' * 89)
 
-    losses['test_loss'] = test_loss
-    losses['test_perp'] = math.exp(test_loss)
+    results['test_loss'] = test_loss
+    results['test_perp'] = math.exp(test_loss)
 
 # Save
-out = args.save + args.name + '_' + args.class_type + '_' + str(args.r) + '.p'
+out = os.path.join(out_dir, args.class_type + '_' + str(args.r) + '.p')
 print('Saving losses to: ', out)
-pkl.dump(losses, open(out, 'wb'))
+pkl.dump(results, open(out, 'wb'))
