@@ -51,6 +51,7 @@ parser.add_argument('--prune-lr-decay', type=float, default=0.1, help='LR decay 
 parser.add_argument('--prune-factor', type=float, default=1, help='Factor by which to prune')
 parser.add_argument('--prune-iters', type=int, default=1, help='Number of pruning iters')
 parser.add_argument('--save-model', action='store_false', help='Whether to save best model')
+parser.add_argument('--data-dir', default='../../../datasets/', help='Data directory')
 
 # out_dir = '../..'
 out_dir = os.path.dirname(pytorch_root) # repo root
@@ -82,7 +83,7 @@ def save_args(args, results_dir):
 
 def mlp(args):
     for train_frac in args.train_frac:
-        dataset = DatasetLoaders(args.dataset, args.val_frac, args.transform, train_frac, args.batch_size)
+        dataset = DatasetLoaders(args.dataset, args.data_dir, args.val_frac, args.transform, train_frac, args.batch_size)
         model = construct_model(nets[args.model], dataset.in_size, dataset.out_size, args)
 
         for lr, mom in itertools.product(args.lr, args.mom):

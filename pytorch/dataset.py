@@ -12,45 +12,44 @@ import utils
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def get_dataset(dataset_name, transform):
+def get_dataset(dataset_name, data_dir, transform):
     """
     Get paths of datasets.
     """
-    prefix = '/dfs/scratch1/thomasat/datasets/'
     if dataset_name == 'mnist':
-        train_loc = os.path.join(prefix, 'mnist/train_normalized')
-        test_loc = os.path.join(prefix, 'mnist/test_normalized')
+        train_loc = os.path.join(data_dir, 'mnist/train_normalized')
+        test_loc = os.path.join(data_dir, 'mnist/test_normalized')
     elif dataset_name == 'cifar10':
-        train_loc = os.path.join(prefix, 'cifar10_combined/train')
-        test_loc = os.path.join(prefix, 'cifar10_combined/test')
+        train_loc = os.path.join(data_dir, 'cifar10_combined/train')
+        test_loc = os.path.join(data_dir, 'cifar10_combined/test')
     elif dataset_name == 'cifar10mono':
-        train_loc = os.path.join(prefix, 'cifar10_combined/train_grayscale')
-        test_loc = os.path.join(prefix, 'cifar10_combined/test_grayscale')
+        train_loc = os.path.join(data_dir, 'cifar10_combined/train_grayscale')
+        test_loc = os.path.join(data_dir, 'cifar10_combined/test_grayscale')
     elif dataset_name.startswith('mnist_noise'):
         idx = dataset_name[-1]
-        train_loc = os.path.join(prefix,'mnist_noise/train_' + str(idx))
-        test_loc = os.path.join(prefix,'mnist_noise/test_' + str(idx))
+        train_loc = os.path.join(data_dir,'mnist_noise/train_' + str(idx))
+        test_loc = os.path.join(data_dir,'mnist_noise/test_' + str(idx))
     elif dataset_name == 'norb':
-        train_loc = os.path.join(prefix,'norb_full/processed_py2_train_32.pkl')
-        test_loc = os.path.join(prefix,'norb_full/processed_py2_test_32.pkl')
+        train_loc = os.path.join(data_dir,'norb_full/processed_py2_train_32.pkl')
+        test_loc = os.path.join(data_dir,'norb_full/processed_py2_test_32.pkl')
     elif dataset_name == 'rect_images': #TODO
-        train_loc = os.path.join(prefix, 'rect_images/rectangles_im_train.amat')
-        test_loc = os.path.join(prefix, 'rect_images/rectangles_im_test.amat')
+        train_loc = os.path.join(data_dir, 'rect_images/rectangles_im_train.amat')
+        test_loc = os.path.join(data_dir, 'rect_images/rectangles_im_test.amat')
     elif dataset_name == 'rect':
-        train_loc = os.path.join(prefix,'rect/train_normalized')
-        test_loc = os.path.join(prefix, 'rect/test_normalized')
+        train_loc = os.path.join(data_dir,'rect/train_normalized')
+        test_loc = os.path.join(data_dir, 'rect/test_normalized')
     elif dataset_name == 'convex':
-        train_loc = os.path.join(prefix, 'convex/train_normalized')
-        test_loc = os.path.join(prefix, 'convex/test_normalized')
+        train_loc = os.path.join(data_dir, 'convex/train_normalized')
+        test_loc = os.path.join(data_dir, 'convex/test_normalized')
     elif dataset_name == 'mnist_rand_bg': #TODO
-        train_loc = os.path.join(prefix, 'mnist_rand_bg/mnist_background_random_train.amat')
-        test_loc = os.path.join(prefix, 'mnist_rand_bg/mnist_background_random_test.amat')
+        train_loc = os.path.join(data_dir, 'mnist_rand_bg/mnist_background_random_train.amat')
+        test_loc = os.path.join(data_dir, 'mnist_rand_bg/mnist_background_random_test.amat')
     elif dataset_name == 'mnist_bg_rot':
-        train_loc = os.path.join(prefix, 'mnist_bg_rot/train_normalized')
-        test_loc = os.path.join(prefix, 'mnist_bg_rot/test_normalized')
+        train_loc = os.path.join(data_dir, 'mnist_bg_rot/train_normalized')
+        test_loc = os.path.join(data_dir, 'mnist_bg_rot/test_normalized')
     elif dataset_name == 'mnist_bg_rot_swap':
-        train_loc = os.path.join(prefix, 'mnist_bg_rot/test_normalized')
-        test_loc = os.path.join(prefix, 'mnist_bg_rot/train_normalized')
+        train_loc = os.path.join(data_dir, 'mnist_bg_rot/test_normalized')
+        test_loc = os.path.join(data_dir, 'mnist_bg_rot/train_normalized')
     #TODO handle iwslt, copy tasks
     # TODO smallnorb, timit
     else:
@@ -118,13 +117,13 @@ def split_train_val(train_X, train_Y, val_fraction, train_fraction=None):
 
 
 
-def create_data_loaders(dataset_name, transform, train_fraction, val_fraction, batch_size):
+def create_data_loaders(dataset_name, data_dir, transform, train_fraction, val_fraction, batch_size):
     if device.type == 'cuda':
         loader_args = {'num_workers': 16, 'pin_memory': True}
     else:
         loader_args = {'num_workers': 4, 'pin_memory': False}
 
-    train_X, train_Y, test_X, test_Y, in_size, out_size = get_dataset(dataset_name, transform) # train/test data, input/output size
+    train_X, train_Y, test_X, test_Y, in_size, out_size = get_dataset(dataset_name, data_dir, transform) # train/test data, input/output size
     # train_X, train_Y = postprocess(transform, train_X, train_Y)
     # test_X, test_Y = postprocess(transform, test_X, test_Y)
 
@@ -147,12 +146,13 @@ def create_data_loaders(dataset_name, transform, train_fraction, val_fraction, b
 
 
 class DatasetLoaders:
-    def __init__(self, name, val_fraction, transform=None, train_fraction=None, batch_size=50):
+    def __init__(self, name, data_dir, val_fraction, transform=None, train_fraction=None, batch_size=50):
         if name.startswith('true'):
             # TODO: Add support for synthetic datasets back. Possibly should be split into separate class
             self.loss = utils.mse_loss
         else:
-            self.train_loader, self.val_loader, self.test_loader, self.in_size, self.out_size = create_data_loaders(name, transform, train_fraction, val_fraction, batch_size)
+            self.train_loader, self.val_loader, self.test_loader, self.in_size, self.out_size = create_data_loaders(name,
+                data_dir, transform, train_fraction, val_fraction, batch_size)
             self.loss = utils.cross_entropy_loss
 
 
