@@ -19,6 +19,7 @@ parser.add_argument('--batch-size', type=int, default=50, metavar='N',
                     help='input batch size for training (default: 128)') #128
 parser.add_argument('--name', default='')
 parser.add_argument('--result-dir', default='../../../results/vae/')
+parser.add_argument('--data-dir', default='../../../../datasets/mnist/')
 parser.add_argument('--layer-size',type=int, default=784)
 parser.add_argument('--class_type', default='unconstrained')
 parser.add_argument('--lr',type=float, default=1e-3)
@@ -39,8 +40,6 @@ torch.manual_seed(args.seed)
 
 device = torch.device("cuda" if args.cuda else "cpu")
 
-data_dir = '/dfs/scratch1/thomasat/datasets/mnist/'
-
 # Make results dir
 out_dir = os.path.join(args.result_dir, args.name)
 if not os.path.exists(out_dir):
@@ -48,11 +47,11 @@ if not os.path.exists(out_dir):
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 train_loader = torch.utils.data.DataLoader(
-    datasets.MNIST(data_dir, train=True, download=True,
+    datasets.MNIST(args.data_dir, train=True, download=True,
                    transform=transforms.ToTensor()),
     batch_size=args.batch_size, shuffle=True, **kwargs)
 test_loader = torch.utils.data.DataLoader(
-    datasets.MNIST(data_dir, train=False, transform=transforms.ToTensor()),
+    datasets.MNIST(args.data_dir, train=False, transform=transforms.ToTensor()),
     batch_size=args.batch_size, shuffle=True, **kwargs)
 
 
