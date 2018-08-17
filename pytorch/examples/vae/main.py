@@ -3,21 +3,23 @@ Modified from pytorch/examples/vae to demonstrate 'StructuredLinear' usage.
 """
 
 from __future__ import print_function
-import argparse, sys
+import argparse, sys, os
 import torch
 import torch.utils.data
 from torch import nn, optim
 from torch.nn import functional as F
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
-sys.path.insert(0, '../pytorch/')
-from structured_layer import StructuredLinear
+sys.path.insert(0, '../../../pytorch/')
+from mlp.nets import class_map
 import pickle as pkl
 
 parser = argparse.ArgumentParser(description='VAE MNIST Example')
 parser.add_argument('--batch-size', type=int, default=50, metavar='N',
                     help='input batch size for training (default: 128)') #128
 parser.add_argument('--name', default='')
+parser.add_argument('--result-dir', default='../../../results/vae/')
+parser.add_argument('--layer-size',type=int, default=784)
 parser.add_argument('--class_type', default='unconstrained')
 parser.add_argument('--r',type=int, default=1)
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
@@ -37,7 +39,11 @@ torch.manual_seed(args.seed)
 device = torch.device("cuda" if args.cuda else "cpu")
 
 data_dir = '/dfs/scratch1/thomasat/datasets/mnist/'
-results_dir = '/dfs/scratch1/thomasat/results/vae_mnist/'
+
+# Make results dir
+out_dir = os.path.join(args.result_dir, args.name)
+if not os.path.exists(out_dir):
+    os.makedirs(out_dir)
 
 kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 train_loader = torch.utils.data.DataLoader(
@@ -52,8 +58,8 @@ test_loader = torch.utils.data.DataLoader(
 class VAE(nn.Module):
     def __init__(self):
         super(VAE, self).__init__()
-
-        self.fc1 = StructuredLinear(class_type=args.class_type,r=args.r,layer_size=784)#nn.Linear(784, 784)
+        # Check bias
+        self.fc1 = class_map[args.class_type](layer_size=args.layer_size, r=args.r, bias=False)
         self.fc21 = nn.Linear(784, 20)
         self.fc22 = nn.Linear(784, 20)
         self.fc3 = nn.Linear(20, 400)
@@ -136,28 +142,26 @@ def test(epoch):
                 comparison = torch.cat([data[:n],
                                       recon_batch.view(args.batch_size, 1, 28, 28)[:n]])
                 save_image(comparison.cpu(),
-                         results_dir + 'reconstruction_' + str(epoch) + '.png', nrow=n)
+                         args.result_dir + 'reconstruction_' + str(epoch) + '.png', nrow=n)
 
     test_loss /= len(test_loader.dataset)
     print('====> Test set loss: {:.4f}'.format(test_loss))
     return test_loss
 
 train_losses = []
-test_losses = []
 for epoch in range(1, args.epochs + 1):
     train_losses.append(train(epoch))
-    test_losses.append(test(epoch))
+    test_losses = test(epoch)
     with torch.no_grad():
         sample = torch.randn(64, 20).to(device)
         sample = model.decode(sample).cpu()
         save_image(sample.view(64, 1, 28, 28),
-                   results_dir + '/sample_' + str(epoch) + '.png')
+                   args.result_dir + '/sample_' + str(epoch) + '.png')
 
-stuff = {}
-stuff['train'] = train_losses
-stuff['test'] = test_losses
+results = {}
+results['train'] = train_losses
+results['test'] = test_loss
 
-save_name = args.name + '_' + args.class_type + '_' + str(args.r) + '_' + str(args.epochs)
-out = results_dir + save_name
-print('Saving to: ', out)
-pkl.dump(stuff, open(out, 'wb'))
+out_filename = os.path.join(out_dir, args.class_type + '_r' + str(args.r) + '_e' + str(args.epochs))
+print('Saving to: ', out_filename)
+pkl.dump(results, open(out_filename, 'wb'))
