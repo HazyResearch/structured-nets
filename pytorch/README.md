@@ -2,11 +2,11 @@
 
 structure/ contains code for matrix multiplication and gradient computation for various structured matrix classes, as well as PyTorch layers for them.
 
-## MLP
+## Usage
 
 Example command:
 ```
-python mlp/main.py --dataset mnist_noise_1 --result-dir test --lr 1e-3 --epochs 10 model SHL --class-type toeplitz
+python main.py --dataset mnist_noise_1 --result-dir test --lr 1e-3 --epochs 10 model SHL --class-type toeplitz
 ```
 runs a single hidden layer model with a Toeplitz-like matrix of equal dimensions to the dataset input size.
 The dataset is expected to already be stored at ../../../datasets/{name}. See scripts/data for example preprocessing scripts.
@@ -26,7 +26,6 @@ For general parameters including model params, this feature can be handled with 
 ` parallel python mlp/main.py ... MLP model SHL --class-type ::: t sd ::: -r ::: 1 4 16 `
 runs Toeplitz-like and LDR subdiagonal ranks 1,4,16.
 
+## Other Tasks
 
-## Other tasks
-
-Probably broken right now
+See <a href="https://github.com/thomasat/structured_matrices/tree/master/pytorch/examples" rel="nofollow">here</a> for examples of using a structured layer in additional architectures.
