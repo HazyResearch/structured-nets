@@ -10,7 +10,7 @@ import torch
 from torch.optim.lr_scheduler import StepLR
 from inspect import signature
 
-# add PyTorch root to path
+# Add PyTorch root to path
 pytorch_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, pytorch_root)
 from dataset import DatasetLoaders
@@ -32,7 +32,6 @@ parser.add_argument('--transform', default='none', help='Any transform of datase
 parser.add_argument('--train-frac', type=float, nargs='+', default=[None])
 parser.add_argument('--val-frac', type=float, default=0.15)
 parser.add_argument("--result-dir", help='Where to save results')
-# parser.add_argument('--restore', type=int, default=0, help='Whether to restore from latest checkpoint')
 parser.add_argument('--trials', type=int, default=1, help='Number of independent runs')
 parser.add_argument('--trial-id', type=int, nargs='+', help='Specify trial numbers; alternate to --trials')
 parser.add_argument('--batch-size', type=int, default=50, help='Batch size')
@@ -42,7 +41,6 @@ parser.add_argument('--lr', nargs='+', type=float, default=[1e-3], help='Learnin
 parser.add_argument('--mom', nargs='+', type=float, default=[0.9], help='Momentums')
 parser.add_argument('--lr-decay', type=float, default=1.0)
 parser.add_argument('--log-freq', type=int, default=100)
-# parser.add_argument('--steps', type=int, help='Steps')
 parser.add_argument('--test', action='store_false', help='Toggle testing on test set')
 parser.add_argument('--prune', action='store_true', help='Whether to do pruning')
 parser.add_argument('--prune-lr-decay', type=float, default=0.1, help='LR decay factor in each pruning iter')
@@ -51,7 +49,7 @@ parser.add_argument('--prune-iters', type=int, default=1, help='Number of prunin
 parser.add_argument('--save-model', action='store_false', help='Whether to save best model')
 parser.add_argument('--data-dir', default='../../datasets/', help='Data directory')
 
-out_dir = os.path.dirname(pytorch_root) # repo root
+out_dir = os.path.dirname(pytorch_root) # Repo root
 
 # seed = 0
 # np.random.seed(seed)
@@ -90,7 +88,7 @@ def mlp(args):
                     + '_ep' + str(args.epochs) \
                     + '_' + str(args.dataset) \
                     + '_vf' + str(args.val_frac)
-                    # + '_steps' + str(steps)
+
             if train_frac is not None:
                 run_name += '_tf' + str(train_frac)
 
@@ -105,7 +103,6 @@ def mlp(args):
                 log_path = os.path.join(out_dir, 'tensorboard', args.result_dir, run_name, str(trial_iter))
                 checkpoint_path = os.path.join(out_dir, 'checkpoints', args.result_dir, run_name, str(trial_iter))
                 result_path = os.path.join(results_dir, str(trial_iter))
-                # vis_path = os.path.join(out_dir, 'vis', args.result_dir, run_iter_name)
 
                 model.reset_parameters()
                 if args.optim == 'sgd':
@@ -129,9 +126,7 @@ def mlp(args):
                         log_path, checkpoint_path, result_path, args.test, args.save_model)
 
 
-## parse
-
-# task
+## Parse
 parser.set_defaults(task=mlp)
 # subparsers = parser.add_subparsers()
 # mlp_parser = subparsers.add_parser('MLP')
@@ -141,13 +136,13 @@ parser.set_defaults(task=mlp)
 model_options = []
 nets = {}
 for model in descendants(ArghModel):
-    # change the names so argh can create parsers
+    # Change the names so argh can create parsers
     model.args.__name__ = model.__name__
     model_options.append(model.args)
     nets[model.__name__] = model
 argh.add_commands(parser, model_options, namespace='model', namespace_kwargs={'dest': 'model'})
 for model in ArghModel.__subclasses__():
-    # change names back
+    # Change names back
     model.args.__name__ = 'args'
 
 
