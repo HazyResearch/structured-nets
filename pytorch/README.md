@@ -17,7 +17,7 @@ The dataset is expected to already be stored at `../../../datasets/{name}`. See 
 - Each model has its own parameters, which can be listed with `python main.py model {name} -h`
 - The class-type flag accepts a name of a structured class (e.g. 'toeplitz' or 'subdiagonal\_corner') or an abbreviation (e.g. 't' or 'sdc')
 
-### Multiple parameters
+### Multiple Parameters
 main.py supports passing in multiple parameters for certain optimizer hyperparameters, and it will search over all combinations. For example,
 ` python main.py ... --lr 1e-3 2e-3 --mom 0.9 0.99 ... `
 will search over 4 combinations of parameters.
