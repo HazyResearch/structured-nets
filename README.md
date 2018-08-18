@@ -4,7 +4,7 @@ Learning with structured matrices
 ## Requirements
 Python 3.6+
 
-pytorch>=0.4.1
+PyTorch >=0.4.1
 
 ## Installing CUDA Extensions
 Some of the functions are written in CUDA for speed. To install them:

@@ -1,3 +1,5 @@
+## License
+
 Part of the code in this directory has been replicated from pytorch/examples/word_language_model
 and pytorch/examples/vae to demonstrate 'StructuredLinear' usage.
 
@@ -25,3 +27,11 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## VAE
+
+See the <a href="https://github.com/pytorch/examples/tree/master/vae" rel="nofollow">PyTorch documentation</a> for additional information.
+
+## LSTM
+
+See the <a href="https://github.com/pytorch/examples/tree/master/word_language_model" rel="nofollow">PyTorch documentation</a> for additional information.

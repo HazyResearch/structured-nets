@@ -2,14 +2,14 @@
 
 structure/ contains code for matrix multiplication and gradient computation for various structured matrix classes, as well as PyTorch layers for them.
 
-## Usage
+## Example Usage
 
 Example command:
 ```
 python main.py --dataset mnist_noise_1 --result-dir test --lr 1e-3 --epochs 10 model SHL --class-type toeplitz
 ```
 runs a single hidden layer model with a Toeplitz-like matrix of equal dimensions to the dataset input size.
-The dataset is expected to already be stored at ../../../datasets/{name}. See scripts/data for example preprocessing scripts.
+The dataset is expected to already be stored at ../../../datasets/{name}. See ../scripts/data for example preprocessing scripts, and models/nets.py for additional models.
 
 ### Flags
 - Dataset, training, and optimizer flags are listed with `python mlp/main.py -h`
