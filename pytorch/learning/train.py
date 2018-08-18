@@ -9,14 +9,12 @@ from tensorboardX import SummaryWriter
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def test_split(net, dataloader, loss_fn):
-    # assert data_X.shape[0] == data_Y.shape[0]
     n = len(dataloader.dataset)
     total_loss = 0.0
     total_acc = 0.0
     for data in dataloader:
         batch_X, batch_Y = data
         batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
-        # print("lengths: ", len(dataloader), len(batch_X), len(batch_Y))
 
         output = net(batch_X)
         loss_batch, acc_batch = loss_fn(output, batch_Y)
@@ -30,11 +28,9 @@ def train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, che
     test, save_model, epoch_offset=0):
     logging.debug('Tensorboard log path: ' + log_path)
     logging.debug('Tensorboard checkpoint path: ' + checkpoint_path)
-    # logging.debug('Tensorboard vis path: ' + vis_path)
     logging.debug('Results directory: ' + result_path)
 
     os.makedirs(checkpoint_path, exist_ok=True)
-    # os.makedirs(vis_path, exist_ok=True)
 
     writer = SummaryWriter(log_path)
     net.to(device)
@@ -44,8 +40,6 @@ def train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, che
     for name, param in net.named_parameters():
         if param.requires_grad:
             logging.debug(('Parameter name, shape: ', name, param.data.shape))
-
-    # steps_in_epoch = int(np.ceil(dataset.train_X.shape[0] / params.batch_size))
 
     losses = {'Train': [], 'Val': [], 'DR': [], 'ratio': [], 'Test':[]}
     accuracies = {'Train': [], 'Val': [], 'Test':[]}
@@ -65,24 +59,20 @@ def train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, che
         logging.debug(f"{name} loss, accuracy: {loss:.6f}, {acc:.6f}")
 
 
-    # compute initial stats
+    # Compute initial stats
     t1 = time.time()
     init_loss, init_accuracy = test_split(net, dataset.val_loader, dataset.loss)
     log_stats('Initial', 'Val', init_loss, init_accuracy, epoch_offset)
 
-    # print("length of dataloader: ", len(dataset.train_loader))
     for epoch in range(epochs):
         logging.debug('Starting epoch ' + str(epoch+epoch_offset))
         for step, data in enumerate(dataset.train_loader, 0):
-        # get the inputs
+            # Get the inputs
             batch_xs, batch_ys = data
             batch_xs, batch_ys = batch_xs.to(device), batch_ys.to(device)
 
-            # batch_xs, batch_ys = dataset.batch(params.batch_size, step)
-            # batch_xs, batch_ys = Variable(torch.FloatTensor(batch_xs).cuda()), Variable(torch.FloatTensor(batch_ys).cuda())
-            optimizer.zero_grad()   # zero the gradient buffers
+            optimizer.zero_grad()   # Zero the gradient buffers
 
-            # output = net.forward(batch_xs)
             output = net(batch_xs)
             train_loss, train_accuracy = dataset.loss(output, batch_ys)
             train_loss += net.loss()
@@ -90,7 +80,7 @@ def train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, che
 
             optimizer.step()
 
-            # log training every log_freq steps
+            # Log training every log_freq steps
             total_step = (epoch + epoch_offset)*len(dataset.train_loader) + step+1
             if total_step % log_freq == 0:
                 logging.debug(('Time: ', time.time() - t1))
@@ -99,7 +89,7 @@ def train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, che
 
                 log_stats('Train', 'Train', train_loss.data.item(), train_accuracy.data.item(), total_step)
 
-        # validate and checkpoint by epoch
+        # Validate and checkpoint by epoch
         # Test on validation set
         val_loss, val_accuracy = test_split(net, dataset.val_loader, dataset.loss)
         log_stats('Validation', 'Val', val_loss, val_accuracy, epoch+epoch_offset+1)
@@ -110,9 +100,8 @@ def train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, che
         for param_group in optimizer.param_groups:
             logging.debug('Current LR: ' + str(param_group['lr']))
 
-        # record best model
+        # Record best model
         if val_accuracy > best_val_acc:
-            # save_path = os.path.join(params.checkpoint_path, str(step))
             if save_model:
                 save_path = os.path.join(checkpoint_path, 'best')
                 with open(save_path, 'wb') as f:
@@ -128,7 +117,7 @@ def train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, che
 
             best_val_acc = val_accuracy
 
-    # save last checkpoint
+    # Save last checkpoint
     save_path = os.path.join(checkpoint_path, 'last')
     with open(save_path, 'wb') as f:
         torch.save(net.state_dict(), f)
