@@ -30,8 +30,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## VAE
 
+Example command:
+```
+python main.py --class-type toeplitz
+```
+
 See the <a href="https://github.com/pytorch/examples/tree/master/vae" rel="nofollow">PyTorch documentation</a> for additional information.
 
 ## LSTM
+
+Example command:
+```
+python main.py --cuda --tied --nhid=128 --emsize=128 --log-interval=5 --class_type=toeplitz
+```
 
 See the <a href="https://github.com/pytorch/examples/tree/master/word_language_model" rel="nofollow">PyTorch documentation</a> for additional information.

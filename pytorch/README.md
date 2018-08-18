@@ -8,7 +8,7 @@ Example command:
 ```
 python main.py --dataset mnist_noise_1 --result-dir test --lr 1e-3 --epochs 10 model SHL --class-type toeplitz
 ```
-runs a single hidden layer model with a Toeplitz-like matrix of equal dimensions to the dataset input size.
+runs a single hidden layer model with the hidden layer constrained to be a Toeplitz-like matrix of equal dimensions to the dataset input size.
 The dataset is expected to already be stored at ../../../datasets/{name}. See ../scripts/data for example preprocessing scripts, and models/nets.py for additional models.
 
 ### Flags

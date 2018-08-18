@@ -8,7 +8,7 @@ from torch.nn import init
 from torch.autograd import Variable
 import sys
 sys.path.insert(0, '../../../pytorch/')
-from mlp.nets import class_map
+from models.nets import class_map
 
 class LSTMCell(nn.Module):
     def __init__(self, class_type, r, input_size, hidden_size, use_bias=True):

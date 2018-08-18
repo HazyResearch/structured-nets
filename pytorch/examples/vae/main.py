@@ -11,7 +11,7 @@ from torch.nn import functional as F
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
 sys.path.insert(0, '../../../pytorch/')
-from mlp.nets import class_map
+from models.nets import class_map
 import pickle as pkl
 
 parser = argparse.ArgumentParser(description='VAE MNIST Example')
@@ -21,7 +21,7 @@ parser.add_argument('--name', default='')
 parser.add_argument('--result-dir', default='../../../results/vae/')
 parser.add_argument('--data-dir', default='../../../../datasets/mnist/')
 parser.add_argument('--layer-size',type=int, default=784)
-parser.add_argument('--class_type', default='unconstrained')
+parser.add_argument('--class-type', default='unconstrained')
 parser.add_argument('--lr',type=float, default=1e-3)
 parser.add_argument('--r',type=int, default=1)
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
