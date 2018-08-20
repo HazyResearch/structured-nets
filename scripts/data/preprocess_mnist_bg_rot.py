@@ -1,3 +1,5 @@
+# Download from http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/DeepVsShallowComparisonICML2007
+
 import numpy as np
 import pickle as pkl
 from sklearn.preprocessing import OneHotEncoder
