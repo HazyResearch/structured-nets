@@ -1,3 +1,5 @@
+# From https://github.com/ndrplz/small_norb/blob/master/smallnorb/dataset.py
+
 import struct
 import numpy as np
 import matplotlib.pyplot as plt

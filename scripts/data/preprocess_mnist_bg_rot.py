@@ -1,6 +1,6 @@
 import numpy as np
 import pickle as pkl
-from sklearn.preprocessing import OneHotEncoder 
+from sklearn.preprocessing import OneHotEncoder
 from data_utils import normalize_data, apply_normalization
 
 def process_data(data):

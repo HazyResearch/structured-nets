@@ -1,9 +1,11 @@
 import numpy as np
 import pickle as pkl
 import os
-from sklearn.preprocessing import OneHotEncoder                                                                
+from sklearn.preprocessing import OneHotEncoder
 import matplotlib.pyplot as plt
 from data_utils import normalize_data, apply_normalization
+
+# Download from https://www.cs.toronto.edu/~kriz/cifar.html
 
 # Assumes 3 input channels
 # Converts to grayscale
@@ -11,7 +13,7 @@ def convert_grayscale(data, img_size=32):
     n = data.shape[0]
     channel_size = int(data.shape[1]/3)
     print('channel_size:', channel_size)
-    im_r = data[:, 0:channel_size].reshape((n, img_size, img_size))             
+    im_r = data[:, 0:channel_size].reshape((n, img_size, img_size))
     im_g = data[:, channel_size:2*channel_size].reshape((n, img_size, img_size))
     im_b = data[:, 2*channel_size:].reshape((n, img_size, img_size))
     img = np.stack((im_r, im_g, im_b), axis=-1)
@@ -51,7 +53,7 @@ train_Y = []
 enc = OneHotEncoder()
 
 for i in range(train_batches):
-    this_batch_loc = os.path.join(data_dir, 'data_batch_' + str(i+1)) 
+    this_batch_loc = os.path.join(data_dir, 'data_batch_' + str(i+1))
     X,Y = load_data(this_batch_loc)
     train_X.append(X)
     train_Y.append(Y)
@@ -64,7 +66,7 @@ train_Y = np.vstack(train_Y)
 train_X, mean, sd = normalize_data(train_X)
 
 # Shuffle
-idx = np.arange(0, train_X.shape[0])  
+idx = np.arange(0, train_X.shape[0])
 np.random.shuffle(idx)
 train_X = train_X[idx,:]
 train_Y = train_Y[idx,:]

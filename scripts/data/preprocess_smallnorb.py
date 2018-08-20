@@ -1,3 +1,5 @@
+# Download from https://cs.nyu.edu/~ylclab/data/norb-v1.0-small/
+
 import sys
 import pickle as pkl
 sys.path.insert(0, '../../')

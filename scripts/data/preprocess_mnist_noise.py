@@ -1,7 +1,9 @@
 import numpy as np
 import pickle as pkl
-from sklearn.preprocessing import OneHotEncoder 
+from sklearn.preprocessing import OneHotEncoder
 from data_utils import normalize_data, apply_normalization
+
+# Download from http://www.iro.umontreal.ca/~lisa/twiki/bin/view.cgi/Public/DeepVsShallowComparisonICML2007
 
 n_variations = 6
 for idx in np.arange(1, n_variations+1):
