@@ -356,3 +356,23 @@ class SHL(SL):
 
     def forward(self, x):
         return self.W2(F.relu(self.W(x)))
+
+class MLP(ArghModel):
+    """
+    Multi layer fully connected net.
+    """
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=False, num_layers=1): pass
+    def reset_parameters(self):
+        if self.layer_size == -1:
+            self.layer_size = self.in_size
+        layers = []
+        for layer in range(self.num_layers):
+            layers.append(class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias))
+        self.layers = nn.ModuleList(layers)
+        self.W2 = nn.Linear(self.layer_size, self.out_size)
+
+    def forward(self, x):
+        output = F.relu(self.layers[0](x))
+        for i in range(self.num_layers-1):
+            output = F.relu(self.layers[i](output))
+        return self.W2(output)
