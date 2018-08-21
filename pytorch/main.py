@@ -116,8 +116,8 @@ def mlp(args):
                 lr_scheduler = StepLR(optimizer, step_size=1, gamma=args.lr_decay)
 
                 if args.prune:
-                    # Is there a better way to enforce pruning only for unconstrained?
-                    assert model.class_type in ['unconstrained', 'u']
+                    # Is there a better way to enforce pruning only for unconstrained and MLP?
+                    assert model.class_type in ['unconstrained', 'u'] and args.model == 'MLP'
                     prune.prune(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq, log_path,
                         checkpoint_path, result_path, args.test, args.save_model, args.prune_lr_decay, args.prune_factor,
                         args.prune_iters)

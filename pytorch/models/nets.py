@@ -361,7 +361,7 @@ class MLP(ArghModel):
     """
     Multi layer fully connected net.
     """
-    def args(class_type='unconstrained', layer_size=-1, r=1, bias=False, num_layers=1): pass
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True, num_layers=1): pass
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
