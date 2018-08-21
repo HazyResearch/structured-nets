@@ -166,6 +166,9 @@ def postprocess(transform, X, Y=None):
         assert X.shape[1] == 784
         print(X.shape, type(X))
         X = np.pad(X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
+    if 'randomize' in transform:
+        assert Y is not None
+        np.random.shuffle(Y)
     return X, Y
 
 def augment(self, X, Y=None):
