@@ -361,6 +361,8 @@ class MLP(ArghModel):
     """
     Multi layer fully connected net.
     """
+    def name(self):
+        return self.layers[0].name()
     def args(class_type='unconstrained', layer_size=-1, r=1, bias=True, num_layers=1): pass
     def reset_parameters(self):
         if self.layer_size == -1:
@@ -374,5 +376,5 @@ class MLP(ArghModel):
     def forward(self, x):
         output = F.relu(self.layers[0](x))
         for i in range(self.num_layers-1):
-            output = F.relu(self.layers[i](output))
+            output = F.relu(self.layers[i+1](output))
         return self.W2(output)
