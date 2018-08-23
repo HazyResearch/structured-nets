@@ -118,11 +118,11 @@ def train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, che
             best_val_acc = val_accuracy
 
     # Save last checkpoint
-    save_path = os.path.join(checkpoint_path, 'last')
-    with open(save_path, 'wb') as f:
-        torch.save(net.state_dict(), f)
-    logging.debug(("Last model saved in file: %s" % save_path))
-
+    if save_model:
+        save_path = os.path.join(checkpoint_path, 'last')
+        with open(save_path, 'wb') as f:
+            torch.save(net.state_dict(), f)
+        logging.debug(("Last model saved in file: %s" % save_path))
 
     # Test trained model
     if test:
@@ -133,6 +133,7 @@ def train(dataset, net, optimizer, lr_scheduler, epochs, log_freq, log_path, che
 
             test_loss, test_accuracy = test_split(net, dataset.test_loader, dataset.loss)
             log_stats('Test', 'Test', test_loss, test_accuracy, 0)
+
         else:
             log_stats('Test', 'Test', test_loss_of_best_val, test_acc_of_best_val, 0)
 
