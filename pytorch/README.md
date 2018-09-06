@@ -28,4 +28,4 @@ runs Toeplitz-like and LDR subdiagonal ranks 1,4,16.
 
 ## Other Tasks
 
-See <a href="https://github.com/thomasat/structured_matrices/tree/master/pytorch/examples" rel="nofollow">here</a> for examples of using a structured layer in additional architectures.
+See <a href="https://github.com/HazyResearch/structured-nets/tree/master/pytorch/examples" rel="nofollow">here</a> for examples of using a structured layer in additional architectures.
