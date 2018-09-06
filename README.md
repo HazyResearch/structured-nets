@@ -19,4 +19,4 @@ python setup.py install
 
 ## Example Usage
 
-See <a href="https://github.com/thomasat/structured_matrices/tree/master/pytorch" rel="nofollow">our PyTorch section</a>.
+See <a href="https://github.com/HazyResearch/structured-nets/tree/master/pytorch" rel="nofollow">our PyTorch section</a>.
