@@ -19,11 +19,8 @@ class LSTMCell(nn.Module):
         self.class_type = class_type
         self.r = r
 
-        # Replace W_ii, W_if, W_ig, W_io with structured matrices
-        self.W_ii = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
-        self.W_if = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
-        self.W_ig = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
-        self.W_io = class_map[class_type](layer_size=hidden_size, r=r, bias=False)
+        # Replace W_ih with structured matrices
+        self.W_ih = class_map[class_type](layer_size=4*hidden_size, r=r, bias=False)
 
         self.W_hh = nn.Parameter(
             torch.FloatTensor(hidden_size, 4 * hidden_size))
@@ -47,11 +44,10 @@ class LSTMCell(nn.Module):
         bias_batch = (self.bias.unsqueeze(0)
                       .expand(batch_size, *self.bias.size()))
         wh_b = torch.addmm(bias_batch, h_0, self.W_hh)
-        wi_i = self.W_ii(input_)
-        wi_f = self.W_if(input_)
-        wi_g = self.W_ig(input_)
-        wi_o = self.W_io(input_)
-        wi = torch.cat((wi_i, wi_f, wi_g, wi_o), 1)
+        z = torch.zeros(input_.size(0),3*self.hidden_size).cuda()
+        input_padded = torch.cat((input_, z), dim=1)
+        wi = self.W_ih(input_padded)
+
         f, i, o, g = torch.split(wh_b + wi,
                                  split_size_or_sections=self.hidden_size, dim=1)
         c_1 = torch.sigmoid(f)*c_0 + torch.sigmoid(i)*torch.tanh(g)
