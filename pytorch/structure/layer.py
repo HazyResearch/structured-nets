@@ -42,12 +42,22 @@ class Unconstrained(StructuredLinear):
     class_type = 'unconstrained'
     abbrev = 'u'
 
+    def name(self):
+        return self.__class__.abbrev + str(self.hidden_size)
+
+    def __init__(self, layer_size, hidden_size=None, **kwargs):
+        if hidden_size is None:
+            hidden_size = layer_size
+        super().__init__(layer_size, hidden_size=hidden_size, **kwargs)
+
     def reset_parameters(self):
         super().reset_parameters()
-        self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
+        self.W = Parameter(torch.Tensor(self.layer_size, self.hidden_size))
         self.init_stddev = np.sqrt(1./self.layer_size)
         torch.nn.init.normal_(self.W, std=self.init_stddev)
         self.mask = None
+        if self.bias:
+            self.b = Parameter(torch.zeros(self.hidden_size))
 
     def set_mask(self, mask, device):
         self.mask = Variable(torch.FloatTensor(mask).to(device), requires_grad=False)
@@ -217,8 +227,8 @@ class LDRSubdiagonal(LearnedOperator):
             self.subd_B = Parameter(torch.ones(self.layer_size-1))
 
     def forward(self, x):
-        # out = kry.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
-        out = kry.subdiag_mult_conv(self.subd_A, self.subd_B, self.G, self.H, x)
+        out = kry.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
+        #out = kry.subdiag_mult_conv(self.subd_A, self.subd_B, self.G, self.H, x)
         return self.apply_bias(out)
 
 class LDRSubdiagonalC(LDRSubdiagonal):
