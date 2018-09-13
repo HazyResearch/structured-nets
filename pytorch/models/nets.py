@@ -7,15 +7,6 @@ from torch.nn.parameter import Parameter
 
 import structure.LDR as ldr
 import structure.layer as sl
-from utils import descendants
-
-
-# create a map from structured class names to the Python class
-class_map = {}
-for cls in descendants(sl.StructuredLinear):
-    if cls.class_type is None: continue
-    class_map[cls.class_type] = cls
-    class_map[cls.abbrev] = cls
 
 
 def construct_model(cls, in_size, out_size, args):
@@ -97,7 +88,7 @@ class CNN(ArghModel):
         self.conv1 = nn.Conv2d(1, 6, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
-        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.W = sl.StructuredLinear(self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias)
         self.logits = nn.Linear(self.layer_size, self.out_size)
 
     def name(self):
@@ -123,7 +114,7 @@ class CNNColor(ArghModel):
         self.conv1 = nn.Conv2d(3, 6, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
-        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.W = sl.StructuredLinear(self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias)
         self.logits = nn.Linear(self.layer_size, self.out_size)
 
     def name(self):
@@ -206,7 +197,7 @@ class WLDRFC(ArghModel):
     def args(class_type='unconstrained', layer_size=-1, r=1, fc_size = 512): pass
     def reset_parameters(self):
         if self.layer_size == -1: self.layer_size = self.in_size
-        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r)
+        self.W = sl.StructuredLinear(self.class_type, layer_size=self.layer_size, r=self.r)
         self.fc = nn.Linear(3*1024, self.fc_size)
         self.logits = nn.Linear(self.fc_size, 10)
 
@@ -265,14 +256,14 @@ class LDRLDR(ArghModel):
         if self.channels:
             self.LDR1 = ldr.LDR(self.class1, 3, 3, self.rank1, self.n)
         else:
-            self.LDR1 = class_map[self.class1](layer_size=3*self.n, r=self.rank1)
+            self.LDR1 = sl.StructuredLinear(self.class1, layer_size=3*self.n, r=self.rank1)
 
-        self.LDR211 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
-        self.LDR212 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
-        self.LDR221 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
-        self.LDR222 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
-        self.LDR231 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
-        self.LDR232 = class_map[self.class2](layer_size=self.fc_size, r=self.rank2)
+        self.LDR211 = sl.StructuredLinear(self.class2, layer_size=self.fc_size, r=self.rank2)
+        self.LDR212 = sl.StructuredLinear(self.class2, layer_size=self.fc_size, r=self.rank2)
+        self.LDR221 = sl.StructuredLinear(self.class2, layer_size=self.fc_size, r=self.rank2)
+        self.LDR222 = sl.StructuredLinear(self.class2, layer_size=self.fc_size, r=self.rank2)
+        self.LDR231 = sl.StructuredLinear(self.class2, layer_size=self.fc_size, r=self.rank2)
+        self.LDR232 = sl.StructuredLinear(self.class2, layer_size=self.fc_size, r=self.rank2)
         self.b = Parameter(torch.zeros(self.fc_size))
         self.logits = nn.Linear(self.fc_size, 10)
 
@@ -312,8 +303,8 @@ class LDRLDR2(ArghModel):
             self.layer_size = self.in_size
         self.n = self.layer_size
 
-        self.LDR1 = class_map[self.class1](layer_size=self.channels*self.n, r=self.rank1, bias=True)
-        self.LDR2 = class_map[self.class2](layer_size=self.channels*self.n, r=self.rank2, bias=True)
+        self.LDR1 = sl.StructuredLinear(self.class1, layer_size=self.channels*self.n, r=self.rank1, bias=True)
+        self.LDR2 = sl.StructuredLinear(self.class2,layer_size=self.channels*self.n, r=self.rank2, bias=True)
         self.logits = nn.Linear(self.fc_size, 10)
 
     def forward(self, x):
@@ -342,7 +333,7 @@ class SL(ArghModel):
             self.layer_size = self.in_size
         if self.hidden_size == -1:
             self.hidden_size = self.in_size
-        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias,
+        self.W = sl.StructuredLinear(self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias,
             hidden_size=self.hidden_size)
 
     def forward(self, x):
@@ -372,7 +363,7 @@ class MLP(ArghModel):
             self.layer_size = self.in_size
         layers = []
         for layer in range(self.num_layers):
-            layers.append(class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias))
+            layers.append(sl.StructuredLinear(self.class_type,layer_size=self.layer_size, r=self.r, bias=self.bias))
         self.layers = nn.ModuleList(layers)
         self.W2 = nn.Linear(self.layer_size, self.out_size)
 
