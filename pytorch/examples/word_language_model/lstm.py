@@ -8,7 +8,7 @@ from torch.nn import init
 from torch.autograd import Variable
 import sys
 sys.path.insert(0, '../../../pytorch/')
-from models.nets import class_map
+import structure.layer as sl
 
 class LSTMCell(nn.Module):
     def __init__(self, class_type, r, input_size, hidden_size, use_bias=True):
@@ -20,7 +20,7 @@ class LSTMCell(nn.Module):
         self.r = r
 
         # Replace W_ih with structured matrices
-        self.W_ih = class_map[class_type](layer_size=4*hidden_size, r=r, bias=False)
+        self.W_ih = sl.StructuredLinear(class_type, layer_size=4*hidden_size, r=r, bias=False)
 
         self.W_hh = nn.Parameter(
             torch.FloatTensor(hidden_size, 4 * hidden_size))

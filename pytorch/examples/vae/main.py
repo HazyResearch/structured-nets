@@ -11,7 +11,7 @@ from torch.nn import functional as F
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
 sys.path.insert(0, '../../../pytorch/')
-from models.nets import class_map
+import structure.layer as sl
 import pickle as pkl
 
 parser = argparse.ArgumentParser(description='VAE MNIST Example')
@@ -58,7 +58,7 @@ test_loader = torch.utils.data.DataLoader(
 class VAE(nn.Module):
     def __init__(self):
         super(VAE, self).__init__()
-        self.fc1 = class_map[args.class_type](layer_size=args.layer_size, r=args.r, bias=False)
+        self.fc1 = sl.StructuredLinear(class_type=args.class_type, layer_size=args.layer_size, r=args.r, bias=False)
         self.fc21 = nn.Linear(784, 20)
         self.fc22 = nn.Linear(784, 20)
         self.fc3 = nn.Linear(20, 400)
