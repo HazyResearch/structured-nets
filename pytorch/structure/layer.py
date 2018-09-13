@@ -9,7 +9,9 @@ from . import krylov as kry
 from . import circulant as circ
 from . import fastfood as ff
 
-class StructuredLinear(nn.Module):
+from utils import descendants
+
+class Layer(nn.Module):
     class_type = None
     abbrev = None
 
@@ -38,7 +40,7 @@ class StructuredLinear(nn.Module):
     def loss(self):
         return 0
 
-class Unconstrained(StructuredLinear):
+class Unconstrained(Layer):
     class_type = 'unconstrained'
     abbrev = 'u'
 
@@ -76,7 +78,7 @@ class Unconstrained(StructuredLinear):
 
 
 
-class Circulant(StructuredLinear):
+class Circulant(Layer):
     class_type = 'circulant'
     abbrev = 'c'
 
@@ -90,7 +92,7 @@ class Circulant(StructuredLinear):
         return self.apply_bias(circ.circulant_multiply(self.c, x))
 
 
-class FastFood(StructuredLinear):
+class FastFood(Layer):
     class_type = 'fastfood'
     abbrev = 'f'
 
@@ -116,7 +118,7 @@ class FastFood(StructuredLinear):
     def forward(self, x):
         return self.apply_bias(ff.fastfood_multiply(self.S, self.G, self.B, self.P, x))
 
-class LowRank(StructuredLinear):
+class LowRank(Layer):
     class_type = 'low_rank'
     abbrev = 'lr'
 
@@ -277,3 +279,13 @@ class LDRTridiagonalC(LDRTridiagonal):
         self.corners_A = (Parameter(torch.tensor(0.0)), Parameter(torch.tensor(0.0)))
         self.corners_B = (Parameter(torch.tensor(0.0)), Parameter(torch.tensor(0.0)))
 
+
+# create a map from class names to the Python class
+class_map = {}
+for cls in descendants(Layer):
+    if cls.class_type is None: continue
+    class_map[cls.class_type] = cls
+    class_map[cls.abbrev] = cls
+
+def StructuredLinear(class_type, **kwargs):
+    return class_map[class_type](**kwargs)
