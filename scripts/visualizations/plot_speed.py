@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0,'../../pytorch/')
 
 import structure.toeplitz_cpu as toep
-import structure.triXXF as subd
+import structure.scratch.krylovfast as subd
 
 # sizes = [1<<9, 1<<10, 1<<11, 1<<12, 1<<13, 1<<14, 1<<15]
 exps = np.arange(7, 16)
