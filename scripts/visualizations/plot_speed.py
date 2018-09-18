@@ -1,3 +1,8 @@
+import os
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+
 import numpy as np
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
@@ -10,7 +15,7 @@ import structure.toeplitz_cpu as toep
 import structure.scratch.krylovfast as subd
 
 # sizes = [1<<9, 1<<10, 1<<11, 1<<12, 1<<13, 1<<14, 1<<15]
-exps = np.arange(7,16)#np.arange(7, 16)
+exps = np.arange(7,14)#np.arange(7, 16)
 sizes = 1 << exps
 
 ranks = [1]
