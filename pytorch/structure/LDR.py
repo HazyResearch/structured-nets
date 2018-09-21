@@ -53,7 +53,6 @@ class LDR(nn.Module):
                 if self.displacement in ['toeplitz_corner', 'toeplitz', 'tc', 't']:
                     g = self.G[i,j]
                     h = self.H[i,j]
-                    fat = x[i]
                     comps[i,j] = toep.toeplitz_mult(self.G[i,j], self.H[i,j], x[i], self.corner)
                 elif self.displacement == 'subdiagonal' or self.displacement == 'sd':
                     comps[i,j] = kry.subdiag_mult_conv(self.subd_A[i,j], self.subd_B[i,j], self.G[i,j], self.H[i,j], x[i])
