@@ -176,18 +176,18 @@ class KrylovTransposeMultiply():
 
     def plan_ffts_forward_pass(self):
         n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
-        self.S_storage = np.empty((m, batch_size + rank + 2, n))
-        self.S_f_storage = [np.empty((batch_size + rank + 2, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
-        self.T_f_storage = [np.empty((batch_size + 1, rank + 1, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
-        self.T_storage = np.empty((m, batch_size + 1, rank + 1, n))
+        self.S_storage = np.empty((m, batch_size + rank, n))
+        self.S_f_storage = [np.empty((batch_size + rank, 1 << d, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.T_f_storage = [np.empty((batch_size, rank, (1 << (m - d - 1)) + 1), dtype='complex128') for d in range(m)]
+        self.T_storage = [np.empty((batch_size, rank, 1 << (m - d))) for d in range(m)]
         self.ffts_forward_pass = []
         for d, (S, S_f, T_f, T) in enumerate(zip(self.S_storage, self.S_f_storage, self.T_f_storage, self.T_storage)):
-            S = S.reshape((batch_size + rank + 2, 1 << d, 1 << (m - d)))
-            T = T.reshape((batch_size + 1, rank + 1, 1 << d, 1 << (m - d)))
+            S = S.reshape((batch_size + rank, 1 << d, 1 << (m - d)))
             fft_time2freq = pyfftw.FFTW(S, S_f, direction='FFTW_FORWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'], threads=4)
             fft_freq2time = pyfftw.FFTW(T_f, T, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'], threads=4)
             self.ffts_forward_pass.append((fft_time2freq, fft_freq2time))
 
+    # @profile
     def __call__(self, subdiag, v, u):
         """Multiply Krylov(A, v)^T @ u when A is zero except on the subdiagonal.
         We don't use bit reversal here.
@@ -195,56 +195,54 @@ class KrylovTransposeMultiply():
         n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
         u, v = u.reshape(batch_size, 1, n, 1), v.reshape(1, rank, n, 1)
         self.S_storage.fill(0.0)
-        T_prev = np.empty((batch_size + 1, rank + 1, n, 1))
-        T_prev[:batch_size, :rank] = u * v
-        T_prev[:batch_size, -1:] = u
-        T_prev[-1:, :rank] = v
-        T_prev[-1:, -1:] = 1.0
+        # T_prev = np.empty((batch_size + 1, rank + 1, n, 1))
+        T_prev = (u * v).sum(axis=-2)
+        T_01_prev = u.reshape(batch_size, n, 1)
+        T_10_prev = v.reshape(rank, n, 1).copy()  # Copy since we'll be changing this array directly
+        T_11_prev = np.ones(n)
         for d in range(m)[::-1]:
             n1, n2 = 1 << d, 1 << (m - d - 1)
-            S = self.S_storage[d].reshape((batch_size + rank + 2, n1, 2 * n2))
+            S = self.S_storage[d].reshape((batch_size + rank, n1, 2 * n2))
             S_f = self.S_f_storage[d]
             T_f = self.T_f_storage[d]
-            T = self.T_storage[d].reshape((batch_size + 1, rank + 1, n1, 2 * n2))
+            T = self.T_storage[d]
             fft_time2freq, fft_freq2time = self.ffts_forward_pass[d]
 
-            S_00, S_01, S_10, S_11 = T_prev[:batch_size, :rank], T_prev[:batch_size, -1], T_prev[-1, :rank], T_prev[-1, -1]
-            S0_10, S0_11, S1_01, S1_11 = S[:rank], S[rank], S[rank+1:rank+1+batch_size], S[-1]
+            S_00, S_01, S_10, S_11 = T_prev, T_01_prev, T_10_prev, T_11_prev
+            S0_10, S1_01 = S[:rank], S[rank:]
             S0_10[:, :, :n2] = S_10[:, ::2]
             S1_01[:, :, :n2] = S_01[:, 1::2]
-            S0_11[:, :n2] = S_11[::2]
-            S1_11[:, :n2] = S_11[1::2]
 
             # polynomial multiplications
             S_f = fft_time2freq(S, output_array=S_f) ## dS_ = fft(dS*_**_f)
-            S0_10_f, S0_11_f, S1_01_f, S1_11_f = S_f[:rank], S_f[rank], S_f[rank+1:rank+1+batch_size], S_f[-1]
-            T_00_f, T_01_f, T_10_f, T_11_f = T_f[:batch_size, :rank], T_f[:batch_size, -1], T_f[-1, :rank], T_f[-1, -1]
-            T_00_f[:] = S1_01_f[:, np.newaxis] * S0_10_f[np.newaxis]
-            T_01_f[:] = S1_01_f * S0_11_f
-            T_10_f[:] = S1_11_f * S0_10_f
-            T_11_f[:] = S1_11_f * S0_11_f  ## dS1_01_f += dT_[0] * S0_10_f; dS0_10_f += dT_[0] * S1_01_f
+            S0_10_f, S1_01_f = S_f[:rank], S_f[rank:]
+            T_00_f = T_f
+            T_00_f[:] = (S1_01_f[:, np.newaxis] * subdiag[(n2 - 1)::(2 * n2), np.newaxis] * S0_10_f[np.newaxis]).sum(axis=-2)
             ## note that the S*_**_f are the only things that need to be stored in t he forward pass
             ## also note that there is an optimization here; should only need half
 
             T = fft_freq2time(T_f, output_array=T) ## dT_ = ifft(dT) (because DFT matrix symmetric)
-            T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
+            # T *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] ## dT *= subdiag[...]
             ## for learning A, should get something like dsubd[...] = T
 
-            T_00, T_01, T_10, T_11 = T[:batch_size, :rank], T[:batch_size, -1], T[-1, :rank], T[-1, -1]
+            T_00 = T
             # polynomial additions
-            T_00[:, :, :, n2:] += S_00[:, :, ::2] ## dS_00[:n1,:] = T_00[:,n2:]
-            T_00[:, :, :, n2:] += S_00[:, :, 1::2]
-            T_01[:, :, n2:] += S_01[:, ::2]
-            T_10[:, :, n2:] += S_10[:, 1::2]
+            T_00[:, :, n2:] += S_00
+            # TODO (trid): Use in-place multiplication here
+            T_01 = np.concatenate((S_01[:, 1::2] * subdiag[(n2 - 1)::(2 * n2), np.newaxis] * S_11[::2, np.newaxis], S_01[:, ::2]), axis=-1)
+            # T_10 = np.concatenate((S_10[:, ::2] * subdiag[(n2 - 1)::(2 * n2), np.newaxis] * S_11[1::2, np.newaxis], S_10[:, 1::2]), axis=-1)
+            T_10 = S_10.reshape(batch_size, n1, 2 * n2)
+            T_10[:, :, :n2] *= subdiag[(n2 - 1)::(2 * n2), np.newaxis] * S_11[1::2, np.newaxis]
+            T_11 = S_11[::2] * subdiag[(n2 - 1)::(2 * n2)] * S_11[1::2]
 
             ## autodiff correspondences annotated in with '##'
             ## this function takes in S and outputs T;
             ## the backwards pass calls these lines in reverse,
             ## taking dT and outputting dS where ## dx := \partial{L}/\partial{x},
             ## (L is the final output of the entire algorithm)
-            T_prev = T
+            T_prev, T_01_prev, T_10_prev, T_11_prev = T, T_01, T_10, T_11
 
-        return T[:batch_size, :rank, :, ::-1].squeeze()
+        return T[:, :, ::-1].squeeze()
 
 
 class KrylovMultiply():
@@ -399,3 +397,29 @@ class KrylovMultiply():
         du = ((dT_next[:, :rank] * v).sum(axis=1) + dT_next[:, -1]).squeeze()
         # du = (w[0] * v + dT_next[1]).squeeze()
         return du
+
+
+def test_krylov_transpose_multiply():
+    m = 14
+    n = 1<<m
+    subdiag = np.random.random(n-1)
+    A = np.diag(subdiag, -1)
+    u = np.random.random(n)
+    v = np.random.random(n)
+    # k1 = krylov_mult_slow(A,v,u,n)
+    # k1_allocated = krylov_mult_slow_allocated(A,v,u,n)
+    # k11 = krylov_mult_slow_faster(A,v,u,n)
+    # k2 = krylov_mult(A,v,u,n)
+    resolvent_bilinear_flattened = create(n, m, lib='fftw')
+    krylov_transpose_multiply = KrylovTransposeMultiply(n)
+    k3 = resolvent_bilinear_flattened(A, v, u, n, m)
+    k3_nobf = krylov_transpose_multiply(subdiag, v, u)
+    print(np.allclose(k3, k3_nobf))
+
+
+def main():
+    test_krylov_transpose_multiply()
+
+
+if __name__ == '__main__':
+    main()
