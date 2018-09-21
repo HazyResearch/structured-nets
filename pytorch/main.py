@@ -87,10 +87,16 @@ def mlp(args):
                     + '_bs' + str(args.batch_size) \
                     + '_ep' + str(args.epochs) \
                     + '_' + str(args.dataset) \
-                    + '_vf' + str(args.val_frac)
+                    + '_vf' + str(args.val_frac) \
+                    + '_m' + str(args.model)
+
+#+ '_nl' + str(args.num_layers)
 
             if train_frac is not None:
                 run_name += '_tf' + str(train_frac)
+
+            if args.prune:
+                run_name += '_pf' + str(args.prune_factor)
 
             results_dir = os.path.join(out_dir,
                                         'results',
@@ -117,7 +123,7 @@ def mlp(args):
 
                 if args.prune:
                     # Is there a better way to enforce pruning only for unconstrained and MLP?
-                    assert model.class_type in ['unconstrained', 'u'] and args.model == 'MLP'
+                    assert model.class_type in ['unconstrained', 'u'] and args.model in ['MLP','CNN']
                     prune.prune(dataset, model, optimizer, lr_scheduler, args.epochs, args.log_freq, log_path,
                         checkpoint_path, result_path, args.test, args.save_model, args.prune_lr_decay, args.prune_factor,
                         args.prune_iters)
