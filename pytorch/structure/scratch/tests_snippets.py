@@ -4,8 +4,8 @@ os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['NUMEXPR_NUM_THREADS'] = '1'
 os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
 import numpy as np
-from triXXF import *
-from triextrafat import *
+from krylovfast import *
+from krylovslow import *
 
 np.random.seed(0)
 
@@ -50,79 +50,3 @@ np.allclose(k3, k3_nobf)
 # print(np.linalg.norm(k1-k2))
 # print(np.linalg.norm(k1-k3))
 # print(np.linalg.norm(k1-k3b))
-
-# Test non-transpose multiply
-m = 14
-n = 1 << m
-subdiag = np.random.random(n-1)
-A = np.diag(subdiag, -1)
-u = np.random.random(n)
-v = np.random.random(n)
-krylov_multiply = KrylovMultiply(n)
-result = krylov_construct(A, v, n).T @ u
-result1 = krylov_multiply(subdiag, v, u)
-np.allclose(result, result1)
-
-# Test batch transpose multiply
-m = 12
-n = 1<<m
-batch_size = 100
-subdiag = np.random.random(n-1)
-A = np.diag(subdiag, -1)
-u = np.random.random((batch_size, n))
-v = np.random.random(n)
-krylov_transpose_multiply = KrylovTransposeMultiply(n, batch_size)
-result1 = krylov_transpose_multiply(subdiag, v, u)
-resolvent_bilinear_flattened = create(n, m, lib='fftw')
-result = resolvent_bilinear_flattened(A, v, u[10], n, m)
-np.allclose(result1[10], result)
-K = krylov_construct(A, v, n)
-result2 = u @ K.T
-np.allclose(result1, result2)
-
-# Test batch non-transpose multiply
-m = 14
-n = 1<<m
-batch_size = 100
-subdiag = np.random.random(n-1)
-A = np.diag(subdiag, -1)
-u = np.random.random((batch_size, n))
-v = np.random.random(n)
-krylov_multiply = KrylovMultiply(n, batch_size)
-result1 = krylov_multiply(subdiag, v, u)
-K = krylov_construct(A, v, n)
-result2 = u @ K
-np.allclose(result1, result2)
-
-# Test batch transpose multiply with rank >= 2
-m = 14
-n = 1<<m
-batch_size = 100
-rank = 3
-subdiag = np.random.random(n-1)
-A = np.diag(subdiag, -1)
-u = np.random.random((batch_size, n))
-v = np.random.random((rank, n))
-krylov_transpose_multiply = KrylovTransposeMultiply(n, batch_size, rank)
-result1 = krylov_transpose_multiply(subdiag, v, u)
-resolvent_bilinear_flattened = create(n, m, lib='fftw')
-result = resolvent_bilinear_flattened(A, v[0], u[10], n, m)
-np.allclose(result1[10, 0], result)
-Ks = [krylov_construct(A, v[i], n) for i in range(rank)]
-result2 = np.stack([u @ K.T for K in Ks]).swapaxes(0, 1).squeeze()
-np.allclose(result1, result2)
-
-# Test batch non-transpose multiply with rank >= 2
-m = 14
-n = 1<<m
-batch_size = 100
-rank = 3
-subdiag = np.random.random(n-1)
-A = np.diag(subdiag, -1)
-w = np.random.random((batch_size, rank, n))
-v = np.random.random((rank, n))
-krylov_multiply = KrylovMultiply(n, batch_size, rank)
-result1 = krylov_multiply(subdiag, v, w)
-Ks = [krylov_construct(A, v[i], n) for i in range(rank)]
-result2 = np.stack([w[:, i] @ Ks[i] for i in range(rank)]).swapaxes(0, 1).squeeze().sum(axis=1)
-np.allclose(result1, result2)
