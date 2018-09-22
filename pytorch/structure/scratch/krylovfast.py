@@ -196,7 +196,7 @@ class KrylovTransposeMultiply():
         u, v = u.reshape(batch_size, n), v.reshape(rank, n)
         result = np.zeros((batch_size, rank, n), dtype=u.dtype)
         # T_00_sum = u @ v.T
-        T_00_sum = (u * v[:, np.newaxis]).sum(axis=-1)
+        T_00_sum = (u[:, np.newaxis] * v).sum(axis=-1)
         result[:, :, 0] += T_00_sum
         T_01 = u.reshape(batch_size, n, 1).copy()  # Copy since we'll be changing this array directly
         T_10 = v.reshape(rank, n, 1)
@@ -272,7 +272,6 @@ class KrylovMultiply():
             fft_freq2time = pyfftw.FFTW(dS_f, dS, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'], threads=1)
             self.ffts_backward_pass.append((fft_time2freq, fft_freq2time))
 
-    #@profile
     def __call__(self, subdiag, v, w):
         n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
         # Forward pass. Since K @ w can be computed by autodiffing K^T @ u, we
@@ -332,8 +331,8 @@ class KrylovMultiply():
 def test_krylov_transpose_multiply():
     m = 14
     n = 1<<m
-    batch_size = 1
-    rank = 1
+    batch_size = 3
+    rank = 2
     subdiag = np.random.random(n-1)
     A = np.diag(subdiag, -1)
     u = np.random.random((batch_size, n))
@@ -346,14 +345,14 @@ def test_krylov_transpose_multiply():
     krylov_transpose_multiply = KrylovTransposeMultiply(n, batch_size, rank)
     k3 = resolvent_bilinear_flattened(A, v[0], u[0], n, m)
     k3_nobf = krylov_transpose_multiply(subdiag, v, u)
-    assert np.allclose(k3, k3_nobf)
+    assert np.allclose(k3, k3_nobf[0, 0])
 
 
 def test_krylov_multiply():
     m = 14
     n = 1<<m
-    batch_size = 1
-    rank = 1
+    batch_size = 3
+    rank = 2
     subdiag = np.random.random(n-1)
     A = np.diag(subdiag, -1)
     w = np.random.random((batch_size, rank, n))
