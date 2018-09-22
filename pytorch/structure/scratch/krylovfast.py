@@ -2,8 +2,9 @@ import numpy as np
 import itertools
 
 import pyfftw
-
-from krylovslow import krylov_construct
+import sys
+sys.path.insert(0,'../../../pytorch/')
+from structure.scratch.krylovslow import krylov_construct
 
 
 # define fft calls
@@ -271,7 +272,7 @@ class KrylovMultiply():
             fft_freq2time = pyfftw.FFTW(dS_f, dS, direction='FFTW_BACKWARD', flags=['FFTW_MEASURE', 'FFTW_DESTROY_INPUT'], threads=1)
             self.ffts_backward_pass.append((fft_time2freq, fft_freq2time))
 
-    @profile
+    #@profile
     def __call__(self, subdiag, v, w):
         n, m, batch_size, rank = self.n, self.m, self.batch_size, self.rank
         # Forward pass. Since K @ w can be computed by autodiffing K^T @ u, we
