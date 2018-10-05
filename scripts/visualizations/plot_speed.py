@@ -7,95 +7,98 @@ import numpy as np
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 from timeit import default_timer as timer
-
+import timeit
+import pickle as pkl
+import matplotlib.patches as mpatches
 import sys
 sys.path.insert(0,'../../pytorch/')
 
 import structure.toeplitz_cpu as toep
 import structure.scratch.krylovfast as subd
+plt.rcParams['font.family'] = 'serif'
 
-# sizes = [1<<9, 1<<10, 1<<11, 1<<12, 1<<13, 1<<14, 1<<15]
-exps = np.arange(7,14)#np.arange(7, 16)
+def test_unstructured(n,trials,reps):
+    u_setup_str = '''
+import numpy as np
+np.random.seed(0)
+A = np.random.normal(size=({n}, {n}))
+v = np.random.normal(size=({n}))
+'''.format(n=n)
+    return min(timeit.repeat("A @ v", u_setup_str, number = trials, repeat = reps))
+
+def test_toeplitz(n,r,trials,reps):
+    t_setup_str = '''
+import numpy as np
+import structure.toeplitz_cpu as toep
+np.random.seed(0)
+G = np.random.normal(size=({r}, {n}))
+H = np.random.normal(size=({r}, {n}))
+v = np.random.normal(size=(1,{n}))
+'''.format(n=n,r=r)
+    return min(timeit.repeat("toep.toeplitz_mult(G, H, v)", t_setup_str, number = trials, repeat = reps))
+
+def test_lr(n,r,trials,reps):
+    lr_setup_str = '''
+import numpy as np
+np.random.seed(0)
+G = np.random.normal(size=({n}, {r}))
+H = np.random.normal(size=({r}, {n}))
+v = np.random.normal(size={n})
+'''.format(n=n,r=r)
+    return min(timeit.repeat("Hv = H @ v;G @ Hv", lr_setup_str, number = trials, repeat = reps))
+
+
+def test_sd(n,r,trials,reps):
+    sd_setup_str = '''
+import numpy as np
+import structure.scratch.krylovfast as subd
+np.random.seed(0)
+G = np.random.normal(size=({r}, {n}))
+H = np.random.normal(size=({r}, {n}))
+v = np.random.normal(size=(1,{n}))
+K = subd.KrylovMultiply({n}, 1, {r})
+KT = subd.KrylovTransposeMultiply({n}, 1, {r})
+subd_A = np.random.normal(size=({n}-1))
+subd_B = np.random.normal(size=({n}-1))
+'''.format(n=n,r=r)
+    return min(timeit.repeat("K(subd_A, G, KT(subd_B, H, v))", sd_setup_str, number = trials, repeat = reps))
+
+exps = np.arange(9,16)
 sizes = 1 << exps
+rs = [1,2,4,8,16]
+trials = 1000
+reps = 10
+out_loc = 'speed_data.p'
 
-ranks = [1]
+data = {}
+data['rs'] = rs
+data['sizes'] = sizes
+data['trials'] = trials
+data['reps'] = reps
 
-# For each trial, randomly generate A and v for unconstrained
-# For structured classes, randomly generate v,G,H,subd_A,subd_B in each trial
-# Report mean and standard deviation
+times_t = np.zeros((len(rs), sizes.size))
+times_sd = np.zeros((len(rs), sizes.size))
+times_lr = np.zeros((len(rs), sizes.size))
+speedups_t = np.zeros((len(rs), sizes.size))
+speedups_sd = np.zeros((len(rs), sizes.size))
+speedups_lr = np.zeros((len(rs), sizes.size))
+unstructured_times = np.zeros(sizes.size)
 
-fc_times = [] # n x num_trials
-t_times = {}#r -> n x num_trials
-sd_times = {}#r -> n x num_trials
-# for i, n in enumerate(sizes):
-
-trials = 100
 for idx_n, n in enumerate(sizes):
-    fc_times.append([])
-    print('FC, N: ', n)
+    unstructured_times[idx_n] = test_unstructured(n,trials,reps)
 
-    # test unconstrained
-    for _ in range(trials):
-        v = np.random.normal(scale=0.01, size=(n))
-        A = np.random.normal(scale=0.01, size=(n, n))
-        start = timer()
-        A @ v
-        end = timer()
-        fc_times[idx_n].append(end-start)
-    #print('N, fc_time: ', fc_times[idx_n])
+data['unstructured_times'] = unstructured_times
 
-fc_times = np.array(fc_times)
-
-for idx_r, r in enumerate(ranks):
-    t_times[idx_r] = []
-    sd_times[idx_r] = []
+for idx_r, r in enumerate(rs):
     for idx_n, n in enumerate(sizes):
-        print('T/SD, N: ', n)
-        # test toeplitz_like
-        t_times[idx_r].append([])
-        sd_times[idx_r].append([])
-        for _ in range(trials):
-            v = np.random.normal(scale=0.01, size=(1, n))
-            G = np.random.normal(scale=0.01, size=(r, n))
-            H = np.random.normal(scale=0.01, size=(r, n))
-            start = timer()
-            toep.toeplitz_mult(G, H, v)
-            end = timer()
-            t_times[idx_r][idx_n].append(end-start)
+        t = test_toeplitz(n,r,trials,reps)
+        sd = test_sd(n,r,trials,reps)
+        lr = test_lr(n,r,trials,reps)
+        times_t[idx_r,idx_n] = t
+        times_sd[idx_r,idx_n] = sd
+        times_lr[idx_r,idx_n] = lr
+        data['t'] = times_t
+        data['sd'] = times_sd
+        data['lr'] = times_lr
 
-        # test subdiagonal
-        for _ in range(trials):
-            v = np.random.normal(scale=0.01, size=(1, n))
-            G = np.random.normal(scale=0.01, size=(r, n))
-            H = np.random.normal(scale=0.01, size=(r, n))
-            subd_A = np.random.normal(scale=0.01, size=(n-1))
-            subd_B = np.random.normal(scale=0.01, size=(n-1))
-            K = subd.KrylovMultiply(n, 1, r)
-            KT = subd.KrylovTransposeMultiply(n, 1, r)
-            start = timer()
-            K(subd_A, G, KT(subd_B, H, v))
-            end = timer()
-            sd_times[idx_r][idx_n].append(end-start)
-
-    t_times[idx_r] = np.array(t_times[idx_r])
-    sd_times[idx_r] = np.array(sd_times[idx_r])
-
-print('FC: ', fc_times.shape)
-print('T: ', t_times[0].shape)
-print('SD: ', sd_times[0].shape)
-
-
-# Compute mean and stdev
-
-plt.figure()
-plt.errorbar(sizes, np.mean(fc_times,axis=1), yerr=np.std(fc_times,axis=1), label='Fully Connected')
-for i, r in enumerate(ranks):
-    plt.errorbar(sizes, np.mean(t_times[i],axis=1), yerr=np.std(t_times[i],axis=1),label='Toeplitz-like r'+str(r))
-    plt.errorbar(sizes, np.mean(sd_times[i],axis=1), yerr=np.std(sd_times[i],axis=1),label='Scale-cycle r'+str(r))
-plt.xscale('log', basex=2)
-plt.yscale('log')
-plt.xlabel("Dimension")
-plt.ylabel("Computation Cost")
-plt.legend()
-# plt.show()
-plt.savefig('speed.pdf')
+pkl.dump(data,open(out_loc,'wb'),protocol=2)
