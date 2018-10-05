@@ -79,27 +79,30 @@ class CNN(ArghModel):
     """
     Single channel net where the dense last layer has same dimensions as input
     """
-    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True): pass
+    def name(self):
+        return self.layers[0].name()
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True,hidden_size=-1): pass
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
+        if self.hidden_size == -1:
+            self.hidden_size = self.layer_size
         assert self.layer_size == self.in_size
         self.d = int(np.sqrt(self.layer_size))
         self.conv1 = nn.Conv2d(1, 6, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
-        self.W = sl.StructuredLinear(self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias)
-        self.logits = nn.Linear(self.layer_size, self.out_size)
-
-    def name(self):
-        return self.W.name()
-
+        layers = []
+        layers.append(sl.StructuredLinear(self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias,
+            hidden_size=self.hidden_size))
+        self.layers = nn.ModuleList(layers)
+        self.logits = nn.Linear(self.hidden_size, self.out_size)
     def forward(self, x):
         x = x.view(-1, 1, self.d, self.d)
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = x.view(-1, self.layer_size)
-        x = F.relu(self.W(x))
+        x = F.relu(self.layers[0](x))
         x = self.logits(x)
         return x
 
@@ -107,15 +110,18 @@ class CNNColor(ArghModel):
     """
     3 channel net where the dense last layer has same dimensions as input
     """
-    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True): pass
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True,hidden_size=-1): pass
     def reset_parameters(self):
         self.layer_size = int(self.in_size/3)
+        if self.hidden_size == -1:
+            self.hidden_size = self.layer_size
         self.d = int(np.sqrt(self.layer_size))
         self.conv1 = nn.Conv2d(3, 6, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
-        self.W = sl.StructuredLinear(self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias)
-        self.logits = nn.Linear(self.layer_size, self.out_size)
+        self.W = sl.StructuredLinear(self.class_type, layer_size=self.layer_size, r=self.r, bias=self.bias,
+            hidden_size=self.hidden_size)
+        self.logits = nn.Linear(self.hidden_size, self.out_size)
 
     def name(self):
         return self.W.name()
