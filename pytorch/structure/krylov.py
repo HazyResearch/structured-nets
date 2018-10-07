@@ -154,9 +154,17 @@ def krylov_transpose_multiply_conv(subdiag, v, u):
                            torch.zeros((rank + batch_size, n1, n2), dtype=S_10.dtype, device=S_10.device)), dim=-1)
             S_f = torch.rfft(S, 1)
             S0_10_f, S1_01_f = S_f[:rank], S_f[rank:rank+batch_size]
+            # Different ways to compute the same expression, for speed vs readability
+            # Option 1: call complex_mult, slowest
             # T_00_f_sum = complex_mult(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis]).sum(dim=2)
-            # Manually doing complex multiply, somehow this is faster than Cupy's complex mult
-            prod = (S1_01_f[:, np.newaxis, ..., np.newaxis] * S0_10_f[np.newaxis, ..., np.newaxis, :]).sum(dim=2)
+            # Option 2: multiply and sum
+            # prod = (S1_01_f[:, np.newaxis, ..., np.newaxis] * S0_10_f[np.newaxis, ..., np.newaxis, :]).sum(dim=2)
+            # Option 3: einsum
+            prod = torch.einsum('bnmo,rnmp->brmop', S1_01_f, S0_10_f)
+            # Option 4: manually doing permute and reshape and bmm, only 3% faster than einsum.
+            # temp1 = S1_01_f.permute(2, 0, 3, 1).reshape((-1, batch_size * 2, n1))
+            # temp2 = S0_10_f.permute(2, 1, 0, 3).reshape((-1, n1, rank * 2))
+            # prod = (temp1 @ temp2).reshape((-1, batch_size, 2, rank, 2)).permute(1, 3, 0, 2, 4)
             T_00_f_sum = torch.stack((prod[..., 0, 0] - prod[..., 1, 1], prod[..., 0, 1] + prod[..., 1, 0]), dim=-1)
             T_00_sum = torch.irfft(T_00_f_sum, 1, signal_sizes=(2 * n2, ))[..., :-1]
         # polynomial additions
@@ -203,9 +211,19 @@ def krylov_transpose_multiply(subdiag, v, u):
         # polynomial multiplications
         S_f = torch.rfft(S, 1)
         S0_10_f, S1_01_f = S_f[:rank], S_f[rank:rank+batch_size]
+        # Different ways to compute the same expression, for speed vs readability
+        # Option 1: call complex_mult, slowest
         # T_00_f_sum = complex_mult(S1_01_f[:, np.newaxis], S0_10_f[np.newaxis]).sum(dim=2)
+        # Option 2: multiply and sum
         # Manually doing complex multiply, somehow this is faster than Cupy's complex mult
-        prod = (S1_01_f[:, np.newaxis, ..., np.newaxis] * S0_10_f[np.newaxis, ..., np.newaxis, :]).sum(dim=2)
+        # prod = (S1_01_f[:, np.newaxis, ..., np.newaxis] * S0_10_f[np.newaxis, ..., np.newaxis, :]).sum(dim=2)
+        # Option 3: einsum
+        prod = torch.einsum('bnmo,rnmp->brmop', S1_01_f, S0_10_f)
+        # Option 4: manually doing permute and reshape and bmm, only 3% faster than einsum.
+        # temp1 = S1_01_f.permute(2, 0, 3, 1).reshape((-1, batch_size * 2, n1))
+        # temp2 = S0_10_f.permute(2, 1, 0, 3).reshape((-1, n1, rank * 2))
+        # prod = (temp1 @ temp2).reshape((-1, batch_size, 2, rank, 2)).permute(1, 3, 0, 2, 4)
+        # prod = (S1_01_f[:, np.newaxis, ..., np.newaxis] * S0_10_f[np.newaxis, ..., np.newaxis, :]).sum(dim=2)
         T_00_f_sum = torch.stack((prod[..., 0, 0] - prod[..., 1, 1], prod[..., 0, 1] + prod[..., 1, 0]), dim=-1)
         T_00_sum = torch.irfft(T_00_f_sum, 1, signal_sizes=(2 * n2, ))[..., :-1]
 
@@ -326,7 +344,8 @@ def krylov_multiply_conv(subdiag, v, w):
             S0_10_f = torch.rfft(torch.cat((S0_10_mult_subdiag, torch.zeros_like(S0_10_mult_subdiag)), dim=-1), 1)
             # dS1_01_f = complex_mult(conjugate(S0_10_f), dT_00_sum_f[:, :, np.newaxis]).sum(dim=1)
             # Manually doing complex multiply
-            prod = (S0_10_f[..., np.newaxis] * dT_00_sum_f[:, :, np.newaxis, :, np.newaxis, :]).sum(dim=1)
+            # prod = (S0_10_f[..., np.newaxis] * dT_00_sum_f[:, :, np.newaxis, :, np.newaxis, :]).sum(dim=1)
+            prod = torch.einsum('rnmo,brmp->bnmop', S0_10_f, dT_00_sum_f)
             dS1_01_f = torch.stack((prod[..., 0, 0] + prod[..., 1, 1], prod[..., 0, 1] - prod[..., 1, 0]), dim=-1)
             dS1_01 = torch.irfft(dS1_01_f, 1, signal_sizes=(2 * n2, ))[:, :, :n2]
         dS_01[:, 1::2] = dT_01[:, :, n2:] * S0_11_mult_subdiag[:, np.newaxis] + dS1_01
@@ -385,7 +404,8 @@ def krylov_multiply(subdiag, v, w):
         S0_10_f = torch.rfft(torch.cat((S0_10_mult_subdiag, torch.zeros_like(S0_10_mult_subdiag)), dim=-1), 1)
         # dS1_01_f = complex_mult(conjugate(S0_10_f), dT_00_sum_f[:, :, np.newaxis]).sum(dim=1)
         # Manually doing complex multiply
-        prod = (S0_10_f[..., np.newaxis] * dT_00_sum_f[:, :, np.newaxis, :, np.newaxis, :]).sum(dim=1)
+        # prod = (S0_10_f[..., np.newaxis] * dT_00_sum_f[:, :, np.newaxis, :, np.newaxis, :]).sum(dim=1)
+        prod = torch.einsum('rnmo,brmp->bnmop', S0_10_f, dT_00_sum_f)
         dS1_01_f = torch.stack((prod[..., 0, 0] + prod[..., 1, 1], prod[..., 0, 1] - prod[..., 1, 0]), dim=-1)
         dS1_01 = torch.irfft(dS1_01_f, 1, signal_sizes=(2 * n2, ))[:, :, :n2]
         dS_01[:, 1::2] = dT_01[:, :, n2:] * S0_11_mult_subdiag[:, np.newaxis] + dS1_01
@@ -908,8 +928,8 @@ def test_krylov_multiply():
     v = torch.rand((rank, n), requires_grad=True, device=device)
     w = torch.rand((batch_size, rank, n), requires_grad=True, device=device)
     # Fast algorithm on GPU
-    result = krylov_multiply_conv(subdiag, v, w)
-    # result = krylov_multiply(subdiag, v, w)
+    # result = krylov_multiply_conv(subdiag, v, w)
+    result = krylov_multiply(subdiag, v, w)
     # result = krylov_multiply_old(subdiag, v, w)
     grad, = torch.autograd.grad(result.sum(), subdiag, retain_graph=True)
     # Using autodiff
