@@ -219,7 +219,8 @@ class KrylovTransposeMultiply():
             S_f = fft_time2freq(S, output_array=S_f)
             S0_10_f, S1_01_f = S_f[:rank], S_f[rank:rank + batch_size]
             T_00_f_sum = T_f
-            T_00_f_sum[:] = (S1_01_f[:, np.newaxis] * S0_10_f[np.newaxis]).sum(axis=-2)
+            # T_00_f_sum[:] = (S1_01_f[:, np.newaxis] * S0_10_f[np.newaxis]).sum(axis=-2)
+            np.einsum("bnm,rnm->brm", S1_01_f, S0_10_f, out=T_00_f_sum)
             T = fft_freq2time(T_f, output_array=T)
             T_00_sum = T
 
@@ -317,7 +318,8 @@ class KrylovMultiply():
 
             dT_00_sum_f = fft_time2freq(dT, output_array=dT_f)
             dS1_01_f = dS_f
-            dS1_01_f[:] = (np.conjugate(S0_10_mult_subdiag_f, out=S0_10_mult_subdiag_f) * dT_00_sum_f[:, :, np.newaxis]).sum(axis=1)
+            # dS1_01_f[:] = (np.conjugate(S0_10_mult_subdiag_f, out=S0_10_mult_subdiag_f) * dT_00_sum_f[:, :, np.newaxis]).sum(axis=1)
+            np.einsum("brm,rnm->bnm", dT_00_sum_f, np.conjugate(S0_10_mult_subdiag_f, out=S0_10_mult_subdiag_f), out=dS1_01_f)
 
             dS1_01 = fft_freq2time(dS_f, output_array=dS)
             dS_01[:, 1::2] = dT_01[:, :, n2:] * S0_11_mult_subdiag[:, np.newaxis] + dS1_01[:, :, :n2]
