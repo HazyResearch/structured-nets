@@ -1,5 +1,5 @@
-# structured_matrices
-Learning with structured matrices
+# structured-nets
+Code to accompany the paper <a href="https://arxiv.org/abs/1810.02309">Learning Compressed Transforms with Low Displacement Rank</a>.
 
 ## Requirements
 Python 3.6+
