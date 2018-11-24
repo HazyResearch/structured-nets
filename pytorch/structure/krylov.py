@@ -706,6 +706,8 @@ def subdiag_linear_map(subdiag, upper_right_corner=0.0):
     n = subdiag.size(0) + 1
     shift_down = torch.arange(-1, n - 1, device=subdiag.device)
     subdiag_extended = torch.cat((torch.tensor([upper_right_corner], dtype=subdiag.dtype, device=subdiag.device), subdiag))
+    # Pytorch 1.0 has torch.roll that should be much faster
+    # return lambda v: subdiag_extended * v.roll(1, dims=-1)
     return lambda v: subdiag_extended * v[..., shift_down]
 
 
