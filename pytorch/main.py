@@ -13,6 +13,7 @@ from inspect import signature
 # Add PyTorch root to path
 pytorch_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, pytorch_root)
+# print(sys.path)
 from dataset import DatasetLoaders
 from models.nets import ArghModel, construct_model
 from learning import train, prune
@@ -47,9 +48,10 @@ parser.add_argument('--prune-lr-decay', type=float, default=0.1, help='LR decay 
 parser.add_argument('--prune-factor', type=float, default=1, help='Factor by which to prune')
 parser.add_argument('--prune-iters', type=int, default=1, help='Number of pruning iters')
 parser.add_argument('--save-model', action='store_false', help='Whether to save best model')
-parser.add_argument('--data-dir', default='../../datasets/', help='Data directory')
+parser.add_argument('--data-dir', default='/dfs/scratch1/thomasat/datasets/', help='Data directory')
 
-out_dir = os.path.dirname(pytorch_root) # Repo root
+# out_dir = os.path.dirname(pytorch_root) # Repo root
+out_dir = pytorch_root # Repo root
 
 # seed = 0
 # np.random.seed(seed)
