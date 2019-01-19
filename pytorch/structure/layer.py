@@ -113,8 +113,10 @@ class LowRank(StructuredLinear):
     def name(self):
         return self.__class__.abbrev + str(self.r)
 
-    def __init__(self, layer_size, r=1, **kwargs):
-        super().__init__(layer_size, r=r, **kwargs)
+    # def __init__(self, layer_size, r=1, **kwargs):
+    #     super().__init__(layer_size, r=r, **kwargs)
+    def __init__(self, r=1, **kwargs):
+        super().__init__(r=r, **kwargs)
 
     def reset_parameters(self):
         super().reset_parameters()
