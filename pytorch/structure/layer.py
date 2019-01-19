@@ -9,6 +9,17 @@ from . import krylov as kry
 from . import circulant as circ
 from . import fastfood as ff
 
+import sys, os
+projects_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../'))
+projects_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../learning-circuits'))
+circuits_root = os.path.normpath(os.path.join(os.path.abspath(__file__), '../../../'))
+sys.path.insert(0, circuits_root)
+sys.path.insert(0, projects_root)
+print(sys.path)
+import butterfly
+from complex_utils import real_to_complex
+
+
 class StructuredLinear(nn.Module):
     class_type = None
     abbrev = None
@@ -270,3 +281,89 @@ class LDRTridiagonalC(LDRTridiagonal):
         self.corners_A = (Parameter(torch.tensor(0.0)), Parameter(torch.tensor(0.0)))
         self.corners_B = (Parameter(torch.tensor(0.0)), Parameter(torch.tensor(0.0)))
 
+
+
+
+class Trifat(StructuredLinear):
+    class_type = 'trifat'
+    abbrev = 'tri'
+
+    def name(self):
+        return f"tri{self.depth}-{'c' if self.complex else 'r'}{'fo' if self.fixed_order else 'lo'}"
+
+    def __init__(self, complex=True, fixed_order=True, depth=1, **kwargs):
+        super().__init__(complex=complex, fixed_order=fixed_order, depth=depth, **kwargs)
+
+    def reset_parameters(self):
+        super().reset_parameters()
+        # self.model = butterfly.ButterflyProduct(size=size, complex=True, fixed_order=True)
+        components = [[butterfly.BlockPermProduct(size=self.layer_size, complex=True, share_logit=False), butterfly.ButterflyProduct(size=self.layer_size, complex=True)] for _ in range(self.depth)]
+        components_ = [l for lis in components for l in lis]
+        # self.model = nn.Sequential(
+        #     butterfly.BlockPermProduct(size=self.layer_size, complex=True, share_logit=False),
+        #     butterfly.Block2x2DiagProduct(size=self.layer_size, complex=True),
+        #     butterfly.BlockPermProduct(size=self.layer_size, complex=True, share_logit=False),
+        #     butterfly.Block2x2DiagProduct(size=self.layer_size, complex=True)
+        # )
+        self.model = nn.Sequential(*components_)
+        # self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
+        # self.init_stddev = np.sqrt(1./self.layer_size)
+        # torch.nn.init.normal_(self.W, std=self.init_stddev)
+        # self.mask = None
+
+    # def set_mask(self, mask, device):
+    #     self.mask = Variable(torch.FloatTensor(mask).to(device), requires_grad=False)
+    #     self.W.data *= self.mask.data
+    #     print('Num. nonzero entries after pruning: ', torch.nonzero(self.W).size(0))
+
+    def forward(self, x):
+        # out = torch.matmul(x, self.W)
+        # out = self.model(real_to_complex(x))[..., 0]
+        # print(x.size())
+        # print(self.layer_size)
+        out = self.model(real_to_complex(x))[..., 0]
+        return self.apply_bias(out)
+
+
+class Butterfly(StructuredLinear):
+    class_type = 'butterfly'
+    abbrev = 'b'
+
+    def name(self):
+        return f"bf{self.depth}{'c' if self.complex else 'r'}"
+
+    def __init__(self, complex=True, fixed_order=True, depth=2, **kwargs):
+        super().__init__(complex=complex, fixed_order=fixed_order, depth=depth, **kwargs)
+
+    def reset_parameters(self):
+        super().reset_parameters()
+        # self.model = butterfly.ButterflyProduct(size=size, complex=True, fixed_order=True)
+        components = [[butterfly.BlockPermProduct(size=self.layer_size, complex=self.complex, share_logit=True),butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]
+        components_ = [l for lis in components for l in lis]
+        # self.model = nn.Sequential(
+        #     butterfly.BlockPermProduct(size=self.layer_size, complex=True, share_logit=False),
+        #     butterfly.Block2x2DiagProduct(size=self.layer_size, complex=True),
+        #     butterfly.BlockPermProduct(size=self.layer_size, complex=True, share_logit=False),
+        #     butterfly.Block2x2DiagProduct(size=self.layer_size, complex=True)
+        # )
+        self.model = nn.Sequential(*components_)
+        # self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
+        # self.init_stddev = np.sqrt(1./self.layer_size)
+        # torch.nn.init.normal_(self.W, std=self.init_stddev)
+        # self.mask = None
+
+    # def set_mask(self, mask, device):
+    #     self.mask = Variable(torch.FloatTensor(mask).to(device), requires_grad=False)
+    #     self.W.data *= self.mask.data
+    #     print('Num. nonzero entries after pruning: ', torch.nonzero(self.W).size(0))
+
+    def forward(self, x):
+        # out = torch.matmul(x, self.W)
+        # out = self.model(real_to_complex(x))[..., 0]
+        # print(x.size())
+        # print(self.layer_size)
+        if self.complex:
+            out = self.model(real_to_complex(x))[..., 0]
+        else:
+            out = self.model(x)
+        return self.apply_bias(out)
