@@ -16,6 +16,7 @@ sys.path.insert(0, pytorch_root)
 # print(sys.path)
 from dataset import DatasetLoaders
 from models.nets import ArghModel, construct_model
+import models.resnet
 from learning import train, prune
 from utils import descendants
 
