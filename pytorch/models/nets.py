@@ -9,13 +9,13 @@ import structure.LDR as ldr
 import structure.layer as sl
 from utils import descendants
 
-import sys, os
-projects_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../'))
-projects_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../learning-circuits'))
-circuits_root = os.path.normpath(os.path.join(os.path.abspath(__file__), '../../../'))
-sys.path.insert(0, circuits_root)
-sys.path.insert(0, projects_root)
-print(sys.path)
+# import sys, os
+# projects_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../'))
+# projects_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../learning-circuits'))
+# circuits_root = os.path.normpath(os.path.join(os.path.abspath(__file__), '../../../'))
+# sys.path.insert(0, circuits_root)
+# sys.path.insert(0, projects_root)
+# print(sys.path)
 
 # import butterfly as butt
 

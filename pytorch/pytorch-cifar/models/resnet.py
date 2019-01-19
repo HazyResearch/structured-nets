@@ -11,6 +11,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+import sys, os
+projects_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../'))
+sys.path.append(projects_root)
+print(sys.path)
+
+
+from structure.conv import BConv2d
+
 class BasicBlock(nn.Module):
     expansion = 1
 

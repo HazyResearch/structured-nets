@@ -10,11 +10,11 @@ from . import circulant as circ
 from . import fastfood as ff
 
 import sys, os
-projects_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../'))
+# projects_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../'))
 projects_root = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../learning-circuits'))
 circuits_root = os.path.normpath(os.path.join(os.path.abspath(__file__), '../../../'))
-sys.path.insert(0, circuits_root)
-sys.path.insert(0, projects_root)
+sys.path.append(circuits_root)
+sys.path.append(projects_root)
 print(sys.path)
 import butterfly
 from complex_utils import real_to_complex
