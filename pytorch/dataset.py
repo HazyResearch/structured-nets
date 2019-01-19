@@ -150,7 +150,7 @@ def create_data_loaders(dataset_name, data_dir, transform, train_fraction, val_f
 
 class DatasetLoaders:
     def __init__(self, name, data_dir, val_fraction, transform=None, train_fraction=None, batch_size=50):
-        if name == 'cifar10':
+        if name == 'cifar10_':
             loaders, data_shape, self.out_size, val_idx = get_CIFAR10_data('/dfs/scratch1/albertgu/datasets', augment_level=1, batch_size=100,
                      num_val=5000, num_workers=2, seed=None, val_idx=None)
             self.train_loader = loaders['train']
