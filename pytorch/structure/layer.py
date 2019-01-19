@@ -220,7 +220,8 @@ class LDRSubdiagonal(LearnedOperator):
 
     def forward(self, x):
         # out = kry.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
-        out = kry.subdiag_mult_conv(self.subd_A, self.subd_B, self.G, self.H, x)
+        # out = kry.subdiag_mult_conv(self.subd_A, self.subd_B, self.G, self.H, x)
+        out = kry.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
         return self.apply_bias(out)
 
 class LDRSubdiagonalC(LDRSubdiagonal):
