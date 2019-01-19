@@ -6,6 +6,9 @@ import pickle as pkl
 from sklearn.preprocessing import OneHotEncoder
 import torch
 from torchvision import datasets, transforms
+from torch.utils.data.sampler import SubsetRandomSampler
+import torch.nn.functional as F
+
 
 import utils
 
@@ -147,7 +150,15 @@ def create_data_loaders(dataset_name, data_dir, transform, train_fraction, val_f
 
 class DatasetLoaders:
     def __init__(self, name, data_dir, val_fraction, transform=None, train_fraction=None, batch_size=50):
-        if name.startswith('true'):
+        if name == 'cifar10':
+            loaders, data_shape, self.out_size, val_idx = get_CIFAR10_data('/dfs/scratch1/albertgu/datasets', augment_level=1, batch_size=100,
+                     num_val=5000, num_workers=2, seed=None, val_idx=None)
+            self.train_loader = loaders['train']
+            self.val_loader = loaders['val']
+            self.test_loader = loaders['test']
+            self.in_size = 3072
+            self.loss = utils.torch_cross_entropy_loss
+        elif name.startswith('true'):
             # TODO: Add support for synthetic datasets back. Possibly should be split into separate class
             self.loss = utils.mse_loss
         else:
@@ -163,7 +174,7 @@ class DatasetLoaders:
 def postprocess(transform, X, Y=None):
     # pad from 784 to 1024
     if 'pad' in transform:
-        assert X.shape[1] == 784
+        assert X.shape[1] == 784, X.shape
         print(X.shape, type(X))
         X = np.pad(X.reshape((-1,28,28)), ((0,0),(2,2),(2,2)), 'constant').reshape(-1,1024)
     return X, Y
@@ -203,3 +214,72 @@ def augment(self, X, Y=None):
         Y = np.concatenate([Y, Y, Y, Y], axis=0)
 
     return X, Y
+
+def get_CIFAR10_data(data_dir, augment_level=1, batch_size=100,
+                     num_val=5000, num_workers=2, seed=None, val_idx=None):
+  """Returns dataloaders and format information for the CIFAR dataset.
+     Thanks to https://gist.github.com/kevinzakka/d33bf8d6c7f06a9d8c76d97a7879f5cb."""
+
+  num_train = 50000 - num_val
+  if num_train % batch_size:
+    log_warn('Batch size does not evenly divide number of training examples')
+
+  normalize = transforms.Normalize(mean=[0.49139765, 0.48215759, 0.44653141],
+                                   std=[0.24703199, 0.24348481, 0.26158789])
+  test_transform_list = [transforms.ToTensor(), normalize]
+  if augment_level == 0:
+    train_transform_list = test_transform_list
+  elif augment_level == 1:
+    train_transform_list = [transforms.ToTensor(),
+                            transforms.Lambda(lambda x: F.pad(x.unsqueeze(0),
+                                              (4,4,4,4), mode='reflect').squeeze()),
+                            transforms.ToPILImage(), transforms.RandomCrop(32),
+                            transforms.RandomHorizontalFlip()] + test_transform_list
+  else:
+    train_transform_list = [transforms.RandomCrop(size=32, padding=4),
+                            transforms.RandomRotation(2.5),
+                            transforms.RandomHorizontalFlip()] + \
+                            test_transform_list + \
+                            [transforms.ColorJitter(.25, .25, .25),
+                             Cutout(n_holes=1, length=16)]
+  test_transform = transforms.Compose(test_transform_list)
+  train_transform = transforms.Compose(train_transform_list)
+
+  dataset_path = data_dir + '/cifar-10-batches-py'
+  do_download = not os.path.exists(os.path.expanduser(dataset_path))
+  train_set = datasets.CIFAR10(root=data_dir, train=True,
+                  download=do_download, transform=train_transform)
+  test_set = datasets.CIFAR10(root=data_dir, train=False,
+                  download=do_download, transform=test_transform)
+
+  test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size,
+                    shuffle=False, num_workers=num_workers, pin_memory=True)
+
+  if num_val or val_idx is not None:
+    indices = list(range(len(train_set)))
+    if val_idx is None:
+      np.random.shuffle(indices)
+      train_idx, val_idx = indices[num_val:], indices[:num_val]
+    else:
+      train_idx = np.setdiff1d(indices, val_idx)
+    train_sampler = SubsetRandomSampler(train_idx)
+    val_sampler = SubsetRandomSampler(val_idx)
+    val_set = datasets.CIFAR10(root=data_dir, train=True,
+                  download=False, transform=test_transform)
+    val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size,
+                     shuffle=False, num_workers=num_workers, sampler=val_sampler,
+                     pin_memory=True)
+  else:
+    train_sampler = None
+    val_idx = None
+    val_loader = None
+
+  seed_fn = None if seed is None else lambda x: np.random.seed(-(seed+1+x))
+  train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
+                     shuffle=False, num_workers=num_workers, sampler=train_sampler,
+                     worker_init_fn=seed_fn, pin_memory=True)
+
+  data_shape = (3, 32, 32)
+  num_classes = 10
+  loaders = {'train': train_loader, 'test': test_loader, 'val': val_loader}
+  return loaders, data_shape, num_classes, val_idx
