@@ -7,6 +7,7 @@ from torch.nn.parameter import Parameter
 
 import structure.LDR as ldr
 import structure.layer as sl
+from structure.conv import BConv2d
 from utils import descendants
 
 # import sys, os
@@ -162,7 +163,7 @@ class CNN(ArghModel):
     """
     Single channel net where the dense last layer has same dimensions as input
     """
-    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True): pass
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True, real=False): pass
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
@@ -171,11 +172,11 @@ class CNN(ArghModel):
         self.conv1 = nn.Conv2d(1, 6, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
-        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias, complex=(not self.real))
         self.logits = nn.Linear(self.layer_size, self.out_size)
 
     def name(self):
-        return self.W.name()
+        return 'cnn_' + self.W.name()
 
     def forward(self, x):
         x = x.view(-1, 1, self.d, self.d)
@@ -190,18 +191,21 @@ class CNNColor(ArghModel):
     """
     3 channel net where the dense last layer has same dimensions as input
     """
-    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True): pass
+    def args(class_type='unconstrained', layer_size=-1, r=1, bias=True, real=False, bconv=False): pass
     def reset_parameters(self):
         self.layer_size = int(self.in_size/3)
         self.d = int(np.sqrt(self.layer_size))
-        self.conv1 = nn.Conv2d(3, 6, 5, padding=2)
+        if self.bconv:
+            self.conv1 = BConv2d(3, 6, 1024, 1024, bias=False)
+        else:
+            self.conv1 = nn.Conv2d(3, 6, 5, padding=2)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5, padding=2)
-        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias)
+        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, bias=self.bias, real=False)
         self.logits = nn.Linear(self.layer_size, self.out_size)
 
     def name(self):
-        return self.W.name()
+        return 'cnn_' + self.W.name()
 
     def forward(self, x):
         x = x.view(-1, 3, self.d, self.d)
@@ -410,11 +414,11 @@ class SL(ArghModel):
     def name(self):
         return self.W.name()
 
-    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=False): pass
+    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=False, fixed_perm=False): pass
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
-        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, depth=self.depth, complex=(not self.real), bias=self.bias)
+        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, depth=self.depth, complex=(not self.real), bias=self.bias, fixed_perm=self.fixed_perm)
 
     def forward(self, x):
         return self.W(x)
@@ -423,7 +427,9 @@ class SHL(SL):
     """
     Single hidden layer
     """
-    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=True): pass
+    def name(self):
+        return 'shl_' + self.W.name()
+    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=True, fixed_perm=False): pass
     def reset_parameters(self):
         super().reset_parameters()
         self.W2 = nn.Linear(self.layer_size, self.out_size)

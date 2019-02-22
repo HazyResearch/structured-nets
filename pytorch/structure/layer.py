@@ -17,6 +17,7 @@ sys.path.append(circuits_root)
 sys.path.append(projects_root)
 print(sys.path)
 import butterfly
+from utils import bitreversal_permutation
 from complex_utils import real_to_complex
 
 
@@ -330,15 +331,18 @@ class Butterfly(StructuredLinear):
     abbrev = 'b'
 
     def name(self):
-        return f"bf{self.depth}{'c' if self.complex else 'r'}"
+        return f"bf{'c' if self.complex else 'r'}{self.depth}{'fp' if self.fixed_perm else ''}"
 
-    def __init__(self, complex=True, fixed_order=True, depth=2, **kwargs):
-        super().__init__(complex=complex, fixed_order=fixed_order, depth=depth, **kwargs)
+    def __init__(self, complex=True, fixed_order=True, depth=2, fixed_perm=False, **kwargs):
+        super().__init__(complex=complex, fixed_order=fixed_order, depth=depth, fixed_perm=fixed_perm, **kwargs)
 
     def reset_parameters(self):
         super().reset_parameters()
         # self.model = butterfly.ButterflyProduct(size=size, complex=True, fixed_order=True)
-        components = [[butterfly.BlockPermProduct(size=self.layer_size, complex=self.complex, share_logit=True),butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]
+        if self.fixed_perm:
+            components = [[butterfly.FixedPermutation(torch.tensor(bitreversal_permutation(self.layer_size)), complex=self.complex),butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]
+        else:
+            components = [[butterfly.BlockPermProduct(size=self.layer_size, complex=self.complex, share_logit=True),butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]
         components_ = [l for lis in components for l in lis]
         # self.model = nn.Sequential(
         #     butterfly.BlockPermProduct(size=self.layer_size, complex=True, share_logit=False),

@@ -1,7 +1,10 @@
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
+import torch.nn.functional as F
 
 from models.nets import ArghModel
+from structure.conv import BConv2d
+import structure.layer as sl
 
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
@@ -19,8 +22,7 @@ model_urls = {
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
 
 
 def conv1x1(in_planes, out_planes, stride=1):
@@ -100,12 +102,17 @@ class Bottleneck(nn.Module):
 
 class ResNet(ArghModel):
 
-    def args(block=BasicBlock, layers=[2,2,2,2], num_classes=10, zero_init_residual=False, class_type='unconstrained'): pass
+    def name(self):
+        return f"ResNet{self.last_layer}"
+
+    def args(block=BasicBlock, layers=[2,2,2,2], num_classes=10, zero_init_residual=False, bconv=False, last_layer=''): pass
     def reset_parameters(self):
         # super(ResNet, self).__init__()
         self.inplanes = 64
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
+        if self.bconv:
+            self.conv1 = BConv2d(3, 64, 1024, 1024, bias=False)
+        else:
+            self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -114,7 +121,18 @@ class ResNet(ArghModel):
         self.layer3 = self._make_layer(self.block, 256, self.layers[2], stride=2)
         self.layer4 = self._make_layer(self.block, 512, self.layers[3], stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * self.block.expansion, self.num_classes)
+        # self.fc = nn.Linear(512 * self.block.expansion, 512 * self.block.expansion)
+
+        if self.last_layer == '':
+            self.fc = nn.Sequential()
+        elif self.last_layer == 'fc':
+            self.fc = nn.Linear(512 * self.block.expansion, 512 * self.block.expansion)
+        elif self.last_layer == 'b':
+            self.fc = sl.Butterfly(layer_size=512 * self.block.expansion, fixed_perm=True)
+        else:
+            assert False, f"Last layer type {self.last_layer} is not supported."
+
+        self.logits = nn.Linear(512 * self.block.expansion, self.num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -153,30 +171,30 @@ class ResNet(ArghModel):
         # print(x.size())
         # print(x)
         x = x.view(-1, 3, 32, 32)
-        print(x.size())
+        # print(x.size())
         x = self.conv1(x)
-        print(x.size())
+        # print(x.size())
         x = self.bn1(x)
-        print(x.size())
         x = self.relu(x)
-        print(x.size())
-        x = self.maxpool(x)
-        print(x.size())
 
         x = self.layer1(x)
-        print(x.size())
+        # print(x.size())
         x = self.layer2(x)
-        print(x.size())
+        # print(x.size())
         x = self.layer3(x)
-        print(x.size())
+        # print(x.size())
         x = self.layer4(x)
-        print(x.size())
+        # print(x.size())
 
-        x = self.avgpool(x)
-        print(x.size())
+        # x = self.avgpool(x)
+        x = F.avg_pool2d(x, 4)
+        # print(x.size())
         x = x.view(x.size(0), -1)
-        print(x.size())
-        x = self.fc(x)
+        # print(x.size())
+        # print(x.size())
+        x = F.relu(self.fc(x))
+        x = self.logits(x)
+        # print(x.size())
 
         return x
 
