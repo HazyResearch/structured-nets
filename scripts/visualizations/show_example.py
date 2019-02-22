@@ -19,6 +19,7 @@ import pickle as pkl
 
 # NORB
 data_loc = '/dfs/scratch1/thomasat/datasets/norb_full/processed_py2_train_28.pkl'
+data_loc = '/dfs/scratch1/thomasat/datasets/cifar10_combined/train_grayscale'
 data = pkl.load(open(data_loc, 'rb'))
 data = data['X']
 

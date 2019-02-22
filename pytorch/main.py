@@ -42,6 +42,7 @@ parser.add_argument('--optim', default='sgd', help='Optimizer')
 parser.add_argument('--lr', nargs='+', type=float, default=[1e-3], help='Learning rates')
 parser.add_argument('--mom', nargs='+', type=float, default=[0.9], help='Momentums')
 parser.add_argument('--lr-decay', type=float, default=1.0)
+parser.add_argument('--lrd-freq', type=int, default=25)
 parser.add_argument('--weight-decay', type=float, default=0.0)
 parser.add_argument('--log-freq', type=int, default=100)
 parser.add_argument('--test', action='store_false', help='Toggle testing on test set')
@@ -87,6 +88,8 @@ def mlp(args):
             run_name = args.name + '_' + model.name() \
                     + '_lr' + str(lr) \
                     + '_lrd' + str(args.lr_decay) \
+                    + '_lrf' + str(args.lrd_freq) \
+                    + '_wd' + str(args.weight_decay) \
                     + '_mom' + str(mom) \
                     + '_bs' + str(args.batch_size) \
                     + '_ep' + str(args.epochs) \
@@ -117,7 +120,7 @@ def mlp(args):
                     optimizer = torch.optim.Adam(model.parameters(), lr=lr, amsgrad=True)
                 else:
                     assert False, "invalid optimizer"
-                lr_scheduler = StepLR(optimizer, step_size=25, gamma=args.lr_decay)
+                lr_scheduler = StepLR(optimizer, step_size=args.lrd_freq, gamma=args.lr_decay)
 
                 if args.prune:
                     # Is there a better way to enforce pruning only for unconstrained?
