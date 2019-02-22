@@ -4,16 +4,40 @@ import subprocess
 import itertools
 import random
 
-models = ['SHL', 'CNN']
+# models = ['SHL', 'CNN']
+models = ['SHL']
 
-datasets = ['mnist --transform pad', 'mnist_bg_rot --transform pad', 'cifar10mono'] #, 'norb --transform pad']
+# datasets = ['mnist --transform pad', 'mnist_bg_rot --transform pad', 'cifar10mono'] #, 'norb --transform pad']
+datasets = ['mnist_noise_1 --transform pad', 'mnist_bg_rot --transform pad', 'cifar10mono']
+# datasets = ['mnist_noise_1 --transform pad']
 
-# lrs = ['5e-3', '1e-2', '2e-2', '4e-2', '1e-1', '2e-1', '4e-1']
-lrs = ['1e-2', '2e-2', '4e-2', '1e-1']
+lrds = ['1.0']
+wds = ['0.0']
+# lrs = ['5e-3', '1e-2', '2e-2', '5e-2', '1e-1', '2e-1', '5e-1']
+# lrs = ['1e-2', '2e-2', '5e-2', '1e-1']
+lrs = ['2e-1', '1e-1', '5e-2', '2e-2', '1e-2', '5e-3']
 
-flagss = ['', '--real']
+batch_size = 50
 
-trials = list(range(3))
+# flagss = ['', '--real']
+# flagss = ['', '--real', '--fixed-perm']
+# flagss = ['--fixed-perm', '--fixed-perm --real']
+flagss = ['--fixed-perm --depth 1']
+
+# trials = list(range(1))
+trials = [0,1,2]
+
+# ResNet experiments
+# models = ['ResNet']
+# datasets = ['cifar10_']
+# lrs = ['1e-1', '2e-1']
+# lrds = ['0.1', '0.2']
+# wds = ['0.0', '1e-4']
+# # wds = ['2e-4', '5e-4']
+# flagss = ['', '--last-layer fc', '--last-layer b']
+# trials = [2]
+# batch_size = 256
+
 
 epochs = [100]
 epoch = 100
@@ -32,21 +56,24 @@ def run(run_name, machines=1):
     outputs = []
 
     commit_hash = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip().decode("utf-8")
-    stuff = itertools.product(models, datasets, lrs, flagss, trials)
+    stuff = itertools.product(trials, models, datasets, lrs, lrds, wds, flagss)
     hparams = list(stuff)
     random.shuffle(hparams)
-    for model, dataset, lr, flags, trial in hparams:
+    for trial, model, dataset, lr, lrd, wd, flags in hparams:
 	# python main.py --dataset cifar10mono --result-dir butterfly --lr 1e-2 --epochs 100 model SHL --class-type b
         param = [
             '--dataset', dataset,
             '--result-dir', run_name,
-            '--name', model,
+            # '--name', model,
             '--lr', lr,
+            '--lr-decay', lrd,
+            '--weight-decay', wd,
             '--trial-id', str(trial),
             '--epochs', str(epoch),
+            '--batch-size', str(batch_size),
             # '--trials', '3',
             'model', model,
-            '--class-type', 'b',
+            # '--class-type', 'b',
             flags
             ]
         params.append(" ".join(param))
