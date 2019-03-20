@@ -331,30 +331,32 @@ class Butterfly(StructuredLinear):
     abbrev = 'b'
 
     def name(self):
-        return f"bf{'c' if self.complex else 'r'}{self.depth}{'fp' if self.fixed_perm else ''}"
+        return f"bf{'c' if self.complex else 'r'}d{self.depth}r{self.r}{'fp' if self.fixed_perm else ''}"
 
-    def __init__(self, complex=True, fixed_order=True, depth=2, fixed_perm=False, **kwargs):
-        super().__init__(complex=complex, fixed_order=fixed_order, depth=depth, fixed_perm=fixed_perm, **kwargs)
+    def __init__(self, complex=True, fixed_order=True, depth=2, r=1, fixed_perm=False, **kwargs):
+        super().__init__(complex=complex, fixed_order=fixed_order, depth=depth, r=r, fixed_perm=fixed_perm, **kwargs)
 
     def reset_parameters(self):
         super().reset_parameters()
         # self.model = butterfly.ButterflyProduct(size=size, complex=True, fixed_order=True)
-        if self.fixed_perm:
-            components = [[butterfly.FixedPermutation(torch.tensor(bitreversal_permutation(self.layer_size)), complex=self.complex),butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]
-        else:
-            components = [[butterfly.BlockPermProduct(size=self.layer_size, complex=self.complex, share_logit=True),butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]
-        components_ = [l for lis in components for l in lis]
-        # self.model = nn.Sequential(
-        #     butterfly.BlockPermProduct(size=self.layer_size, complex=True, share_logit=False),
-        #     butterfly.Block2x2DiagProduct(size=self.layer_size, complex=True),
-        #     butterfly.BlockPermProduct(size=self.layer_size, complex=True, share_logit=False),
-        #     butterfly.Block2x2DiagProduct(size=self.layer_size, complex=True)
-        # )
-        self.model = nn.Sequential(*components_)
-        # self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
-        # self.init_stddev = np.sqrt(1./self.layer_size)
-        # torch.nn.init.normal_(self.W, std=self.init_stddev)
-        # self.mask = None
+        self.model = nn.ModuleList([])
+        for _ in range(self.r):
+            if self.fixed_perm:
+                components = [[butterfly.FixedPermutation(torch.tensor(bitreversal_permutation(self.layer_size)), complex=self.complex),butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]
+            else:
+                components = [[butterfly.BlockPermProduct(size=self.layer_size, complex=self.complex, share_logit=True),butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]
+            components_ = [l for lis in components for l in lis]
+            # self.model = nn.Sequential(
+            #     butterfly.BlockPermProduct(size=self.layer_size, complex=True, share_logit=False),
+            #     butterfly.Block2x2DiagProduct(size=self.layer_size, complex=True),
+            #     butterfly.BlockPermProduct(size=self.layer_size, complex=True, share_logit=False),
+            #     butterfly.Block2x2DiagProduct(size=self.layer_size, complex=True)
+            # )
+            self.model.append(nn.Sequential(*components_))
+            # self.W = Parameter(torch.Tensor(self.layer_size, self.layer_size))
+            # self.init_stddev = np.sqrt(1./self.layer_size)
+            # torch.nn.init.normal_(self.W, std=self.init_stddev)
+            # self.mask = None
 
     # def set_mask(self, mask, device):
     #     self.mask = Variable(torch.FloatTensor(mask).to(device), requires_grad=False)
@@ -367,7 +369,11 @@ class Butterfly(StructuredLinear):
         # print(x.size())
         # print(self.layer_size)
         if self.complex:
-            out = self.model(real_to_complex(x))[..., 0]
+            out = map(lambda m: m(real_to_complex(x))[..., 0], self.model)
+            # out = self.model(real_to_complex(x))[..., 0]
         else:
-            out = self.model(x)
+            out = map(lambda m: m(x), self.model)
+            # out = self.model(x)
+        # out = list(out)
+        out = sum(out)
         return self.apply_bias(out)
