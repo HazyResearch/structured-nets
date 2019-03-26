@@ -331,17 +331,20 @@ class Butterfly(StructuredLinear):
     abbrev = 'b'
 
     def name(self):
-        return f"bf{'c' if self.complex else 'r'}d{self.depth}r{self.r}{'fp' if self.fixed_perm else ''}"
+        return f"bf{'c' if self.complex else 'r'}d{self.depth}r{self.r}{self.perm}p"
 
-    def __init__(self, complex=True, fixed_order=True, depth=2, r=1, fixed_perm=False, **kwargs):
-        super().__init__(complex=complex, fixed_order=fixed_order, depth=depth, r=r, fixed_perm=fixed_perm, **kwargs)
+    def __init__(self, complex=True, fixed_order=True, depth=2, r=1, perm='i', **kwargs):
+        assert perm in ['i', 'b', 'l'], "Permutation must be i (identity), b (bit reversal), or l (learned)"
+        super().__init__(complex=complex, fixed_order=fixed_order, depth=depth, r=r, perm=perm, **kwargs)
 
     def reset_parameters(self):
         super().reset_parameters()
         # self.model = butterfly.ButterflyProduct(size=size, complex=True, fixed_order=True)
         self.model = nn.ModuleList([])
         for _ in range(self.r):
-            if self.fixed_perm:
+            if self.perm == 'i':
+                components = [[butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]
+            elif self.perm == 'b':
                 components = [[butterfly.FixedPermutation(torch.tensor(bitreversal_permutation(self.layer_size)), complex=self.complex),butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]
             else:
                 components = [[butterfly.BlockPermProduct(size=self.layer_size, complex=self.complex, share_logit=True),butterfly.Block2x2DiagProduct(size=self.layer_size, complex=self.complex)] for _ in range(self.depth)]

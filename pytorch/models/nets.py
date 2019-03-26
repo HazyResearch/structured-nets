@@ -414,11 +414,11 @@ class SL(ArghModel):
     def name(self):
         return self.W.name()
 
-    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=False, fixed_perm=False): pass
+    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=False, perm='i'): pass
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
-        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, depth=self.depth, complex=(not self.real), bias=self.bias, fixed_perm=self.fixed_perm)
+        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, depth=self.depth, complex=(not self.real), bias=self.bias, perm=self.perm)
 
     def forward(self, x):
         return self.W(x)
@@ -428,8 +428,8 @@ class SHL(SL):
     Single hidden layer
     """
     def name(self):
-        return 'shl_' + self.W.name()
-    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=True, fixed_perm=False): pass
+        return 'shl-' + self.W.name()
+    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=True, perm='i'): pass
     def reset_parameters(self):
         super().reset_parameters()
         self.W2 = nn.Linear(self.layer_size, self.out_size)
