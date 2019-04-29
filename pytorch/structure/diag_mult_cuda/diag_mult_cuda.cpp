@@ -1,4 +1,4 @@
-#include <torch/torch.h>
+#include <torch/extension.h>
 
 void subdiagMultGPU(float *d_Subdiag, float *d_Data, float *d_Output, int shiftSubdiag, int shiftV, int batchSize, int N, bool batchedSubdiag);
 
@@ -10,7 +10,7 @@ at::Tensor cycle_mult(at::Tensor subdiag, at::Tensor v, int shiftSubdiag, int sh
   v = v.contiguous();
   auto n = v.sizes().back();
   auto batchSize = v.numel() / n;
-  auto output = at::empty_like(v);
+  auto output = torch::empty_like(v);
   bool batchedSubdiag = subdiag.numel() == v.numel();
   subdiagMultGPU(subdiag.data<float>(), v.data<float>(), output.data<float>(), shiftSubdiag, shiftV, batchSize, n, batchedSubdiag);
   return output;
@@ -24,7 +24,7 @@ at::Tensor subdiagKrylov(at::Tensor subdiag, at::Tensor v, int m) {
   v = v.contiguous();
   auto n = v.sizes().back();
   auto batchSize = v.numel() / n;
-  auto output = at::empty(v.type(), at::IntList{m, batchSize, n});
+  auto output = torch::empty({m, batchSize, n}, torch::dtype(v.dtype()).device(v.device()));
   // subdiagKrylovGPU(subdiag.data<float>(), v.data<float>(), output.data<float>(), shiftSubdiag, shiftV, batchSize, n);
   output[0] = v;
   for (int i = 1; i < m; ++i) {
