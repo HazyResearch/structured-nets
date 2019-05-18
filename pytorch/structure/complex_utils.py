@@ -13,6 +13,11 @@ def conjugate(X):
 
 def complex_mult(X, Y):
     assert X.shape[-1] == 2 and Y.shape[-1] == 2, 'Last dimension must be 2'
+    # prod = X * Y
+    # out = torch.empty_like(prod)
+    # out[..., 0] = prod[..., 0] - prod[..., 1]
+    # out[..., 1] = X[..., 0] * Y[..., 1] + X[..., 1] * Y[..., 0]
+    # return out
     return torch.stack(
         (X[..., 0] * Y[..., 0] - X[..., 1] * Y[..., 1],
          X[..., 0] * Y[..., 1] + X[..., 1] * Y[..., 0]),

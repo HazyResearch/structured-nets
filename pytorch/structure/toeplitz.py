@@ -2,6 +2,7 @@
 '''
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from .complex_utils import complex_mult, conjugate
 from .krylov import Krylov
@@ -10,6 +11,69 @@ from .krylov import Krylov
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 ##### Fast multiplication for the Toeplitz-like case
+
+class ToeplitzLikeMult(torch.autograd.Function):
+    def krylovT(u, x):
+        """
+        u: (rank, n)
+        input: (batch_size, n)
+        """
+
+        reverse_idx = torch.arange(n-1, -1, -1, device=u.device) # might speed things up if this could be cached?
+        u_expand = F.pad(u[:, reverse_idx], (0, n))
+        v_expand = F.pad(v, (0, n))
+        u_f = torch.rfft(u_expand, 1)
+        v_f = torch.rfft(v_expand, 1)
+        uv_f = complex_mult(u_f[:, np.newaxis], v_f[np.newaxis])
+        output = torch.irfft(uv_f, 1, signal_sizes=(2 * n, ))[:, :, reverse_idx]
+        return output
+
+
+    def krylov(v, w):
+        """Multiply \sum_i Krylov(Z_f, v_i) @ w_i.
+        Parameters:
+            v: (rank, n)
+            w: (batch_size, rank, n)
+            f: real number
+        Returns:
+            product: (batch, n)
+        """
+        w_f = torch.rfft(torch.cat((w, torch.zeros_like(w)), dim=-1), 1)
+        v_f = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
+        wv_sum_f = complex_mult(w_f, v_f).sum(dim=1)
+        output = torch.irfft(wv_sum_f, 1, signal_sizes=(2 * n, ))[..., :n]
+        return output
+
+
+    @staticmethod
+    def forward(ctx, u, v, input):
+        """
+        Parameters:
+        u: (rank, n)
+        v: (rank, n)
+        input: (batch_size, n)
+        """
+        intermediate = krylovT(u, input) # (batch, rank, n)
+        ctx.save_for_backward(u, v, input, intermediate)
+        output = krylov(v, intermediate) # (batch, n)
+        return output
+    def backward(ctx, grad):
+        """
+        grad: (batch, n)
+
+        u: (rank, n)
+        v: (rank, n)
+        input: (batch, n)
+        intermediate: (b, r, n)
+        """
+        u, v, input, intermediate = ctx.saved_tensors
+        d_v = krylov(grad, intermediate.transpose(0,1)) # (rank, n)
+        d_intermediate = krylovT(v, batch) # (b, r, n)
+        d_u = krylov(input, d_intermediate.transpose(0,1))
+        d_input = krylov(u, d_intermediate) #(b, n)
+        return d_u, d_v, d_input
+
+
 
 def toeplitz_krylov_transpose_multiply(v, u, f=0.0):
     """Multiply Krylov(Z_f, v_i)^T @ u.
@@ -20,18 +84,23 @@ def toeplitz_krylov_transpose_multiply(v, u, f=0.0):
     Returns:
         product: (batch, rank, n)
     """
-    _, n = u.shape
-    _, n_ = v.shape
+    batch, n = u.shape
+    rank, n_ = v.shape
     assert n == n_, 'u and v must have the same last dimension'
     if f != 0.0:  # cycle version
         # Computing the roots of f
         mod = abs(f) ** (torch.arange(n, dtype=u.dtype, device=u.device) / n)
         if f > 0:
-            arg = torch.stack((torch.ones(n, dtype=u.dtype, device=u.device),
-                               torch.zeros(n, dtype=u.dtype, device=u.device)), dim=-1)
+            # arg = torch.stack((torch.ones(n, dtype=u.dtype, device=u.device),
+            #                    torch.zeros(n, dtype=u.dtype, device=u.device)), dim=-1)
+            arg = u.new_zeros(n, 2)
+            arg[:, 0] = 1.0
         else:  # Find primitive roots of -1
             angles = torch.arange(n, dtype=u.dtype, device=u.device) / n * np.pi
-            arg = torch.stack((torch.cos(angles), torch.sin(angles)), dim=-1)
+            # arg = torch.stack((torch.cos(angles), torch.sin(angles)), dim=-1)
+            arg = u.new_empty(n, 2)
+            arg[:, 0] = torch.cos(angles)
+            arg[:, 1] = torch.sin(angles)
         eta = mod[:, np.newaxis] * arg
         eta_inverse = (1.0 / mod)[:, np.newaxis] * conjugate(arg)
         u_f = torch.ifft(eta_inverse * u[..., np.newaxis], 1)
@@ -41,10 +110,28 @@ def toeplitz_krylov_transpose_multiply(v, u, f=0.0):
         # We only need the real part of complex_mult(eta, uv)
         return eta[..., 0] * uv[..., 0] - eta[..., 1] * uv[..., 1]
     else:
-        u_f = torch.rfft(torch.cat((u.flip(1), torch.zeros_like(u)), dim=-1), 1)
-        v_f = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
+        reverse_idx = torch.arange(n-1, -1, -1, device=u.device)
+        # reverse_idx = list(range(n-1,-1,-1))
+        # u_f = torch.rfft(torch.cat((u.flip(1), torch.zeros_like(u)), dim=-1), 1)
+        # u_f = torch.rfft(torch.cat((u[:,reverse_idx], torch.zeros_like(u)), dim=-1), 1)
+        # u_expand = u.new_zeros(batch, 2*n)
+        # v_expand = u.new_zeros(rank, 2*n)
+        # u_expand[:, reverse_idx] = u
+        # v_expand[:, :n] = v
+        # u_expand = F.pad(u[:, reverse_idx], (0, n))
+        u_expand = F.pad(u[:, reverse_idx], (0, n))
+        v_expand = F.pad(v, (0, n))
+
+
+        # u_f = torch.rfft(torch.cat((u[:,reverse_idx], torch.zeros_like(u)), dim=-1), 1)
+        # v_f = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
+        u_f = torch.rfft(u_expand, 1)
+        v_f = torch.rfft(v_expand, 1)
         uv_f = complex_mult(u_f[:, np.newaxis], v_f[np.newaxis])
-        return torch.irfft(uv_f, 1, signal_sizes=(2 * n, ))[..., :n].flip(2)
+        # uv_f = complex_mult(u_f[:, None], v_f[None])
+        # torch.irfft(uv_f, 1, signal_sizes=(2 * n, ))[..., :n].flip(2)
+        output = torch.irfft(uv_f, 1, signal_sizes=(2 * n, ))[:, :, reverse_idx]
+        return output
 
 
 def toeplitz_krylov_multiply_by_autodiff(v, w, f=0.0):
@@ -77,7 +164,7 @@ def toeplitz_krylov_multiply(v, w, f=0.0):
     Returns:
         product: (batch, n)
     """
-    _, rank, n = w.shape
+    batch, rank, n = w.shape
     rank_, n_ = v.shape
     assert n == n_, 'w and v must have the same last dimension'
     assert rank == rank_, 'w and v must have the same rank'
@@ -85,11 +172,17 @@ def toeplitz_krylov_multiply(v, w, f=0.0):
         # Computing the roots of f
         mod = abs(f) ** (torch.arange(n, dtype=w.dtype, device=w.device) / n)
         if f > 0:
-            arg = torch.stack((torch.ones(n, dtype=w.dtype, device=w.device),
-                               torch.zeros(n, dtype=w.dtype, device=w.device)), dim=-1)
+            # arg = torch.stack((torch.ones(n, dtype=w.dtype, device=w.device),
+            #                    torch.zeros(n, dtype=w.dtype, device=w.device)), dim=-1)
+            arg = w.new_empty(n, 2)
+            arg[:, 0] = 1.0
+            arg[:, 1] = 0.0
         else:  # Find primitive roots of -1
             angles = torch.arange(n, dtype=w.dtype, device=w.device) / n * np.pi
-            arg = torch.stack((torch.cos(angles), torch.sin(angles)), dim=-1)
+            # arg = torch.stack((torch.cos(angles), torch.sin(angles)), dim=-1)
+            arg = w.new_empty(n, 2)
+            arg[:, 0] = torch.cos(angles)
+            arg[:, 1] = torch.sin(angles)
         eta = mod[:, np.newaxis] * arg
         eta_inverse = (1.0 / mod)[:, np.newaxis] * conjugate(arg)
         w_f = torch.fft(eta * w[..., np.newaxis], 1)
@@ -99,13 +192,19 @@ def toeplitz_krylov_multiply(v, w, f=0.0):
         # We only need the real part of complex_mult(eta_inverse, wv_sum)
         return eta_inverse[..., 0] * wv_sum[..., 0] - eta_inverse[..., 1] - wv_sum[..., 1]
     else:
-        w_f = torch.rfft(torch.cat((w, torch.zeros_like(w)), dim=-1), 1)
-        v_f = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
+        # w_f = torch.rfft(torch.cat((w, torch.zeros_like(w)), dim=-1), 1)
+        w_expand = w.new_zeros(batch, rank, 2*n)
+        w_expand[:, :, :n] = w
+        w_f = torch.rfft(w_expand, 1)
+        # v_f = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
+        v_expand = v.new_zeros(rank, 2*n)
+        v_expand[:, :n] = v
+        v_f = torch.rfft(v_expand, 1)
         wv_sum_f = complex_mult(w_f, v_f).sum(dim=1)
         return torch.irfft(wv_sum_f, 1, signal_sizes=(2 * n, ))[..., :n]
 
 
-def toeplitz_mult(G, H, x, cycle=True):
+def toeplitz_mult(G, H, x, cycle=False):
     """Multiply \sum_i Krylov(Z_f, G_i) @ Krylov(Z_f, H_i) @ x.
     Parameters:
         G: Tensor of shape (rank, n)
@@ -214,17 +313,18 @@ def test_toeplitz_mult():
     # array([[ 0.,  6., 16., 26.],
     #        [ 0., 12., 38., 66.]])
 
-    m = 10
+    m = 8
     n = 1<<m
     batch_size = 50
     rank = 16
+    cycle = True
     u = torch.rand((batch_size, n), requires_grad=True, device=device)
     v = torch.rand((rank, n), requires_grad=True, device=device)
-    result = toeplitz_mult(v, v, u, cycle=True)
+    result = toeplitz_mult(v, v, u, cycle=False)
     grad, = torch.autograd.grad(result.sum(), v, retain_graph=True)
-    result_slow = toeplitz_mult_slow(v, v, u, cycle=True)
+    result_slow = toeplitz_mult_slow(v, v, u, cycle=False)
     grad_slow, = torch.autograd.grad(result_slow.sum(), v, retain_graph=True)
-    result_slow_fast = toeplitz_mult_slow_fast(v, v, u, cycle=True)
+    result_slow_fast = toeplitz_mult_slow_fast(v, v, u, cycle=False)
     grad_slow_fast, = torch.autograd.grad(result_slow_fast.sum(), v, retain_graph=True)
     # These max and mean errors should be small
     print((result - result_slow).abs().max().item())
