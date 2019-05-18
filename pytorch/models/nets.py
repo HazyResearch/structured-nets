@@ -176,7 +176,7 @@ class CNN(ArghModel):
         self.logits = nn.Linear(self.layer_size, self.out_size)
 
     def name(self):
-        return 'cnn_' + self.W.name()
+        return 'cnn-' + self.W.name()
 
     def forward(self, x):
         x = x.view(-1, 1, self.d, self.d)
@@ -205,7 +205,7 @@ class CNNColor(ArghModel):
         self.logits = nn.Linear(self.layer_size, self.out_size)
 
     def name(self):
-        return 'cnn_' + self.W.name()
+        return 'cnn-' + self.W.name()
 
     def forward(self, x):
         x = x.view(-1, 3, self.d, self.d)
@@ -414,11 +414,11 @@ class SL(ArghModel):
     def name(self):
         return self.W.name()
 
-    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=False, perm='i'): pass
+    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=False, perm='i', ortho_init=False): pass
     def reset_parameters(self):
         if self.layer_size == -1:
             self.layer_size = self.in_size
-        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, depth=self.depth, complex=(not self.real), bias=self.bias, perm=self.perm)
+        self.W = class_map[self.class_type](layer_size=self.layer_size, r=self.r, depth=self.depth, complex=(not self.real), bias=self.bias, perm=self.perm, ortho_init=self.ortho_init)
 
     def forward(self, x):
         return self.W(x)
@@ -429,7 +429,7 @@ class SHL(SL):
     """
     def name(self):
         return 'shl-' + self.W.name()
-    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=True, perm='i'): pass
+    def args(class_type='unconstrained', layer_size=-1, r=1, depth=2, real=False, bias=True, perm='i', ortho_init=False): pass
     def reset_parameters(self):
         super().reset_parameters()
         self.W2 = nn.Linear(self.layer_size, self.out_size)
