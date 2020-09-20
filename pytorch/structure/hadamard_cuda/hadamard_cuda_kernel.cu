@@ -153,7 +153,8 @@ void fwtBatchGPU(float *d_Data, int batchSize, int log2N)
     int N = 1 << nMixedRadixPasses;
     int curBatchSize = batchSize << (log2N - nMixedRadixPasses);
 
-    fwtBatch1Kernel<<<curBatchSize, N / 4, N * sizeof(float)>>>(
+    // (N + 3) / 4 to handle the case of N == 2
+    fwtBatch1Kernel<<<curBatchSize, (N + 3) / 4, N * sizeof(float)>>>(
         d_Data,
         d_Data,
         nMixedRadixPasses
