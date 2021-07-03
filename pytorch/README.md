@@ -29,3 +29,10 @@ runs Toeplitz-like and LDR subdiagonal ranks 1,4,16.
 ## Other Tasks
 
 See <a href="https://github.com/thomasat/structured_matrices/tree/master/pytorch/examples" rel="nofollow">here</a> for examples of using a structured layer in additional architectures.
+
+### Butterfly
+This repository was used to run experiments for the paper "Learning Structured Transforms with Butterfly Matrices".
+Example command:
+```
+python main.py --dataset cifar10mono --result-dir perm --lr 1e-1 --lr-decay 1.0 --weight-decay 0.0 --trial-id 2 --epochs 100 --batch-size 50 model SHL --class-type b --perm b --depth 3 --real --ortho-init
+```
