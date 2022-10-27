@@ -1,15 +1,30 @@
-'''Functions to multiply by a Toeplitz-like matrix.
-'''
-import numpy as np
+# Copyright 2018 HazyResearch
+# https://github.com/HazyResearch/structured-nets
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+A matrix is Toeplitz if every diagonal from top-left to bottom-right has the same elements.
+E.g.
+[1 2 3 4]
+[5 1 2 3]
+[9 5 1 2]
+"""
+
 import torch
 
-from .complex_utils import complex_mult, conjugate
 from .krylov import Krylov
 
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-##### Fast multiplication for the Toeplitz-like case
 
 def toeplitz_krylov_transpose_multiply(v, u, f=0.0):
     """Multiply Krylov(Z_f, v_i)^T @ u.
@@ -22,33 +37,54 @@ def toeplitz_krylov_transpose_multiply(v, u, f=0.0):
     """
     _, n = u.shape
     _, n_ = v.shape
-    assert n == n_, 'u and v must have the same last dimension'
+    assert n == n_, "u and v must have the same last dimension"
     if f != 0.0:  # cycle version
-        # Computing the roots of f
-        mod = abs(f) ** (torch.arange(n, dtype=u.dtype, device=u.device) / n)
-        if f > 0:
-            arg = torch.stack((torch.ones(n, dtype=u.dtype, device=u.device),
-                               torch.zeros(n, dtype=u.dtype, device=u.device)), dim=-1)
-        else:  # Find primitive roots of -1
-            angles = torch.arange(n, dtype=u.dtype, device=u.device) / n * np.pi
-            arg = torch.stack((torch.cos(angles), torch.sin(angles)), dim=-1)
-        eta = mod[:, np.newaxis] * arg
-        eta_inverse = (1.0 / mod)[:, np.newaxis] * conjugate(arg)
-        u_f = torch.ifft(eta_inverse * u[..., np.newaxis], 1)
-        v_f = torch.fft(eta * v[..., np.newaxis], 1)
-        uv_f = complex_mult(u_f[:, np.newaxis], v_f[np.newaxis])
-        uv = torch.fft(uv_f, 1)
-        # We only need the real part of complex_mult(eta, uv)
-        return eta[..., 0] * uv[..., 0] - eta[..., 1] * uv[..., 1]
+        eta = torch.tensor(f, dtype=torch.complex64) ** (
+            torch.arange(n, dtype=u.dtype, device=u.device) / n
+        )
+        u_f = torch.fft.ifft(1 / eta * u)
+        v_f = torch.fft.fft(eta * v)
+        uv = torch.fft.fft(u_f[:, None] * v_f[None])
+        return (eta * uv).real
     else:
-        u_f = torch.rfft(torch.cat((u.flip(1), torch.zeros_like(u)), dim=-1), 1)
-        v_f = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
-        uv_f = complex_mult(u_f[:, np.newaxis], v_f[np.newaxis])
-        return torch.irfft(uv_f, 1, signal_sizes=(2 * n, ))[..., :n].flip(2)
+        u_f = torch.fft.rfft(torch.cat((u.flip(1), torch.zeros_like(u)), dim=-1))
+        v_f = torch.fft.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1))
+        uv_f = u_f[:, None] * v_f[None]
+        return torch.fft.irfft(uv_f)[..., :n].flip(2)
+
+
+def toeplitz_krylov_multiply(v, w, f=0.0):
+    """Multiply sum_i Krylov(Z_f, v_i) @ w_i.
+    Parameters:
+        v: (rank, n)
+        w: (batch_size, rank, n)
+        f: real number
+    Returns:
+        product: (batch, n)
+    """
+    _, rank, n = w.shape
+    rank_, n_ = v.shape
+    assert n == n_, "w and v must have the same last dimension"
+    assert rank == rank_, "w and v must have the same rank"
+    if f != 0.0:  # cycle version
+        eta = torch.tensor(f, dtype=torch.complex64) ** (
+            torch.arange(n, dtype=v.dtype, device=v.device) / n
+        )
+        w_f = torch.fft.fft(1 / eta * w)
+        v_f = torch.fft.fft(eta * v)
+        wv_sum_f = (w_f * v_f).sum(dim=1)  # Does this happen in the right space?
+        wv_sum = torch.fft.ifft(wv_sum_f, 1)
+        return (1 / eta * wv_sum).real
+    else:
+        w_f = torch.fft.rfft(torch.cat((w, torch.zeros_like(w)), dim=-1))
+        v_f = torch.fft.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1))
+        wv_sum_f = (w_f * v_f).sum(dim=1)
+        # return torch.fft.irfft(wv_sum_f, 1, signal_sizes=(2 * n,))[..., :n]
+        return torch.fft.irfft(wv_sum_f)[..., :n]
 
 
 def toeplitz_krylov_multiply_by_autodiff(v, w, f=0.0):
-    """Multiply \sum_i Krylov(Z_f, v_i) @ w_i, using Pytorch's autodiff.
+    """Multiply sum_i Krylov(Z_f, v_i) @ w_i, using Pytorch's autodiff.
     This function is just to check the result of toeplitz_krylov_multiply.
     Parameters:
         v: (rank, n)
@@ -59,54 +95,17 @@ def toeplitz_krylov_multiply_by_autodiff(v, w, f=0.0):
     """
     batch_size, rank, n = w.shape
     rank_, n_ = v.shape
-    assert n == n_, 'w and v must have the same last dimension'
-    assert rank == rank_, 'w and v must have the same rank'
+    assert n == n_, "w and v must have the same last dimension"
+    assert rank == rank_, "w and v must have the same rank"
 
     u = torch.zeros((batch_size, n), dtype=v.dtype, device=v.device, requires_grad=True)
     prod = toeplitz_krylov_transpose_multiply(v, u, f)
-    result, = torch.autograd.grad(prod, u, grad_outputs=w, create_graph=True)
+    (result,) = torch.autograd.grad(prod, u, grad_outputs=w, create_graph=True)
     return result
 
 
-def toeplitz_krylov_multiply(v, w, f=0.0):
-    """Multiply \sum_i Krylov(Z_f, v_i) @ w_i.
-    Parameters:
-        v: (rank, n)
-        w: (batch_size, rank, n)
-        f: real number
-    Returns:
-        product: (batch, n)
-    """
-    _, rank, n = w.shape
-    rank_, n_ = v.shape
-    assert n == n_, 'w and v must have the same last dimension'
-    assert rank == rank_, 'w and v must have the same rank'
-    if f != 0.0:  # cycle version
-        # Computing the roots of f
-        mod = abs(f) ** (torch.arange(n, dtype=w.dtype, device=w.device) / n)
-        if f > 0:
-            arg = torch.stack((torch.ones(n, dtype=w.dtype, device=w.device),
-                               torch.zeros(n, dtype=w.dtype, device=w.device)), dim=-1)
-        else:  # Find primitive roots of -1
-            angles = torch.arange(n, dtype=w.dtype, device=w.device) / n * np.pi
-            arg = torch.stack((torch.cos(angles), torch.sin(angles)), dim=-1)
-        eta = mod[:, np.newaxis] * arg
-        eta_inverse = (1.0 / mod)[:, np.newaxis] * conjugate(arg)
-        w_f = torch.fft(eta * w[..., np.newaxis], 1)
-        v_f = torch.fft(eta * v[..., np.newaxis], 1)
-        wv_sum_f = complex_mult(w_f, v_f).sum(dim=1)
-        wv_sum = torch.ifft(wv_sum_f, 1)
-        # We only need the real part of complex_mult(eta_inverse, wv_sum)
-        return eta_inverse[..., 0] * wv_sum[..., 0] - eta_inverse[..., 1] - wv_sum[..., 1]
-    else:
-        w_f = torch.rfft(torch.cat((w, torch.zeros_like(w)), dim=-1), 1)
-        v_f = torch.rfft(torch.cat((v, torch.zeros_like(v)), dim=-1), 1)
-        wv_sum_f = complex_mult(w_f, v_f).sum(dim=1)
-        return torch.irfft(wv_sum_f, 1, signal_sizes=(2 * n, ))[..., :n]
-
-
 def toeplitz_mult(G, H, x, cycle=True):
-    """Multiply \sum_i Krylov(Z_f, G_i) @ Krylov(Z_f, H_i) @ x.
+    """Multiply sum_i Krylov(Z_f, G_i) @ Krylov(Z_f, H_i) @ x.
     Parameters:
         G: Tensor of shape (rank, n)
         H: Tensor of shape (rank, n)
@@ -115,13 +114,13 @@ def toeplitz_mult(G, H, x, cycle=True):
     Returns:
         product: Tensor of shape (batch_size, n)
     """
-    # f = (1,-1) if cycle else (1,1)
     f = (1, -1) if cycle else (0, 0)
     transpose_out = toeplitz_krylov_transpose_multiply(H, x, f[1])
     return toeplitz_krylov_multiply(G, transpose_out, f[0])
 
 
 ##### Slow multiplication for the Toeplitz-like case
+
 
 def toeplitz_Z_f_linear_map(f=0.0):
     """The linear map for multiplying by Z_f.
@@ -144,17 +143,17 @@ def krylov_toeplitz_fast(v, f=0.0):
     Returns:
         K: Krylov matrix of size (n, n) or (rank, n, n).
     """
-    rank, n  = v.shape
+    rank, n = v.shape
     a = torch.arange(n, device=v.device)
     b = -a
-    indices = a[:, np.newaxis] + b[np.newaxis]
+    indices = a[:, None] + b[None]
     K = v[:, indices]
     K[:, indices < 0] *= f
     return K
 
 
 def toeplitz_mult_slow(G, H, x, cycle=True):
-    """Multiply \sum_i Krylov(Z_f, G_i) @ Krylov(Z_f, H_i) @ x.
+    """Multiply sum_i Krylov(Z_f, G_i) @ Krylov(Z_f, H_i) @ x.
     Uses the explicit Krylov construction with slow (and easy to understand)
     linear map.
     Parameters:
@@ -165,16 +164,22 @@ def toeplitz_mult_slow(G, H, x, cycle=True):
     Returns:
         product: Tensor of shape (batch_size, n)
     """
-    assert G.shape == H.shape, 'G and H must have the same shape'
+    assert G.shape == H.shape, "G and H must have the same shape"
     rank, n = G.shape
     f = (1, -1) if cycle else (0, 0)
-    krylovs = [(Krylov(toeplitz_Z_f_linear_map(f[0]), G[i]), Krylov(toeplitz_Z_f_linear_map(f[1]), H[i]).t()) for i in range(rank)]
+    krylovs = [
+        (
+            Krylov(toeplitz_Z_f_linear_map(f[0]), G[i]),
+            Krylov(toeplitz_Z_f_linear_map(f[1]), H[i]).t(),
+        )
+        for i in range(rank)
+    ]
     prods = [K[0] @ (K[1] @ x.t()) for K in krylovs]
     return sum(prods).t()
 
 
 def toeplitz_mult_slow_fast(G, H, x, cycle=True):
-    """Multiply \sum_i Krylov(Z_f, G_i) @ Krylov(Z_f, H_i) @ x.
+    """Multiply sum_i Krylov(Z_f, G_i) @ Krylov(Z_f, H_i) @ x.
     Uses the fast construction of Krylov matrix.
     Parameters:
         G: Tensor of shape (rank, n)
@@ -188,66 +193,3 @@ def toeplitz_mult_slow_fast(G, H, x, cycle=True):
     f_G, f_H = (1, -1) if cycle else (0, 0)
     K_G, K_H = krylov_toeplitz_fast(G, f_G), krylov_toeplitz_fast(H, f_H)
     return ((x @ K_H) @ K_G.transpose(1, 2)).sum(dim=0)
-
-
-def test_toeplitz_mult():
-    v = torch.tensor([[0,1,0,-1],[0,1,2,3]], dtype=torch.float, device=device, requires_grad=True)
-    u = torch.tensor([[1,1,1,1],[0,1,2,3]], dtype=torch.float, device=device, requires_grad=True)
-
-    w = toeplitz_krylov_transpose_multiply(v, u, f=-1)
-    # output:
-    # [[[ 0 2  2 0]
-    #   [ 6 0 -4 -6]]
-
-    #  [[ -2 2 4  2]
-    #   [ 14 8 0 -8]]]
-
-    toeplitz_mult(v, v, u)
-    toeplitz_mult_slow(v, v, u)
-    # output:
-    # array([[-16., -20.,  -4.,  16.],
-    #        [ 16.,  -8.,  12.,  64.]])
-
-    toeplitz_mult(v, v, u, cycle=False)
-    toeplitz_mult_slow(v, v, u, cycle=False)
-    # output:
-    # array([[ 0.,  6., 16., 26.],
-    #        [ 0., 12., 38., 66.]])
-
-    m = 10
-    n = 1<<m
-    batch_size = 50
-    rank = 16
-    u = torch.rand((batch_size, n), requires_grad=True, device=device)
-    v = torch.rand((rank, n), requires_grad=True, device=device)
-    result = toeplitz_mult(v, v, u, cycle=True)
-    grad, = torch.autograd.grad(result.sum(), v, retain_graph=True)
-    result_slow = toeplitz_mult_slow(v, v, u, cycle=True)
-    grad_slow, = torch.autograd.grad(result_slow.sum(), v, retain_graph=True)
-    result_slow_fast = toeplitz_mult_slow_fast(v, v, u, cycle=True)
-    grad_slow_fast, = torch.autograd.grad(result_slow_fast.sum(), v, retain_graph=True)
-    # These max and mean errors should be small
-    print((result - result_slow).abs().max().item())
-    print((result - result_slow).abs().mean().item())
-    print((grad - grad_slow).abs().max().item())
-    print((grad - grad_slow).abs().mean().item())
-    print((result - result_slow_fast).abs().max().item())
-    print((result - result_slow_fast).abs().mean().item())
-    print((grad - grad_slow_fast).abs().max().item())
-    print((grad - grad_slow_fast).abs().mean().item())
-
-
-def test_memory():
-    """Memory stress test to make sure there's no memory leak.
-    """
-    for _ in range(10000):
-        a = torch.empty((2,4096), dtype=torch.float, device=device, requires_grad=True)
-        b = torch.empty((2,4096), dtype=torch.float, device=device, requires_grad=True)
-        c = toeplitz_mult(a, a, b)
-        g, = torch.autograd.grad(torch.sum(c), a, retain_graph=True)
-
-
-# TODO: move test into subpackage
-if __name__ == '__main__':
-    test_toeplitz_mult()
-    # test_memory()

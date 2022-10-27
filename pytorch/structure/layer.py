@@ -1,15 +1,26 @@
-import numpy as np
+# Copyright 2018 HazyResearch
+# https://github.com/HazyResearch/structured-nets
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 import torch
 import torch.nn as nn
-from torch.nn.parameter import Parameter
 from torch.autograd import Variable
+from torch.nn.parameter import Parameter
 
-from . import toeplitz as toep
-from . import krylov as kry
-from . import circulant as circ
-from . import fastfood as ff
+from . import circulant as circ, fastfood as ff, krylov as kry, toeplitz as toep
 
-from utils import descendants
 
 class Layer(nn.Module):
     class_type = None
@@ -40,9 +51,10 @@ class Layer(nn.Module):
     def loss(self):
         return 0
 
+
 class Unconstrained(Layer):
-    class_type = 'unconstrained'
-    abbrev = 'u'
+    class_type = "unconstrained"
+    abbrev = "u"
 
     def name(self):
         return self.__class__.abbrev + str(self.hidden_size)
@@ -55,7 +67,7 @@ class Unconstrained(Layer):
     def reset_parameters(self):
         super().reset_parameters()
         self.W = Parameter(torch.Tensor(self.layer_size, self.hidden_size))
-        self.init_stddev = np.sqrt(1./self.layer_size)
+        self.init_stddev = torch.sqrt(1.0 / self.layer_size)
         torch.nn.init.normal_(self.W, std=self.init_stddev)
         self.mask = None
         if self.bias:
@@ -64,28 +76,27 @@ class Unconstrained(Layer):
     def set_mask(self, mask, device):
         self.mask = Variable(torch.FloatTensor(mask).to(device), requires_grad=False)
         self.W.data *= self.mask.data
-        print('Num. nonzero entries after pruning: ', torch.nonzero(self.W).size(0))
+        print("Num. nonzero entries after pruning: ", torch.nonzero(self.W).size(0))
 
     def forward(self, x):
         if self.mask is not None:
-            masked_W = self.W*self.mask
-            #print('NNZ, mask: ', torch.nonzero(self.mask).size(0))
-            #print('NNZ, masked_W: ', torch.nonzero(masked_W).size(0))
+            masked_W = self.W * self.mask
+            # print('NNZ, mask: ', torch.nonzero(self.mask).size(0))
+            # print('NNZ, masked_W: ', torch.nonzero(masked_W).size(0))
             out = torch.matmul(x, masked_W)
         else:
             out = torch.matmul(x, self.W)
         return self.apply_bias(out)
 
 
-
 class Circulant(Layer):
-    class_type = 'circulant'
-    abbrev = 'c'
+    class_type = "circulant"
+    abbrev = "c"
 
     def reset_parameters(self):
         super().reset_parameters()
         self.c = Parameter(torch.Tensor(self.layer_size))
-        self.init_stddev = np.sqrt(1./self.layer_size)
+        self.init_stddev = torch.sqrt(1.0 / self.layer_size)
         torch.nn.init.normal_(self.c, std=self.init_stddev)
 
     def forward(self, x):
@@ -93,8 +104,8 @@ class Circulant(Layer):
 
 
 class FastFood(Layer):
-    class_type = 'fastfood'
-    abbrev = 'f'
+    class_type = "fastfood"
+    abbrev = "f"
 
     def reset_parameters(self):
         super().reset_parameters()
@@ -102,25 +113,22 @@ class FastFood(Layer):
         # TODO: check initialization of S (scaling matrix) is correct
         # S,G,B: diagonal, learnable parameters
         # P: permutation, fixed
-        S = np.sqrt(np.random.chisquare(self.layer_size, size=self.layer_size))
-        G = np.random.randn(self.layer_size)
-        S /= np.linalg.norm(G)
-        B = np.random.choice((-1, 1), size=self.layer_size)
+        S = torch.sqrt(torch.random.chisquare(self.layer_size, size=self.layer_size))
+        G = torch.random.randn(self.layer_size)
+        S /= torch.linalg.norm(G)
+        B = torch.random.choice((-1, 1), size=self.layer_size)
         self.S = Parameter(torch.FloatTensor(S))
         self.G = Parameter(torch.FloatTensor(G))
         self.B = Parameter(torch.FloatTensor(B))
-        self.P = torch.LongTensor(np.random.permutation(self.layer_size))
-        #self.init_stddev = np.sqrt(1./self.layer_size)
-        #torch.nn.init.normal_(self.S, std=self.init_stddev)
-        #torch.nn.init.normal_(self.G, std=self.init_stddev)
-        #torch.nn.init.normal_(self.B, std=self.init_stddev)
+        self.P = torch.LongTensor(torch.random.permutation(self.layer_size))
 
     def forward(self, x):
         return self.apply_bias(ff.fastfood_multiply(self.S, self.G, self.B, self.P, x))
 
+
 class LowRank(Layer):
-    class_type = 'low_rank'
-    abbrev = 'lr'
+    class_type = "low_rank"
+    abbrev = "lr"
 
     def name(self):
         return self.__class__.abbrev + str(self.r)
@@ -133,7 +141,7 @@ class LowRank(Layer):
         self.G = Parameter(torch.Tensor(self.r, self.layer_size))
         self.H = Parameter(torch.Tensor(self.r, self.layer_size))
         # self.init_stddev = 0.01
-        self.init_stddev = np.power(1. / (self.r * self.layer_size), 1/2)
+        self.init_stddev = torch.power(1.0 / (self.r * self.layer_size), 1 / 2)
         torch.nn.init.normal_(self.G, std=self.init_stddev)
         torch.nn.init.normal_(self.H, std=self.init_stddev)
 
@@ -149,8 +157,8 @@ class LowRank(Layer):
 
 
 class ToeplitzLike(LowRank):
-    class_type = 'toeplitz'
-    abbrev = 't'
+    class_type = "toeplitz"
+    abbrev = "t"
 
     def reset_parameters(self):
         super().reset_parameters()
@@ -160,25 +168,28 @@ class ToeplitzLike(LowRank):
         out = toep.toeplitz_mult(self.G, self.H, x, self.corner)
         return self.apply_bias(out)
 
+
 class ToeplitzLikeC(ToeplitzLike):
-    class_type = 'toeplitz_corner'
-    abbrev = 'tc'
+    class_type = "toeplitz_corner"
+    abbrev = "tc"
 
     def reset_parameters(self):
         super().reset_parameters()
         self.corner = True
 
+
 class HankelLike(LowRank):
-    class_type = 'hankel'
-    abbrev = 'h'
+    class_type = "hankel"
+    abbrev = "h"
 
     def forward(self, x):
         out = toep.toeplitz_mult(self.G, self.H, x, True)
         return self.apply_bias(out.flip(out.dim() - 1))
 
+
 class VandermondeLike(LowRank):
-    class_type = 'vandermonde'
-    abbrev = 'v'
+    class_type = "vandermonde"
+    abbrev = "v"
 
     def reset_parameters(self):
         super().reset_parameters()
@@ -196,7 +207,7 @@ class VandermondeLike(LowRank):
         # out = (x @ K_B) @ K_A.transpose(1,2)
 
         out = toep.toeplitz_krylov_transpose_multiply(self.H, x)
-        out = out.transpose(0,1) @ K_A.transpose(1,2)
+        out = out.transpose(0, 1) @ K_A.transpose(1, 2)
         out = torch.sum(out, dim=0)
         return self.apply_bias(out)
 
@@ -210,32 +221,35 @@ class LearnedOperator(LowRank):
     Abstract class for learned displacement operators
     Contains parameters such as tie_operators
     """
-    class_type = None # abstract
+
+    class_type = None  # abstract
     abbrev = None
 
     def __init__(self, tie_operators=False, corner=False, **kwargs):
         super().__init__(tie_operators=tie_operators, corner=corner, **kwargs)
 
+
 class LDRSubdiagonal(LearnedOperator):
-    class_type = 'subdiagonal'
-    abbrev = 'sd'
+    class_type = "subdiagonal"
+    abbrev = "sd"
 
     def reset_parameters(self):
         super().reset_parameters()
-        self.subd_A = Parameter(torch.ones(self.layer_size-1))
+        self.subd_A = Parameter(torch.ones(self.layer_size - 1))
         if self.tie_operators:
             self.subd_B = self.subd_A
         else:
-            self.subd_B = Parameter(torch.ones(self.layer_size-1))
+            self.subd_B = Parameter(torch.ones(self.layer_size - 1))
 
     def forward(self, x):
         out = kry.subdiag_mult(self.subd_A, self.subd_B, self.G, self.H, x)
-        #out = kry.subdiag_mult_conv(self.subd_A, self.subd_B, self.G, self.H, x)
+        # out = kry.subdiag_mult_conv(self.subd_A, self.subd_B, self.G, self.H, x)
         return self.apply_bias(out)
 
+
 class LDRSubdiagonalC(LDRSubdiagonal):
-    class_type = 'subdiagonal_corner'
-    abbrev = 'sdc'
+    class_type = "subdiagonal_corner"
+    abbrev = "sdc"
 
     def reset_parameters(self):
         super().reset_parameters()
@@ -243,36 +257,58 @@ class LDRSubdiagonalC(LDRSubdiagonal):
         self.corner_B = Parameter(torch.tensor(0.0))
 
     def forward(self, x):
-        out = kry.subdiag_mult_cuda(self.subd_A, self.subd_B, self.G, self.H, x, corner_A=self.corner_A, corner_B=self.corner_B)
+        out = kry.subdiag_mult_cuda(
+            self.subd_A,
+            self.subd_B,
+            self.G,
+            self.H,
+            x,
+            corner_A=self.corner_A,
+            corner_B=self.corner_B,
+        )
         return self.apply_bias(out)
 
+
 class LDRTridiagonal(LearnedOperator):
-    class_type = 'tridiagonal'
-    abbrev = 'td'
+    class_type = "tridiagonal"
+    abbrev = "td"
 
     def reset_parameters(self):
         super().reset_parameters()
-        self.subd_A = Parameter(torch.ones(self.layer_size-1))
+        self.subd_A = Parameter(torch.ones(self.layer_size - 1))
         self.diag_A = Parameter(torch.zeros(self.layer_size))
-        self.supd_A = Parameter(torch.zeros(self.layer_size-1))
+        self.supd_A = Parameter(torch.zeros(self.layer_size - 1))
         if self.tie_operators:
             self.subd_B = self.subd_A
             self.diag_B = self.diag_A
             self.supd_B = self.supd_A
         else:
-            self.subd_B = Parameter(torch.ones(self.layer_size-1))
+            self.subd_B = Parameter(torch.ones(self.layer_size - 1))
             self.diag_B = Parameter(torch.zeros(self.layer_size))
-            self.supd_B = Parameter(torch.zeros(self.layer_size-1))
-        self.corners_A = (0.0,0.0)
-        self.corners_B = (0.0,0.0)
+            self.supd_B = Parameter(torch.zeros(self.layer_size - 1))
+        self.corners_A = (0.0, 0.0)
+        self.corners_B = (0.0, 0.0)
 
     def forward(self, x):
-        out = kry.tridiag_mult_slow(self.subd_A, self.diag_A, self.supd_A, self.subd_B, self.diag_B, self.supd_B, self.G, self.H, x, corners_A=self.corners_A, corners_B=self.corners_B)
+        out = kry.tridiag_mult_slow(
+            self.subd_A,
+            self.diag_A,
+            self.supd_A,
+            self.subd_B,
+            self.diag_B,
+            self.supd_B,
+            self.G,
+            self.H,
+            x,
+            corners_A=self.corners_A,
+            corners_B=self.corners_B,
+        )
         return self.apply_bias(out)
 
+
 class LDRTridiagonalC(LDRTridiagonal):
-    class_type = 'tridiagonal_corner'
-    abbrev = 'tdc'
+    class_type = "tridiagonal_corner"
+    abbrev = "tdc"
 
     def reset_parameters(self):
         super().reset_parameters()
@@ -281,11 +317,25 @@ class LDRTridiagonalC(LDRTridiagonal):
 
 
 # create a map from class names to the Python class
+def descendants(cls):
+    """
+    Get all subclasses (recursively) of class cls, not including itself
+    Assumes no multiple inheritance
+    """
+    desc = []
+    for subcls in cls.__subclasses__():
+        desc.append(subcls)
+        desc.extend(descendants(subcls))
+    return desc
+
+
 class_map = {}
 for cls in descendants(Layer):
-    if cls.class_type is None: continue
+    if cls.class_type is None:
+        continue
     class_map[cls.class_type] = cls
     class_map[cls.abbrev] = cls
+
 
 def StructuredLinear(class_type, **kwargs):
     return class_map[class_type](**kwargs)
