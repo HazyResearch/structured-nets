@@ -1,26 +1,23 @@
-import numpy as np
+# Copyright 2018 HazyResearch
+# https://github.com/HazyResearch/structured-nets
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+from math import log2
+
+import hadamard_cuda
 import torch
-
-use_hadamard_transform_cuda = True
-try:
-    import hadamard_cuda
-    # import torch.utils.cpp_extension
-    # hadamard_cuda = torch.utils.cpp_extension.load(
-    #     name='hadamard_cuda',
-    #     sources=[
-    #         'hadamard_cuda/hadamard_cuda.cpp',
-    #         'hadamard_cuda/hadamard_cuda_kernel.cu',
-    #     ],
-    #     extra_cuda_cflags=['-O2'],
-    #     verbose=False
-    #     )
-except (ImportError, RuntimeError) as e:
-    print("CUDA version of Hadamard transform isn't installed. Will use Pytorch's version, which is much slower.")
-    use_hadamard_transform_cuda = False
-
-from scipy.linalg import hadamard
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 def hadamard_transform_torch(u, normalize=False):
@@ -33,17 +30,19 @@ def hadamard_transform_torch(u, normalize=False):
         product: Tensor of shape (..., n)
     """
     batch_size, n = u.shape
-    m = int(np.log2(n))
-    assert n == 1 << m, 'n must be a power of 2'
-    x = u[..., np.newaxis]
-    for d in range(m)[::-1]:
-        x = torch.cat((x[..., ::2, :] + x[..., 1::2, :], x[..., ::2, :] - x[..., 1::2, :]), dim=-1)
-    return x.squeeze(-2) / 2**(m / 2) if normalize else x.squeeze(-2)
+    m = int(log2(n))
+    assert n == 1 << m, "n must be a power of 2"
+    x = u[..., None]
+    for _ in range(m):
+        top = x[..., ::2, :] + x[..., 1::2, :]
+        bot = x[..., ::2, :] - x[..., 1::2, :]
+        x = torch.cat((top, bot), dim=-1)
+    return x.squeeze(-2) / 2 ** (m / 2) if normalize else x.squeeze(-2)
 
 
 class HadamardTransformCuda(torch.autograd.Function):
-    '''The unnormalized Hadamard transform (i.e. without dividing by sqrt(2))
-    '''
+    """The unnormalized Hadamard transform (i.e. without dividing by sqrt(2))"""
+
     @staticmethod
     def forward(ctx, u):
         return hadamard_cuda.hadamard_transform(u)
@@ -63,33 +62,7 @@ def hadamard_transform_cuda(u, normalize=False):
         product: Tensor of shape (..., n)
     """
     _, n = u.shape
-    m = int(np.log2(n))
-    assert n == 1 << m, 'n must be a power of 2'
+    m = int(log2(n))
+    assert n == 1 << m, "n must be a power of 2"
     output = HadamardTransformCuda.apply(u)
-    return output / 2**(m / 2) if normalize else output
-
-
-def test_hadamard_transform():
-    m = 15
-    n = 1 << m
-    batch_size = 50
-    u = torch.rand((batch_size, n), requires_grad=True, device=device)
-    result_cuda = hadamard_transform_cuda(u)
-    grad_cuda, = torch.autograd.grad(result_cuda.sum(), u, retain_graph=True)
-    result_torch = hadamard_transform_torch(u)
-    grad_torch, = torch.autograd.grad(result_torch.sum(), u, retain_graph=True)
-    # Explicit construction from scipy
-    H = torch.tensor(hadamard(n), dtype=torch.float, device=device)
-    result_explicit = u @ H.t()
-    print((result_cuda - result_explicit).abs().max().item())
-    print((result_cuda - result_explicit).abs().mean().item())
-    print((result_torch - result_explicit).abs().max().item())
-    print((result_torch - result_explicit).abs().mean().item())
-    print((grad_cuda - grad_torch).abs().max().item())
-    print((grad_cuda - grad_torch).abs().mean().item())
-
-
-hadamard_transform = hadamard_transform_cuda if use_hadamard_transform_cuda else hadamard_transform_torch
-
-if __name__ == '__main__':
-    test_hadamard_transform()
+    return output / 2 ** (m / 2) if normalize else output
